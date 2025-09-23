@@ -16,7 +16,18 @@ import { Skeleton } from './ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
-const initialState = {
+interface FormState {
+  message: string;
+  videoUrl?: string | null;
+  audioUrl?: string | null;
+  errors: {
+    imageUrl?: string[] | undefined;
+    musicPrompt?: string[] | undefined;
+    videoDescription?: string[] | undefined;
+  } | Record<string, string[] | undefined>;
+}
+
+const initialState: FormState = {
   message: '',
   videoUrl: null,
   audioUrl: null,
@@ -221,18 +232,18 @@ export function ImageToVideoGenerator() {
                     </label>
                 </div>
                 )}
-                {state.errors?.imageUrl && <p className="text-sm text-destructive">{state.errors.imageUrl as string}</p>}
+                {state.errors?.imageUrl && <p className="text-sm text-destructive">{state.errors.imageUrl[0]}</p>}
             </div>
 
             <div className="space-y-2 mt-4">
                 <Label htmlFor="videoDescription">Video Description</Label>
                 <Textarea id="videoDescription" name="videoDescription" placeholder="A cinematic zoom-in on the mountain peak with birds flying by." required />
-                {state.errors?.videoDescription && <p className="text-sm text-destructive">{state.errors.videoDescription as string}</p>}
+                {state.errors?.videoDescription && <p className="text-sm text-destructive">{state.errors.videoDescription[0]}</p>}
             </div>
             <div className="space-y-2 mt-4">
                 <Label htmlFor="musicPrompt">Music Prompt</Label>
                 <Input id="musicPrompt" name="musicPrompt" placeholder="Epic orchestral music, uplifting and adventurous tone" required />
-                {state.errors?.musicPrompt && <p className="text-sm text-destructive">{state.errors.musicPrompt as string}</p>}
+                {state.errors?.musicPrompt && <p className="text-sm text-destructive">{state.errors.musicPrompt[0]}</p>}
             </div>
             <div className="mt-4">
                 <Button type="submit" disabled={isUploading || !publicUrl} className="w-full">
