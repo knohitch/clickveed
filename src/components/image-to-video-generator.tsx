@@ -232,18 +232,18 @@ export function ImageToVideoGenerator() {
                     </label>
                 </div>
                 )}
-                {state.errors?.imageUrl && <p className="text-sm text-destructive">{state.errors.imageUrl[0]}</p>}
+                {'imageUrl' in state.errors && state.errors.imageUrl && <p className="text-sm text-destructive">{state.errors.imageUrl[0]}</p>}
             </div>
 
             <div className="space-y-2 mt-4">
                 <Label htmlFor="videoDescription">Video Description</Label>
                 <Textarea id="videoDescription" name="videoDescription" placeholder="A cinematic zoom-in on the mountain peak with birds flying by." required />
-                {state.errors?.videoDescription && <p className="text-sm text-destructive">{state.errors.videoDescription[0]}</p>}
+                {'videoDescription' in state.errors && state.errors.videoDescription && <p className="text-sm text-destructive">{state.errors.videoDescription[0]}</p>}
             </div>
             <div className="space-y-2 mt-4">
                 <Label htmlFor="musicPrompt">Music Prompt</Label>
                 <Input id="musicPrompt" name="musicPrompt" placeholder="Epic orchestral music, uplifting and adventurous tone" required />
-                {state.errors?.musicPrompt && <p className="text-sm text-destructive">{state.errors.musicPrompt[0]}</p>}
+                {'musicPrompt' in state.errors && state.errors.musicPrompt && <p className="text-sm text-destructive">{state.errors.musicPrompt[0]}</p>}
             </div>
             <div className="mt-4">
                 <Button type="submit" disabled={isUploading || !publicUrl} className="w-full">
