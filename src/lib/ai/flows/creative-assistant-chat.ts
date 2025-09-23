@@ -1,9 +1,9 @@
 'use server';
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import {CreativeAssistantChatSchema} from '@/lib/types';
-import type {CreativeAssistantChatRequest} from '@/lib/types';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { CreativeAssistantChatSchema } from '@/lib/types';
+import type { CreativeAssistantChatRequest } from '@/lib/types';
 
 const systemPrompt = `You are an expert creative assistant and video production strategist named 'ClickVid AI'.
 Your goal is to help users brainstorm, refine, and create compelling video content.
@@ -25,40 +25,44 @@ const creativeAssistantChatFlow = ai.defineFlow(
     outputSchema: z.any(), // The output is a stream, so we use z.any() here.
   },
   async ({ history, message }) => {
-    // Format the messages properly for Genkit
+    // Format messages properly for Genkit with correct role typing
+    const formattedHistory = (history || []).map(h => ({
+      role: h.role as 'user' | 'model' | 'system' | 'tool',
+      content: [{ text: h.content }]
+    }));
+    
+    // Use the same approach as support-chat but with correct message structure
     const messages = [
-      { role: 'system', content: [{ text: systemPrompt }] },
-      { role: 'user', content: [{ text: message }] },
-      ...(history?.map(h => ({
-        role: h.role,
-        content: [{ text: h.content }]
-      })) || [])
+      { role: 'system' as 'user' | 'model' | 'system' | 'tool', content: [{ text: systemPrompt }] },
+      { role: 'user' as 'user' | 'model' | 'system' | 'tool', content: [{ text: message }] },
+      ...formattedHistory
     ];
-
-    // Use the ai.generateStream with the correct parameters
-    const stream = await ai.generateStream({
+    
+    // Call the Genkit API with the correct parameters directly
+    const response = await ai.generateStream({
       model: 'googleai/gemini-1.5-flash',
       messages: messages
     });
     
+    // Convert to ReadableStream - this is the core fix
     const encoder = new TextEncoder();
-    const transformStream = new ReadableStream({
+    return new ReadableStream({
       async start(controller) {
         try {
-            for await (const chunk of stream) {
-                if (chunk.content) {
-                    controller.enqueue(encoder.encode(chunk.content[0].text));
-                }
+          // Iterate over the response chunks
+          for await (const chunk of response) {
+            const text = chunk.content?.[0]?.text;
+            if (text) {
+              controller.enqueue(encoder.encode(text));
             }
+          }
         } catch(e) {
-            const errorMessage = e instanceof Error ? e.message : "An unknown streaming error occurred.";
-            controller.enqueue(encoder.encode(`\n\n**Error:** ${errorMessage}`));
+          console.error("Streaming error:", e);
+          controller.enqueue(encoder.encode("\n\n**Error:** An unexpected error occurred."));
         } finally {
-            controller.close();
+          controller.close();
         }
       },
     });
-
-    return transformStream;
   }
 );
