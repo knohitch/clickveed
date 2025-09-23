@@ -352,7 +352,7 @@ export default function SchedulerPage() {
                                         .filter(p => selectedPlatforms.includes(p.id))
                                         .map(p => {
                                             const PlatformIcon = p.icon;
-                                            return <PlatformIcon key={p.id} className="h-5 w-5 text-muted-foreground" title={p.name} />
+                                            return <PlatformIcon key={p.id} className="h-5 w-5 text-muted-foreground" />
                                         })
                                 ) : (
                                     <p className="text-sm text-muted-foreground">No platforms selected.</p>
@@ -365,5 +365,3 @@ export default function SchedulerPage() {
         </div>
     );
 }
-
-    

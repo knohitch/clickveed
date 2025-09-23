@@ -11,7 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { getAvailableTextGenerator } from '../api-service-manager';
+import { generateWithProvider } from '../api-service-manager';
 
 const GenerateAutomationWorkflowInputSchema = z.object({
   prompt: z
@@ -103,17 +103,20 @@ const generateAutomationWorkflowFlow = ai.defineFlow(
     outputSchema: GenerateAutomationWorkflowOutputSchema,
   },
   async ({ prompt: userPrompt, platform }) => {
-    const llm = await getAvailableTextGenerator();
     const promptText = getPromptForPlatform(platform);
 
-    const prompt = ai.definePrompt({
-      name: `generateAutomationWorkflowPrompt-${platform}`,
-      input: { schema: z.object({prompt: z.string() }) },
-      output: { schema: GenerateAutomationWorkflowOutputSchema },
-      prompt: promptText,
-    });
+    const messages = [
+      {
+        role: 'system' as const,
+        content: [{ text: promptText }],
+      },
+      {
+        role: 'user' as const,
+        content: [{ text: userPrompt }],
+      },
+    ];
 
-    const {output} = await llm.generate(prompt, { prompt: userPrompt });
+    const { output } = await generateWithProvider({ messages });
 
     if (!output?.workflow) {
       throw new Error('Failed to generate a valid workflow from the prompt.');
@@ -121,5 +124,3 @@ const generateAutomationWorkflowFlow = ai.defineFlow(
     return output;
   }
 );
-
-    

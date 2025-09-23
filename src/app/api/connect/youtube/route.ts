@@ -15,7 +15,7 @@ const youtubeConfig: PlatformConfig = {
         const { tokens } = await oauth2Client.getToken(code);
         return {
             accessToken: tokens.access_token!,
-            refreshToken: tokens.refresh_token,
+            refreshToken: tokens.refresh_token ?? null,
             expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
         };
     },

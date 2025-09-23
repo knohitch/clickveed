@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     // Create Super Admin user
     const user = await prisma.user.create({
       data: {
-        name,
+        displayName: name,
         email,
         passwordHash,
         role: 'SUPER_ADMIN',
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { message: 'Super Admin account created successfully.', user: { id: user.id, name: user.name, email: user.email } },
+      { message: 'Super Admin account created successfully.', user: { id: user.id, name: user.displayName, email: user.email } },
       { status: 201 }
     );
   } catch (error) {

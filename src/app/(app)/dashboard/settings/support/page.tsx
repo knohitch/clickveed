@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { createTicket } from "@/server/actions/support-actions";
+import { createTicket } from "@/lib/support-actions";
 import { useAuth } from "@/contexts/auth-context";
 import { ContactSupportForm } from "@/components/contact-support-form";
 

@@ -63,9 +63,9 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
 
     if (!hasCreatedTicket.current) {
         createTicket({
-            userName: user.name || 'User',
+            userName: user.displayName?.toString() || 'User',
             userEmail: user.email || 'No email provided',
-            userAvatar: user.image || '',
+            userAvatar: user.avatarUrl?.toString() || '',
             subject: `Chat: ${userInput.substring(0, 50)}...`,
             initialMessage: userInput,
         });
@@ -82,7 +82,7 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
     formRef.current?.reset();
     
     formData.append('history', JSON.stringify(history));
-    formAction(formData);
+    formAction(formData as any);
   }
 
    useEffect(() => {

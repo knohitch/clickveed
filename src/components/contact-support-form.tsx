@@ -25,9 +25,9 @@ export const ContactSupportForm = ({ user, closeDialog }: { user: any, closeDial
 
         try {
             await createTicket({
-                userName: user.name || 'User',
+                userName: user.displayName || 'User',
                 userEmail: user.email || 'No email provided',
-                userAvatar: user.image || '',
+                userAvatar: user.avatarUrl || '',
                 subject,
                 initialMessage
             });

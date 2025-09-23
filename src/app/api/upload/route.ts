@@ -1,92 +1,58 @@
-
-
 'use server';
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { getAdminSettings } from '@/server/actions/admin-actions';
-import { randomUUID } from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { NextResponse } from 'next/server';
+import { uploadToWasabi } from '@/server/services/wasabi-service';
+import prisma from '@/server/prisma';
+import { logError } from '@/lib/error-handler';
+import { validateFile, sanitizeFilename } from '@/lib/file-upload-security';
 
-interface WasabiCredentials {
-    endpoint: string;
-    region: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    bucket: string;
-}
+const MAX_FILE_SIZE_MB = 100; // Limit upload to 100MB
 
-async function getWasabiCredentials(): Promise<WasabiCredentials> {
-    const { apiKeys } = await getAdminSettings();
-    const wasabiEndpoint = apiKeys['wasabiEndpoint'];
-    const wasabiRegion = apiKeys['wasabiRegion'];
-    const wasabiAccessKey = apiKeys['wasabiAccessKey'];
-    const wasabiSecretKey = apiKeys['wasabiSecretKey'];
-    const wasabiBucket = apiKeys['wasabiBucket'];
+export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-    if (!wasabiEndpoint || !wasabiRegion || !wasabiAccessKey || !wasabiSecretKey || !wasabiBucket) {
-        throw new Error('Wasabi storage is not configured.');
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    return {
-        endpoint: `https://${wasabiEndpoint}`,
-        region: wasabiRegion,
-        accessKeyId: wasabiAccessKey,
-        secretAccessKey: wasabiSecretKey,
-        bucket: wasabiBucket,
-    };
-}
-
-export async function POST(request: Request) {
-    const session = await auth();
-    if (!session?.user?.id) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    // Validate file security
+    const securityResult = validateFile(file, 'video');
+    if (!securityResult.isValid) {
+      return NextResponse.json({ error: securityResult.error }, { status: 400 });
     }
 
-    try {
-        const { filename, contentType } = await request.json();
-        
-        if (!filename || !contentType) {
-            return NextResponse.json({ error: 'Filename and contentType are required' }, { status: 400 });
-        }
-
-        const creds = await getWasabiCredentials();
-        const s3Client = new S3Client({
-            endpoint: creds.endpoint,
-            region: creds.region,
-            credentials: {
-                accessKeyId: creds.accessKeyId,
-                secretAccessKey: creds.secretAccessKey,
-            },
-        });
-
-        const fileExtension = filename.split('.').pop();
-        const key = `uploads/${randomUUID()}.${fileExtension}`;
-
-        const command = new PutObjectCommand({
-            Bucket: creds.bucket,
-            Key: key,
-            ContentType: contentType,
-            ACL: 'public-read',
-        });
-
-        const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-        
-        const { apiKeys } = await getAdminSettings();
-        const cdnUrl = apiKeys['bunnyCdnUrl'];
-        let publicUrl;
-         if (cdnUrl) {
-            const finalCdnUrl = cdnUrl.endsWith('/') ? cdnUrl : `${cdnUrl}/`;
-            publicUrl = `${finalCdnUrl}${key}`;
-        } else {
-            publicUrl = `${creds.endpoint}/${creds.bucket}/${key}`;
-        }
-
-        return NextResponse.json({ success: true, uploadUrl: presignedUrl, publicUrl: publicUrl });
-
-    } catch (error) {
-        console.error('Error creating presigned URL:', error);
-        return NextResponse.json({ error: 'Failed to create presigned URL' }, { status: 500 });
+    const bytes = await file.arrayBuffer();
+    const sizeMB = bytes.byteLength / (1024 * 1024);
+    if (sizeMB > MAX_FILE_SIZE_MB) {
+      return NextResponse.json({ error: 'File too large. Max 100MB.' }, { status: 400 });
     }
+
+    // Sanitize filename
+    const sanitizedFilename = sanitizeFilename(file.name);
+    
+    const dataUri = `data:${file.type};base64,${Buffer.from(bytes).toString('base64')}`;
+    const { publicUrl } = await uploadToWasabi(dataUri, 'videos');
+
+    const mediaAsset = await prisma.mediaAsset.create({
+      data: {
+        name: sanitizedFilename,
+        type: 'VIDEO',
+        url: publicUrl,
+        size: sizeMB,
+        userId: session.user.id,
+      },
+    });
+
+    return NextResponse.json({ success: true, assetId: mediaAsset.id });
+  } catch (error) {
+    logError(error as Error, 'File upload failed');
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+  }
 }

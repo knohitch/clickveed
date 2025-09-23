@@ -70,7 +70,12 @@ export function SignupForm() {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Sign Up Failed</AlertTitle>
-              <AlertDescription>{state.error}</AlertDescription>
+              <AlertDescription>
+                {typeof state.error === 'string' 
+                  ? state.error 
+                  : Object.values(state.error).flat().join(', ')
+                }
+              </AlertDescription>
             </Alert>
           )}
           <SignUpButton />

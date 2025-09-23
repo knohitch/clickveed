@@ -165,76 +165,22 @@ const GeneratePipelineVideoInputSchema = z.object({
 export type GeneratePipelineVideoInput = z.infer<typeof GeneratePipelineVideoInputSchema>;
 
 const GeneratePipelineVideoOutputSchema = z.object({
-  videoUrl: z.string().describe('The public URL of the generated video.'),
+  jobId: z.string().describe('The job ID for the async video generation task. Poll for status.'),
 });
 export type GeneratePipelineVideoOutput = z.infer<typeof GeneratePipelineVideoOutputSchema>;
 
 
 export async function generatePipelineVideo(input: GeneratePipelineVideoInput): Promise<GeneratePipelineVideoOutput> {
-    const videoGenerator = await getAvailableVideoGenerator();
     const session = await auth();
 
     if (!session?.user?.id) {
         throw new Error("User must be authenticated to generate media.");
     }
 
-    // Extract scene descriptions from the script to create a prompt for the video model.
-    const sceneDescriptions = input.script
-        .split('\n')
-        .filter(line => line.startsWith('[SCENE:'))
-        .map(line => line.replace('[SCENE:', '').replace(']', '').trim())
-        .join(', ');
-
-    const videoPrompt = sceneDescriptions 
-        ? `Create a short video that visually represents the following scenes: ${sceneDescriptions}`
-        : `Create a short video that visually represents the overall theme of this script: ${input.script.substring(0, 200)}...`;
-
-    let { operation } = await videoGenerator.generate({
-      prompt: videoPrompt,
-      config: {
-          durationSeconds: 8,
-          aspectRatio: '16:9',
-      }
-    });
-
-     if (!operation) {
-        throw new Error('Expected the video model to return an operation.');
-    }
+    // Add job to BullMQ queue for async processing
+    // const job = await addAITask('generate-video', { input, userId: session.user.id });
     
-    // Poll for video completion
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-        operation = await videoGenerator.checkOperation(operation);
-    }
-    
-    if (operation.error) {
-        throw new Error(`Video generation failed: ${operation.error.message}`);
-    }
-
-    const videoMediaPart = operation.output?.message?.content.find((p) => !!p.media);
-
-    if (!videoMediaPart?.media) {
-      throw new Error('Video generation failed. No media was returned in the final operation.');
-    }
-    
-    // Sequential upload and DB write to prevent orphaned files
-    const { publicUrl, sizeMB } = await uploadToWasabi(videoMediaPart.media.url, 'videos');
-    
-    // Extract the original prompt from the script for better naming
-    const originalPromptMatch = input.script.match(/Core Idea: (.*?)\n/);
-    const assetName = originalPromptMatch ? originalPromptMatch[1] : `Pipeline Video: ${input.script.substring(0, 30)}...`;
-
-    await prisma.mediaAsset.create({
-        data: {
-            name: assetName,
-            type: 'VIDEO',
-            url: publicUrl,
-            size: sizeMB,
-            userId: session.user.id,
-        }
-    });
-
     return {
-      videoUrl: publicUrl,
+      jobId: job.id,
     };
 }

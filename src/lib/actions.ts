@@ -53,7 +53,12 @@ export async function generateScriptAction(prevState: any, formData: FormData) {
   }
 
   try {
-    const result = await generateVideoScript(validatedFields.data);
+    const result = await generateVideoScript({
+        topic: validatedFields.data.prompt,
+        length: validatedFields.data.duration,
+        tone: validatedFields.data.tone,
+        style: validatedFields.data.videoType,
+    });
     return { message: "success", script: result.script, errors: {} };
   } catch (error) {
     console.error(error);
@@ -467,7 +472,7 @@ export async function creativeAssistantChatAction(prevState: any, formData: Form
             console.error("Failed to parse chat history:", e);
         }
     }
-    
+
     try {
         const stream = await creativeAssistantChat({ history, message });
         return { message: "", stream, errors: {} };
@@ -490,9 +495,14 @@ export async function supportChatAction(prevState: any, formData: FormData) {
             console.error("Failed to parse chat history:", e);
         }
     }
+
+    const transformedHistory = history.map(h => ({
+        role: (h.role === 'model' ? 'assistant' : h.role) as 'user' | 'assistant',
+        content: h.content,
+    }));
     
     try {
-        const stream = await supportChat({ history, message });
+        const stream = await supportChat({ history: transformedHistory, message });
         // In a real app, you would also save this interaction to a support ticket database here.
         return { message: "", stream, errors: {} };
     } catch (error) {
@@ -549,8 +559,12 @@ export async function repurposeContentAction(input: z.infer<typeof repurposeCont
     }
 
     try {
-        const result = await repurposeContent(validatedFields.data);
-        return { message: "success", content: result.content, errors: {} };
+        const result = await repurposeContent({
+            originalContent: validatedFields.data.transcript,
+            targetPlatform: validatedFields.data.format,
+            format: validatedFields.data.format,
+        });
+        return { message: "success", content: result.repurposedItems, errors: {} };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -618,8 +632,12 @@ export async function researchVideoTopicAction(prevState: any, formData: FormDat
   }
 
   try {
-    const result = await researchVideoTopic(validatedFields.data);
-    return { message: "success", ideas: result.ideas, errors: {} };
+    const result = await researchVideoTopic({
+        topic: validatedFields.data.topic,
+        platform: 'YouTube', // Defaulting to a common platform
+        audience: 'General Audience', // Defaulting to a common audience
+    });
+    return { message: "success", ideas: result.titleIdeas, errors: {} };
   } catch (error) {
     console.error(error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";

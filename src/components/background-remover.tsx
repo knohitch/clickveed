@@ -189,7 +189,7 @@ export function BackgroundRemover() {
         )}
       </div>
 
-      {state.errors?.imageUrl && <p className="text-sm text-destructive mt-2">{state.errors.imageUrl[0]}</p>}
+      {'imageUrl' in (state.errors || {}) && <p className="text-sm text-destructive mt-2">{(state.errors as any)?.imageUrl?.[0]}</p>}
     </form>
   );
 }

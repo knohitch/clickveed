@@ -33,7 +33,7 @@ const ChartPlaceholder = () => (
     </div>
 );
 
-export function AnalyticsClient({ initialData }: AnalyticsClientProps) {
+function AnalyticsClient({ initialData }: AnalyticsClientProps) {
     const [data] = React.useState<AnalyticsData>(initialData);
     
     const totalUsersInPlans = React.useMemo(() => {

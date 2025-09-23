@@ -1,9 +1,35 @@
 
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
+import { RateLimiter } from '@/lib/rate-limiter';
 
 // Custom middleware logic to handle special cases
-export default auth((req) => {
+export default auth(async (req) => {
+  // Redis-based rate limiting for AI routes
+  if (req.nextUrl.pathname.startsWith('/api/ai')) {
+    const ip = req.ip || 'unknown';
+    const clientIP = req.headers.get('x-forwarded-for') || ip;
+    const rateKey = `ai:${clientIP}`;
+    
+    const { isLimited, resetTime } = await RateLimiter.isRateLimited(rateKey, 60000, 10);
+    
+    if (isLimited) {
+      const headers = new Headers();
+      const rateLimitHeaders = RateLimiter.getRateLimitHeaders(true, resetTime);
+      Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+      
+      return new NextResponse(
+        JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }), 
+        { 
+          status: 429,
+          headers
+        }
+      );
+    }
+  }
+
   // For /chin/signup, we need special handling
   if (req.nextUrl.pathname === '/chin/signup') {
     // Allow access to /chin/signup - the page itself will check if Super Admin creation is allowed

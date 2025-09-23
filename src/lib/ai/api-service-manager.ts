@@ -8,8 +8,8 @@
  * configured API keys, ensuring features degrade gracefully if a key is missing.
  */
 import { ai } from '@/ai/genkit';
-import { generate, generateStream, type GenerateRequest, type GenerateStreamRequest, type ModelReference, type Prompt, prompt, type Flow, type FlowInput, type FlowOutput, type Tool, plugin, definePlugin } from 'genkit';
-import { googleAI, type GoogleAIGeminiPlugin, type GoogleAIGeminiPluginOptions } from '@genkit-ai/googleai';
+import { type Tool } from 'genkit';
+import { googleAI, type GoogleAIPlugin } from '@genkit-ai/googleai';
 import { z } from 'zod';
 import { searchPexelsTool } from '@/server/ai/tools/pexels-tool';
 import { searchPixabayTool } from '@/server/ai/tools/pixabay-tool';
@@ -17,12 +17,27 @@ import { getUnsplashRandomPhoto } from '@/server/ai/tools/unsplash-tool';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { initialApiKeysObject } from '@/contexts/admin-settings-context';
 
+// Define request types locally as they are no longer exported from genkit
+type MessageRole = 'user' | 'model' | 'system' | 'tool';
+
+interface Message {
+  role: MessageRole;
+  content: Array<{ text: string }>;
+}
+
+interface GenerateRequest {
+  model: string;
+  messages: Message[];
+  config?: any;
+}
+
+interface GenerateStreamRequest extends GenerateRequest {}
 
 type ProviderName = keyof typeof initialApiKeysObject;
 
 interface ProviderConfig {
     name: ProviderName;
-    model: ModelReference<any>;
+    model: string; // Changed from ModelReference<any> to string
 }
 
 const llmProviderPriority: ProviderConfig[] = [
@@ -34,7 +49,7 @@ const imageProviderPriority: ProviderConfig[] = [
 ];
 
 const videoProviderPriority: ProviderConfig[] = [
-    { name: 'googleVeo', model: 'googleai/veo-2.0-generate-001' as any },
+    { name: 'googleVeo', model: 'googleai/veo-2.0-generate-001' },
 ];
 
 const ttsProviderPriority: ProviderConfig[] = [
@@ -47,14 +62,11 @@ async function getAvailableProvider(priorityList: ProviderConfig[], type: string
     const { apiKeys } = await getAdminSettings();
     
     for (const provider of priorityList) {
-        const apiKey = apiKeys[provider.name];
+        const apiKey = apiKeys[provider.name as keyof typeof apiKeys];
         
         if (apiKey) {
-            // The plugins are already configured in genkit.ts. We just need to find the right model.
-            return {
-                name: provider.name,
-                model: provider.model,
-            };
+            // Return the model string for now - the AI flows will handle the model resolution
+            return provider.model;
         }
     }
     throw new Error(`No API key configured for any enabled ${type} provider. Please configure at least one in the admin panel.`);
@@ -78,14 +90,14 @@ export async function getAvailableTTSProvider() {
 export async function getAvailableStockPhotoTool() {
     const { apiKeys } = await getAdminSettings();
     const toolPriority = ['pexels', 'pixabay', 'unsplash'];
-    const toolMap: Record<string, Tool<any,any>> = {
+    const toolMap: Record<string, Tool> = {
         pexels: searchPexelsTool,
         pixabay: searchPixabayTool,
         unsplash: getUnsplashRandomPhoto
     }
 
     for (const toolKey of toolPriority) {
-        if (apiKeys[toolKey]) {
+        if (apiKeys[toolKey as keyof typeof apiKeys]) {
             return toolMap[toolKey];
         }
     }
@@ -96,26 +108,26 @@ export async function getAvailableStockPhotoTool() {
 // These functions will now use the globally configured `ai` instance
 // with the dynamically selected model.
 export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) {
-    const { model } = await getAvailableTextGenerator();
-    return generate({ ...req, model });
+    const model = await getAvailableTextGenerator();
+    return ai.generate({ ...req, model });
 }
 
 export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest, 'model'>) {
-    const { model } = await getAvailableTextGenerator();
-    return generateStream({ ...req, model });
+    const model = await getAvailableTextGenerator();
+    return ai.generateStream({ ...req, model });
 }
 
 export async function generateImageWithProvider(req: Omit<GenerateRequest, 'model'>) {
-    const { model } = await getAvailableImageGenerator();
-    return generate({ ...req, model });
+    const model = await getAvailableImageGenerator();
+    return ai.generate({ ...req, model });
 }
 
 export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'model'>) {
-    const { model } = await getAvailableVideoGenerator();
-    return generate({ ...req, model });
+    const model = await getAvailableVideoGenerator();
+    return ai.generate({ ...req, model });
 }
 
 export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'>) {
-    const { model } = await getAvailableTTSProvider();
-    return generate({ ...req, model });
+    const model = await getAvailableTTSProvider();
+    return ai.generate({ ...req, model });
 }

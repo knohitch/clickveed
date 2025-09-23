@@ -8,6 +8,7 @@ import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
 import { compare } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
+import type { Adapter } from '@auth/core/adapters';
 
 
 // Define custom types directly in the auth config for co-location and clarity.
@@ -20,9 +21,16 @@ declare module 'next-auth' {
     } & DefaultSession['user'];
   }
 
-  interface User extends DefaultUser {
+  interface User {
+      id?: string;
+      email?: string | null;
+      name?: string | null;
+      image?: string | null;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
+      emailVerified?: Date | null;
+      status?: string;
+      passwordHash?: string;
   }
 }
 
@@ -36,7 +44,7 @@ declare module "next-auth/jwt" {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma) as any,
   session: { strategy: 'jwt' }, // Use JWT for session strategy
   secret: process.env.AUTH_SECRET,
   pages: {
@@ -44,37 +52,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: '/login',
   },
   callbacks: {
-    // The authorize callback is now centralized here for the credentials provider
-    async authorize(credentials) {
-      const credentialsSchema = z.object({
-        email: z.string().email(),
-        password: z.string(),
-      });
-
-      const validatedCredentials = credentialsSchema.safeParse(credentials);
-
-      if (validatedCredentials.success) {
-        const { email, password } = validatedCredentials.data;
-        const user = await prisma.user.findUnique({ where: { email } });
-
-        if (!user || !user.passwordHash) return null;
-        
-        if (user.status === 'Pending') {
-            throw new Error("Email not verified. Please check your inbox for a verification link.");
-        }
-
-        const passwordsMatch = await compare(password, user.passwordHash);
-        
-        if (passwordsMatch) return user;
-      }
-
-      return null;
+    // The authorized callback is now centralized here for the credentials provider
+    async authorized({ auth, request: { nextUrl } }) {
+      return !!auth?.user;
     },
+    
+    async signIn({ user, account }) {
+      return true;
+    },
+    
     
     // The JWT callback is used to enrich the token with custom data
     async jwt({ token, user, trigger, session }) {
       // On initial sign-in, add user details to the token
-      if (user) {
+      if (user && user.id) {
         token.id = user.id;
         token.role = user.role;
         token.onboardingComplete = user.onboardingComplete;

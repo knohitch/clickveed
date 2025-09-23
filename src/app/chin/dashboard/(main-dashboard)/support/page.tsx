@@ -126,7 +126,7 @@ export default function AdminSupportPage() {
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-9 w-9">
-                                            <AvatarImage src={ticket.userAvatar} />
+                                            <AvatarImage src={ticket.userAvatar ?? undefined} />
                                             <AvatarFallback>{ticket.userName.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                         <div className="font-semibold">{ticket.userName}</div>
@@ -175,7 +175,7 @@ export default function AdminSupportPage() {
                                 <div className="p-6 space-y-6">
                                     {selectedTicket.conversation.map((msg, index) => (
                                         <div key={index} className={cn("flex items-start gap-4", msg.sender === 'agent' && "justify-end")}>
-                                            {msg.sender === 'user' && <Avatar><AvatarImage src={selectedTicket.userAvatar} /><AvatarFallback>{selectedTicket.userName.charAt(0)}</AvatarFallback></Avatar>}
+                                            {msg.sender === 'user' && <Avatar><AvatarImage src={selectedTicket.userAvatar ?? undefined} /><AvatarFallback>{selectedTicket.userName.charAt(0)}</AvatarFallback></Avatar>}
                                             <div className={cn("max-w-lg rounded-lg px-4 py-3", msg.sender === 'user' ? "bg-muted" : "bg-primary text-primary-foreground")}>
                                                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                                                 <p className="text-xs text-right mt-2 opacity-70">{msg.timestamp}</p>

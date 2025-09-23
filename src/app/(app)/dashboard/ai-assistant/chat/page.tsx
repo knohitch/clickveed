@@ -160,7 +160,7 @@ export default function AiAssistantChatPage() {
                 const { value, done } = await reader.read();
                 if (done) break;
                 
-                fullResponse += decoder.decode(value, { stream: true });
+                fullResponse += decoder.decode(typeof value === 'string' ? new TextEncoder().encode(value) : value, { stream: true });
 
                 setMessages(prev => {
                     const newMessages = [...prev];

@@ -111,7 +111,10 @@ export default function AdminUsersPage() {
     }, []);
     
     const filteredUsers = users.filter(user => {
-        const roleMatch = filter === 'All' || user.role === filter;
+        const roleMatch = filter === 'All' || 
+            (filter === 'User' && user.role === 'USER') ||
+            (filter === 'Admin' && user.role === 'ADMIN') ||
+            (filter === 'Super Admin' && user.role === 'SUPER_ADMIN');
         const searchMatch = user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || user.email?.toLowerCase().includes(searchQuery.toLowerCase());
         return roleMatch && searchMatch;
     });

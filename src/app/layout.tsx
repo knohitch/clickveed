@@ -1,5 +1,3 @@
-
-// /src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Nunito, Poppins } from 'next/font/google';
 import './globals.css';
@@ -21,7 +19,6 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-// Metadata can be static or dynamic
 export const metadata: Metadata = {
   title: 'ClickVid Pro',
   description: 'The All-in-One AI Video Creation Suite',

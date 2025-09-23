@@ -167,11 +167,11 @@ export default function AdminSubscriptionsPage() {
                  ))
               ) : filteredSubscriptions.length > 0 ? (
                   filteredSubscriptions.map((user) => (
-                    <TableRow key={user.uid}>
+                    <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className='hidden sm:flex'>
-                            <AvatarImage src={user.photoURL ?? ''} />
+                            <AvatarImage src={user.avatarUrl ?? ''} />
                             <AvatarFallback>
                               {user.displayName?.charAt(0)}
                             </AvatarFallback>

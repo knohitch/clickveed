@@ -8,7 +8,7 @@ import type { Prisma } from '@prisma/client';
 // Use Prisma-generated types for consistency
 export type PlanFeature = Prisma.PlanFeatureGetPayload<{}>;
 export type Plan = Prisma.PlanGetPayload<{ include: { features: true } }>;
-export type Promotion = Prisma.PromotionGetPayload<{ include: { applicablePlans: true } }> & { applicablePlanIds: string[] };
+export type Promotion = Prisma.PromotionGetPayload<{}> & { applicablePlanIds: string[] };
 
 export interface EmailSettings {
   id: number;
@@ -105,7 +105,7 @@ const defaultEmailTemplates: EmailTemplates = {
     adminNewTicket: { subject: 'New Support Ticket', body: 'New ticket from {{userName}}.' },
 };
 
-const initialApiKeysObject: ApiKeys = {
+export const initialApiKeysObject: ApiKeys = {
   gemini: '', openai: '', claude: '', azureOpenai: '', openrouter: '', deepseek: '', grok: '', qwen: '', perplexity: '', mistral: '', cohere: '',
   stableDiffusion: '', midjourney: '', dalle: '', imagen: '', dreamstudio: '', leonardo: '', magnific: '',
   googleVeo: '', kling: '', sora: '', wan: '', skyReels: '', pika: '', luma: '', synthesia: '', colossyan: '', runwayml: '', heygen: '', modelscope: '', stableVideo: '', animateDiff: '', videoFusion: '',

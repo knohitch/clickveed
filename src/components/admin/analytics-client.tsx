@@ -15,7 +15,7 @@ export interface AnalyticsData {
     revenueData: { date: string, mrr: number }[];
     planDistributionData: { name: string, value: number, fill: string }[];
     contentGenerationData: { name: string, total: number }[];
-    recentSignups: { name: string, email: string, time: string, avatar: string }[];
+    recentSignups: { displayName: string, email: string, time: string, avatarUrl: string }[];
     summary: {
         totalUsers: { value: string; change: string };
         mrr: { value: string; change: string };
@@ -194,11 +194,11 @@ export function AnalyticsClient({ initialData }: AnalyticsClientProps) {
                             {data.recentSignups.map((user) => (
                                 <div key={user.email} className="flex items-center gap-4">
                                     <Avatar>
-                                        <AvatarImage src={user.avatar} data-ai-hint="user portrait"/>
-                                        <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                                        <AvatarImage src={user.avatarUrl} data-ai-hint="user portrait"/>
+                                        <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
-                                        <p className="font-semibold text-sm truncate">{user.name}</p>
+                                        <p className="font-semibold text-sm truncate">{user.displayName}</p>
                                         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                                     </div>
                                     <p className="text-xs text-muted-foreground">{user.time}</p>

@@ -28,8 +28,8 @@ const AssetCard = ({ asset }: { asset: MediaAssetType }) => {
     return (
         <Card className="overflow-hidden">
             <CardHeader className="p-0 bg-muted aspect-video flex items-center justify-center">
-                {asset.type === 'IMAGE' || asset.thumbnail ? (
-                    <Image src={asset.thumbnail || asset.url} alt={asset.name} width={400} height={300} className="object-cover aspect-video" />
+                {asset.type === 'IMAGE' ? (
+                    <Image src={asset.url} alt={asset.name} width={400} height={300} className="object-cover aspect-video" />
                 ) : (
                     <TypeIcon className="w-16 h-16 text-muted-foreground" />
                 )}

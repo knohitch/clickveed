@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# Enhanced installation script with better error handling
 set -e
 
 echo "🚀 Starting production setup..."
@@ -22,6 +24,15 @@ npx prisma migrate deploy
 # This creates an optimized version of your app in the .next folder.
 echo "🏗️ Building the Next.js application..."
 npm run build
+
+# Step 5: Verify the build was successful
+echo "🔍 Verifying build..."
+if [ -d ".next" ]; then
+    echo "✅ Build successful and .next directory created"
+else
+    echo "❌ Build failed - .next directory not found"
+    exit 1
+fi
 
 echo "✅ Production setup complete!"
 echo "Your application is now ready to be started with a process manager like PM2."

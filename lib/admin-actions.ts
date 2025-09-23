@@ -44,10 +44,10 @@ export async function getAdminSettings() {
     return {
         appName: settings.find(s => s.key === 'appName')?.value as string || 'ClickVid Pro',
         logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
-        allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true' ?? true,
-        isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true' ?? true,
+        allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true',
+        isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true',
         plans: plans.map(p => ({...p, features: p.features || [] })),
-        promotions: promotions.map(p => ({ ...p, applicablePlanIds: p.applicablePlans.map(ap => ap.id) })),
+        promotions: promotions.map(p => ({ ...p, applicablePlanIds: p.applicablePlans.map(ap => ap.planId) })),
         apiKeys: apiKeys.reduce((acc, key) => {
           acc[key.name] = key.value;
           return acc;
@@ -108,21 +108,29 @@ export async function updatePlans(plans: Plan[]) {
 export async function updatePromotions(promotions: Promotion[]) {
     for (const promo of promotions) {
         const { applicablePlanIds, ...promoData } = promo;
+        
+        // First, update the promotion itself
         await prisma.promotion.upsert({
             where: { id: promo.id },
-            update: {
-                ...promoData,
-                applicablePlans: {
-                    set: promo.applicablePlanIds.map(id => ({ id }))
-                }
-            },
-            create: {
-                ...promoData,
-                applicablePlans: {
-                    connect: promo.applicablePlanIds.map(id => ({ id }))
-                }
-            }
+            update: promoData,
+            create: promoData
         });
+        
+        // Then, update the applicable plans relationship
+        // First, delete all existing relationships
+        await prisma.applicablePromotionPlan.deleteMany({
+            where: { promotionId: promo.id }
+        });
+        
+        // Then, create new relationships
+        if (applicablePlanIds.length > 0) {
+            await prisma.applicablePromotionPlan.createMany({
+                data: applicablePlanIds.map(planId => ({
+                    planId,
+                    promotionId: promo.id
+                }))
+            });
+        }
     }
 }
 

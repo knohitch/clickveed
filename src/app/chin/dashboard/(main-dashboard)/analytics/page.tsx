@@ -32,7 +32,7 @@ async function getAnalyticsData(): Promise<AnalyticsData> {
     const recentSignups = await prisma.user.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
-        select: { name: true, email: true, createdAt: true, avatarUrl: true }
+        select: { displayName: true, email: true, createdAt: true, avatarUrl: true }
     });
 
     return {
@@ -44,10 +44,10 @@ async function getAnalyticsData(): Promise<AnalyticsData> {
             { name: "Voiceovers", total: 789 },
         ],
         recentSignups: recentSignups.map(u => ({
-            name: u.name || 'Unnamed User',
+            displayName: u.displayName || 'Unnamed User',
             email: u.email || 'No email',
             time: u.createdAt.toLocaleDateString(),
-            avatar: u.avatarUrl || ''
+            avatarUrl: u.avatarUrl || ''
         })),
         planDistributionData,
         summary: {

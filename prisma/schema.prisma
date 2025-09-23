@@ -17,11 +17,13 @@ datasource db {
 
 model User {
   id                    String          @id @default(cuid())
-  name                  String?
+  displayName           String?         // Renamed from 'name'
   email                 String?         @unique
-  emailVerified         DateTime?
-  image                 String?
+  emailVerified         Boolean?        // Changed from DateTime? to Boolean?
+  avatarUrl             String?         // Renamed from 'image'
   passwordHash          String?
+  passwordResetToken    String?         // Added
+  passwordResetExpires  DateTime?       // Added
   role                  String          @default("USER") // USER, ADMIN, SUPER_ADMIN
   status                String          @default("Active") // Active, Pending
   createdAt             DateTime        @default(now())
@@ -93,12 +95,16 @@ model Plan {
   priceMonthly         Float
   priceQuarterly       Float
   priceYearly          Float
+  videoExports         Int?          // Added
+  aiCredits            Int?          // Added
+  storageGB            Int?          // Added
   stripeProductId      String?       @unique
   stripePriceIdMonthly String?       @unique
   stripePriceIdQuarterly String?     @unique
   stripePriceIdYearly  String?       @unique
   features             PlanFeature[]
   promotions           PromotionOnPlan[]
+  applicablePromotions  ApplicablePromotionPlan[] // Added
   users                User[]
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
@@ -117,6 +123,7 @@ model Promotion {
   discountPercentage Int
   isActive           Boolean           @default(true)
   plans              PromotionOnPlan[]
+  applicablePlans    ApplicablePromotionPlan[] // Added
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 }
@@ -128,6 +135,16 @@ model PromotionOnPlan {
   promotionId String
   assignedAt  DateTime  @default(now())
   assignedBy  String    @default("Admin")
+
+  @@id([planId, promotionId])
+}
+
+model ApplicablePromotionPlan {
+  plan        Plan      @relation(fields: [planId], references: [id])
+  planId      String
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  promotionId String
+  createdAt   DateTime  @default(now())
 
   @@id([planId, promotionId])
 }

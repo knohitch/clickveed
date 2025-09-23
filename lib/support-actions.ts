@@ -43,7 +43,7 @@ export async function getUsers(): Promise<UserWithRole[]> {
 
     return users.map(user => ({
         uid: user.id,
-        displayName: user.name,
+        displayName: user.displayName,
         email: user.email,
         photoURL: user.avatarUrl,
         emailVerified: user.emailVerified ?? false,
@@ -65,7 +65,7 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     // In a real app, you would hash the password here before saving
     const newUser = await prisma.user.create({
         data: {
-            name: userData.fullName,
+            displayName: userData.fullName,
             email: userData.email,
             role: userData.role || 'Admin',
             status: 'Pending',
@@ -74,7 +74,7 @@ export async function createPendingAdminUser(userData: { fullName: string; email
 
     return {
         uid: newUser.id,
-        displayName: newUser.name,
+        displayName: newUser.displayName,
         email: newUser.email,
         role: newUser.role as UserRole,
         status: newUser.status as UserStatus,

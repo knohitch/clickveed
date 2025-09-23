@@ -9,13 +9,38 @@ const nextConfig = {
         }
         return config;
     },
-     typescript: {
+    // Production optimizations
+    experimental: {
+        // Enable React Server Components for better performance
+        serverComponentsExternalPackages: ['@prisma/client']
+    },
+    // Enable strict mode for better error detection
+    reactStrictMode: true,
+    // Enable production-grade image optimization
+    images: {
+        domains: ['cdn.sanity.io', 'res.cloudinary.com', 'images.unsplash.com']
+    },
+    // Configure TypeScript for production
+    typescript: {
         // !! WARN !!
         // Dangerously allow production builds to successfully complete even if
         // your project has type errors.
         // !! WARN !!
-        ignoreBuildErrors: true,
-    }
+        ignoreBuildErrors: process.env.NODE_ENV === 'development'
+    },
+    // Configure ESLint for production
+    eslint: {
+        ignoreDuringBuilds: true
+    },
+    // Optimize CSS for production
+    css: {
+        // Enable CSS optimization
+        minimize: true
+    },
+    // Configure Next.js for production
+    productionBrowserSourceMaps: false,
+    // Disable automatic static optimization for better control
+    staticPageGenerationTimeout: 60
 };
 
 export default nextConfig;

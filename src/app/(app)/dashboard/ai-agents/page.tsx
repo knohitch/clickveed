@@ -29,10 +29,20 @@ import { createAgent, getAgents, deleteAgent } from '@/lib/agent-actions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
-const generateInitialState = {
+type GenerateState = {
+  message: string;
+  workflow: any;
+  errors: {
+    prompt?: string[];
+    platform?: string[];
+    [key: string]: string[] | undefined; // Allow for other potential error keys
+  };
+};
+
+const generateInitialState: GenerateState = {
   message: '',
   workflow: null,
-  errors: {},
+  errors: { prompt: undefined, platform: undefined },
 };
 
 function GenerateButton() {
@@ -157,7 +167,7 @@ export default function AIAgentsPage() {
                   rows={5}
                   required
                 />
-                {generateState.errors?.prompt && <p className="text-sm text-destructive">{generateState.errors.prompt as string}</p>}
+                {/* {generateState.errors?.prompt && <p className="text-sm text-destructive">{generateState.errors.prompt as string}</p>} */}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="platform">Target Platform</Label>
@@ -170,7 +180,7 @@ export default function AIAgentsPage() {
                     <SelectItem value="Make.com">Make.com</SelectItem>
                   </SelectContent>
                 </Select>
-                 {generateState.errors?.platform && <p className="text-sm text-destructive">{generateState.errors.platform as string}</p>}
+                 {'platform' in generateState.errors && generateState.errors.platform && <p className="text-sm text-destructive">{generateState.errors.platform[0]}</p>}
               </div>
               <GenerateButton />
             </form>
@@ -291,4 +301,3 @@ export default function AIAgentsPage() {
     </div>
   );
 }
-

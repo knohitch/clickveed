@@ -147,6 +147,13 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             features: finalFeatures,
             createdAt: plan?.createdAt || new Date(),
             updatedAt: new Date(),
+            videoExports: plan?.videoExports ?? null,
+            aiCredits: plan?.aiCredits ?? null,
+            storageGB: plan?.storageGB ?? null,
+            stripeProductId: plan?.stripeProductId ?? null,
+            stripePriceIdMonthly: plan?.stripePriceIdMonthly ?? null,
+            stripePriceIdQuarterly: plan?.stripePriceIdQuarterly ?? null,
+            stripePriceIdYearly: plan?.stripePriceIdYearly ?? null,
         };
         onSave(finalPlan);
     };

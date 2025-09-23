@@ -41,8 +41,10 @@ export default function FluxProPage() {
         const ctx = canvas?.getContext('2d');
         if (!ctx || !image) return;
 
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
+        if (canvas) {
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+        }
         
         const filterString = `
             brightness(${filters.brightness}%)
@@ -62,7 +64,9 @@ export default function FluxProPage() {
             ctx.fillStyle = text.color;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(text.content, canvas.width * (text.x / 100), canvas.height * (text.y / 100));
+            if (canvas) {
+                ctx.fillText(text.content, canvas.width * (text.x / 100), canvas.height * (text.y / 100));
+            }
         }
 
     }, [image, filters, text, isTextActive]);

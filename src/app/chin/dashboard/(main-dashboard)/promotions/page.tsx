@@ -34,7 +34,6 @@ const PromotionForm = ({ promotion, plans, onSave, closeDialog }: { promotion: P
             applicablePlanIds,
             createdAt: promotion?.createdAt || new Date(),
             updatedAt: new Date(),
-            applicablePlans: [] // This will be populated by the context/backend
         };
         onSave(finalPromotion);
         closeDialog();
