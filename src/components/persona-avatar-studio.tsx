@@ -15,16 +15,34 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
 import Image from 'next/image';
 
-const initialState = {
+type Errors = {
+    personaName?: string[];
+    personaDescription?: string[];
+    avatarDescription?: string[];
+    script?: string[];
+};
+
+type State = {
+    message: string;
+    avatarImageUrl: string | null;
+    videoStatus: string | null;
+    errors: Errors | {};
+};
+
+const initialState: State = {
     message: '',
     avatarImageUrl: null,
     videoStatus: null,
-    errors: {
-        personaName: [],
-        personaDescription: [],
-        avatarDescription: [],
-        script: [],
+    errors: {}
+};
+
+// Helper function to safely access error properties
+function getError(state: State, field: keyof Errors): string | undefined {
+    if (state.errors && typeof state.errors === 'object' && field in state.errors) {
+        const errors = (state.errors as Errors)[field];
+        return errors && errors.length > 0 ? errors[0] : undefined;
     }
+    return undefined;
 }
 
 function SubmitButton() {
@@ -116,12 +134,12 @@ export function PersonaAvatarStudio() {
                         <div className="space-y-2">
                             <Label htmlFor="personaName">Persona Name</Label>
                             <Input id="personaName" name="personaName" placeholder="e.g., 'Eco-Warrior Willow'" required />
-                            {state.errors?.personaName && <p className="text-sm text-destructive mt-1">{state.errors.personaName[0]}</p>}
+                            {getError(state, 'personaName') && <p className="text-sm text-destructive mt-1">{getError(state, 'personaName')}</p>}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="personaDescription">Persona Description</Label>
                             <Textarea id="personaDescription" name="personaDescription" placeholder="A friendly expert in sustainable living, who speaks in a calm, encouraging tone." rows={4} required />
-                             {state.errors?.personaDescription && <p className="text-sm text-destructive mt-1">{state.errors.personaDescription[0]}</p>}
+                             {getError(state, 'personaDescription') && <p className="text-sm text-destructive mt-1">{getError(state, 'personaDescription')}</p>}
                         </div>
                     </CardContent>
                 </Card>
@@ -135,12 +153,12 @@ export function PersonaAvatarStudio() {
                         <div className="space-y-2">
                             <Label htmlFor="avatarDescription">Avatar Visual Description</Label>
                             <Textarea id="avatarDescription" name="avatarDescription" placeholder="A woman in her late 20s with long, flowing brown hair, wearing glasses and a green linen shirt, standing in a lush forest. Photorealistic style." rows={4} required />
-                            {state.errors?.avatarDescription && <p className="text-sm text-destructive mt-1">{state.errors.avatarDescription[0]}</p>}
+                            {getError(state, 'avatarDescription') && <p className="text-sm text-destructive mt-1">{getError(state, 'avatarDescription')}</p>}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="script">Spoken Script</Label>
                             <Textarea id="script" name="script" placeholder="Hello everyone! Today, we're going to explore three simple ways you can reduce your carbon footprint at home..." rows={4} required />
-                            {state.errors?.script && <p className="text-sm text-destructive mt-1">{state.errors.script[0]}</p>}
+                            {getError(state, 'script') && <p className="text-sm text-destructive mt-1">{getError(state, 'script')}</p>}
                         </div>
                         <SubmitButton />
                     </CardContent>
