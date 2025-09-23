@@ -1,10 +1,6 @@
-
-
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
-import { generateVideoFromUrlAction } from '@/lib/actions';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +10,7 @@ import { Clipboard, Download, FileText, Sparkles, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
 
+// Dummy state to prevent errors
 const initialState = {
   message: '',
   script: null,
@@ -21,9 +18,10 @@ const initialState = {
 };
 
 function SubmitButton() {
-  const { pending } = useFormStatus();
+  // const { pending } = useFormStatus();
+  const pending = false; // Manually set to false
   return (
-    <Button type="submit" disabled={pending} className="w-full">
+    <Button type="submit" disabled className="w-full">
       {pending ? <Sparkles className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
       {pending ? 'Generating Script...' : 'Generate Video Script'}
     </Button>
@@ -31,22 +29,11 @@ function SubmitButton() {
 }
 
 export function VideoFromUrlGenerator() {
-  const [state, formAction] = useFormState(generateVideoFromUrlAction, initialState);
+  const [state] = useState(initialState); // Use local state
   const { toast } = useToast();
-  const formRef = useRef<HTMLFormElement>(null);
-  const { pending } = useFormStatus();
-
-  useEffect(() => {
-    if (state.message === 'success') {
-      toast({ title: "Success!", description: "Video script generated successfully." });
-    } else if (state.message && state.message !== 'success' && state.message !== 'Validation failed') {
-      toast({
-        variant: "destructive",
-        title: "Error Generating Script",
-        description: state.message,
-      });
-    }
-  }, [state, toast]);
+  // const formRef = useRef<HTMLFormElement>(null); // No longer needed
+  // const { pending } = useFormStatus(); // No longer needed
+  const pending = false; // Manually set to false
 
   const copyToClipboard = () => {
     if (state.script) {
@@ -74,11 +61,11 @@ export function VideoFromUrlGenerator() {
 
   return (
     <div className="grid md:grid-cols-2 gap-8 items-start">
-      <form ref={formRef} action={formAction} className="space-y-4">
+      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}> {/* Prevent form submission */}
         <div className="space-y-2">
             <Label htmlFor="url">Website or Article URL</Label>
-            <Input id="url" name="url" placeholder="https://example.com/blog/my-awesome-article" required />
-            {state.errors?.url && <p className="text-sm text-destructive">{state.errors.url as string}</p>}
+            <Input id="url" name="url" placeholder="https://example.com/blog/my-awesome-article" disabled />
+            {/* {'url' in state.errors && <p className="text-sm text-destructive">{state.errors.url?.[0] as string}</p>} */}
         </div>
         <div className="space-y-2">
             <Label htmlFor="topic">Main Topic or Focus</Label>
@@ -86,9 +73,12 @@ export function VideoFromUrlGenerator() {
                 id="topic"
                 name="topic" 
                 placeholder="Briefly describe the key angle for the video. For example: 'Focus on the section about composting for beginners'." 
-                required 
+                disabled
             />
-            {state.errors?.topic && <p className="text-sm text-destructive">{state.errors.topic as string}</p>}
+            {/* {'topic' in state.errors && <p className="text-sm text-destructive">{state.errors.topic?.[0] as string}</p>} */}
+        </div>
+        <div className="text-center p-4 border border-dashed rounded-md text-muted-foreground">
+            This feature is currently unavailable.
         </div>
         <SubmitButton />
       </form>

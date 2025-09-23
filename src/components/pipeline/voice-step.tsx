@@ -14,11 +14,31 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { generatePipelineVoiceOverAction } from '@/lib/actions';
 import { Textarea } from '../ui/textarea';
 
-const initialState = {
+type Errors = {
+    script?: string[];
+    voice?: string[];
+};
+
+type State = {
+    message: string;
+    audio: string | null;
+    errors: Errors | {};
+};
+
+const initialState: State = {
   message: '',
   audio: null,
   errors: {},
 };
+
+// Helper function to safely access error properties
+function getError(state: State, field: keyof Errors): string | undefined {
+    if (typeof state.errors === 'object' && state.errors !== null && field in state.errors) {
+        const errors = (state.errors as Errors)[field];
+        return errors && errors.length > 0 ? errors[0] : undefined;
+    }
+    return undefined;
+}
 
 const voiceOptions = [
     {
@@ -106,7 +126,7 @@ export function VoiceStep({ script, onVoiceoverGenerated }: VoiceStepProps) {
                             ))}
                         </SelectContent>
                     </Select>
-                    {state.errors?.voice && <p className="text-sm text-destructive">{state.errors.voice[0]}</p>}
+                    {getError(state, 'voice') && <p className="text-sm text-destructive">{getError(state, 'voice')}</p>}
                 </div>
                 <SubmitButton />
             </form>

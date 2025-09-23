@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useFormStatus } from 'react-dom';
 import { useFormState } from 'react-dom';
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,28 @@ interface ReviewStepProps {
     videoUrl: string | null;
 }
 
-const socialShareInitialState = {
+type Errors = {
+    caption?: string[];
+    platforms?: string[];
+};
+
+type SocialShareState = {
+    message: string;
+    errors: Errors | {};
+};
+
+const socialShareInitialState: SocialShareState = {
     message: '',
     errors: {}
+};
+
+// Helper function to safely access error properties
+function getError(state: SocialShareState, field: keyof Errors): string | undefined {
+    if (typeof state.errors === 'object' && state.errors !== null && field in state.errors) {
+        const errors = (state.errors as Errors)[field];
+        return errors && errors.length > 0 ? errors[0] : undefined;
+    }
+    return undefined;
 }
 
 function ShareButton({ disabled }: { disabled: boolean }) {
@@ -200,7 +219,7 @@ export function ReviewStep({ script, audioUrl, videoUrl }: ReviewStepProps) {
                         <div className="space-y-2">
                             <Label htmlFor="caption">Caption</Label>
                             <Textarea id="caption" name="caption" placeholder="Write a caption for your post..." rows={5} required/>
-                            {state.errors?.caption && <p className="text-sm text-destructive">{state.errors.caption as string}</p>}
+                            {getError(state, 'caption') && <p className="text-sm text-destructive">{getError(state, 'caption')}</p>}
                         </div>
                         <div className="space-y-2">
                             <Label>Publish to</Label>
@@ -222,7 +241,7 @@ export function ReviewStep({ script, audioUrl, videoUrl }: ReviewStepProps) {
                                     </button>
                                 ))}
                             </div>
-                             {state.errors?.platforms && <p className="text-sm text-destructive mt-2">{state.errors.platforms as string}</p>}
+                             {getError(state, 'platforms') && <p className="text-sm text-destructive mt-2">{getError(state, 'platforms')}</p>}
                         </div>
                         <ShareButton disabled={selectedPlatforms.length === 0 || !videoUrl} />
                    </form>

@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { useFormState } from 'react-dom';
+import { useFormState, useFormStatus } from 'react-dom';
 import { analyzeThumbnailsAction } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,18 @@ import type { AnalyzeThumbnailsOutput } from '@/server/ai/flows/analyze-thumbnai
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 
-const initialState = {
+type ThumbnailActionState = {
+  message: string;
+  analysis: any; // We'll keep this as 'any' for now since we don't have the exact type
+  errors: {
+    thumbnailA_Url?: string[];
+    thumbnailB_Url?: string[];
+    videoTitle?: string[];
+    targetAudience?: string[];
+  };
+};
+
+const initialState: ThumbnailActionState = {
   message: '',
   analysis: null,
   errors: {},
@@ -128,7 +139,7 @@ export function ThumbnailTester() {
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   
-  const [state, formAction] = useFormState(analyzeThumbnailsAction, initialState);
+  const [state, formAction] = useFormState<ThumbnailActionState, FormData>(analyzeThumbnailsAction, initialState);
 
   const [fileA, setFileA] = useState<File | null>(null);
   const [previewA, setPreviewA] = useState<string | null>(null);
@@ -175,8 +186,8 @@ export function ThumbnailTester() {
     <div className="space-y-8">
         <form ref={formRef} action={formAction} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                <ThumbnailUploader id="thumbnailA" label="Thumbnail A" preview={previewA} onFileChange={handleFileChange(setPreviewA, setFileA)} error={state.errors?.thumbnailA?.[0]} disabled={false} />
-                <ThumbnailUploader id="thumbnailB" label="Thumbnail B" preview={previewB} onFileChange={handleFileChange(setPreviewB, setFileB)} error={state.errors?.thumbnailB?.[0]} disabled={false} />
+                <ThumbnailUploader id="thumbnailA" label="Thumbnail A" preview={previewA} onFileChange={handleFileChange(setPreviewA, setFileA)} error={state.errors?.thumbnailA_Url?.[0]} disabled={false} />
+                <ThumbnailUploader id="thumbnailB" label="Thumbnail B" preview={previewB} onFileChange={handleFileChange(setPreviewB, setFileB)} error={state.errors?.thumbnailB_Url?.[0]} disabled={false} />
             </div>
 
             <Card>

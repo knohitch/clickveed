@@ -15,7 +15,7 @@ import { createVoiceCloneAction } from '@/lib/actions';
 
 const initialState = {
   message: '',
-  result: null,
+  result: undefined,
   errors: {},
 };
 
@@ -94,7 +94,7 @@ export function VoiceCloningStudio() {
             <div className="space-y-2">
                 <Label htmlFor="voiceName">Name Your Voice</Label>
                 <Input id="voiceName" name="voiceName" placeholder="e.g., 'My Voice'" required/>
-                {state.errors?.voiceName && <p className="text-sm text-destructive">{state.errors.voiceName[0]}</p>}
+                {'voiceName' in state.errors && <p className="text-sm text-destructive">{state.errors.voiceName?.[0]}</p>}
             </div>
             <div className="space-y-2">
                 <Label htmlFor="audio-upload">Upload Audio Samples</Label>
@@ -118,7 +118,7 @@ export function VoiceCloningStudio() {
                         />
                     </label>
                 </div>
-                {state.errors?.fileUrls && <p className="text-sm text-destructive">{state.errors.fileUrls[0]}</p>}
+                {'fileUrls' in state.errors && <p className="text-sm text-destructive">{state.errors.fileUrls?.[0]}</p>}
             </div>
 
             {files.length > 0 && (

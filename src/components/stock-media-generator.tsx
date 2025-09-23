@@ -13,10 +13,18 @@ import Image from 'next/image';
 import { Skeleton } from './ui/skeleton';
 import { Card, CardContent } from './ui/card';
 
-const initialState = {
+type StockMediaActionState = {
+    message: string;
+    images: string[];
+    errors: {
+        prompt?: string[];
+    };
+};
+
+const initialState: StockMediaActionState = {
     message: '',
     images: [],
-    errors: { prompt: [] },
+    errors: {},
 };
 
 function SubmitButton() {
@@ -31,7 +39,7 @@ function SubmitButton() {
 
 export function StockMediaGenerator() {
   const { toast } = useToast();
-  const [state, formAction] = useFormState(generateStockMediaAction, initialState);
+  const [state, formAction] = useFormState<StockMediaActionState, FormData>(generateStockMediaAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const { pending } = useFormStatus();

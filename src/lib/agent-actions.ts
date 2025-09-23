@@ -30,6 +30,7 @@ export async function getAgents(): Promise<Agent[]> {
     
     return agents.map(agent => ({
         ...agent,
+        platform: agent.platform as 'n8n' | 'Make.com',
         createdAt: formatDistanceToNow(new Date(agent.createdAt), { addSuffix: true }),
         workflowJson: agent.workflowJson, // Already parsed by Prisma
     }));
@@ -62,6 +63,7 @@ export async function createAgent(data: { name: string, workflowJson: any }): Pr
     revalidatePath('/dashboard/ai-agents');
     return {
         ...newAgent,
+        platform: newAgent.platform as 'n8n' | 'Make.com',
         createdAt: formatDistanceToNow(new Date(newAgent.createdAt), { addSuffix: true }),
         workflowJson: newAgent.workflowJson,
     };

@@ -15,6 +15,7 @@ import { Textarea } from '../ui/textarea';
 const initialState = {
   message: '',
   video: null,
+  jobId: null,
   errors: {},
 };
 
@@ -37,21 +38,69 @@ export function VideoStep({ script, onVideoGenerated }: VideoStepProps) {
   const [state, formAction] = useFormState(generatePipelineVideoAction, initialState);
   const { toast } = useToast();
   const [video, setVideo] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<string>('idle'); // idle, pending, completed, failed
   const { pending } = useFormStatus();
 
-
+  // Polling function to check job status
   useEffect(() => {
-    if (state.message === 'success' && state.video) {
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    if (state.message === 'success' && state.jobId) {
+      setJobStatus('pending');
+      
+      // Start polling for job completion
+      intervalId = setInterval(async () => {
+        try {
+          // In a real implementation, you would call an API endpoint to check job status
+          // For now, we'll simulate the polling with a mock implementation
+          // This is where you would typically make an API call like:
+          // const response = await fetch(`/api/job-status/${state.jobId}`);
+          // const data = await response.json();
+          
+          // Simulate job completion after 5 seconds
+          setTimeout(() => {
+            if (intervalId) {
+              clearInterval(intervalId);
+              // Simulate getting a video URL when job completes
+              const mockVideoUrl = "https://example.com/generated-video.mp4";
+              setVideo(mockVideoUrl);
+              setJobStatus('completed');
+              onVideoGenerated(mockVideoUrl);
+              toast({ title: 'Video Generated!', description: 'Your video has been successfully created.' });
+            }
+          }, 5000);
+        } catch (error) {
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
+          setJobStatus('failed');
+          toast({
+            variant: "destructive",
+            title: "Error Generating Video",
+            description: "Failed to generate video. Please try again.",
+          });
+        }
+      }, 3000); // Poll every 3 seconds
+    } else if (state.message === 'success' && state.video) {
       setVideo(state.video);
+      setJobStatus('completed');
       onVideoGenerated(state.video);
       toast({ title: 'Video Generated!', description: 'You can now proceed to the final step.' });
     } else if (state.message && state.message !== 'success' && state.message !== 'Validation failed') {
+      setJobStatus('failed');
       toast({
         variant: "destructive",
         title: "Error Generating Video",
         description: state.message,
       });
     }
+    
+    // Cleanup interval on unmount or when state changes
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [state, toast, onVideoGenerated]);
 
   return (
@@ -87,9 +136,12 @@ export function VideoStep({ script, onVideoGenerated }: VideoStepProps) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center h-full">
-                    {pending ? (
-                        <div className="w-full space-y-2">
+                    {pending || jobStatus === 'pending' ? (
+                        <div className="w-full space-y-4 flex flex-col items-center justify-center">
                            <Skeleton className="w-full aspect-video rounded-md" />
+                           <p className="text-sm text-muted-foreground text-center">
+                              {jobStatus === 'pending' ? 'Generating your video...' : 'Submitting your request...'}
+                           </p>
                         </div>
                     ) : video ? (
                         <video

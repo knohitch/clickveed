@@ -1,14 +1,10 @@
-
-
 'use server';
 
 import { generateVideoScript } from "@/server/ai/flows/generate-video-script";
 import { generateVideoFromImage } from "@/server/ai/flows/generate-video-from-image";
-import { generateAutomationWorkflow } from "@/server/ai/flows/generate-automation-workflow";
 import { generatePersonaAvatar } from "@/server/ai/flows/generate-persona-avatar";
 import { generateVoiceOver } from "@/server/ai/flows/generate-voice-over";
 import { createVoiceClone } from "@/server/ai/flows/create-voice-clone";
-import { generateVideoFromUrl } from "@/server/ai/flows/generate-video-from-url";
 import { generateStockMedia } from "@/server/ai/flows/generate-stock-media";
 import { generatePipelineScript, generatePipelineVoiceOver, generatePipelineVideo } from "@/server/ai/flows/video-pipeline";
 import { generateTimedTranscript as generateTimedTranscriptFlow } from "@/server/ai/flows/generate-timed-transcript";
@@ -20,6 +16,7 @@ import { repurposeContent } from "@/server/ai/flows/repurpose-content";
 import { analyzeThumbnails } from "@/server/ai/flows/analyze-thumbnails";
 import { researchVideoTopic } from "@/server/ai/flows/research-video-topic";
 import { findViralClips as findViralClipsFlow } from "@/server/ai/flows/find-viral-clips";
+import { generateAutomationWorkflow } from "@/lib/ai/flows/generate-automation-workflow";
 import { z } from "zod";
 import type { CreativeAssistantChatRequest, Message } from "@/lib/types";
 import { revalidatePath } from "next/cache";
@@ -103,35 +100,6 @@ export async function generateVideoAction(prevState: any, formData: FormData) {
     }
 }
 
-
-const automationWorkflowSchema = z.object({
-    prompt: z.string().min(10, { message: "Workflow description must be at least 10 characters long." }),
-    platform: z.enum(['n8n', 'Make.com']),
-});
-
-export async function generateAutomationWorkflowAction(prevState: any, formData: FormData) {
-    const validatedFields = automationWorkflowSchema.safeParse({
-        prompt: formData.get('prompt'),
-        platform: formData.get('platform'),
-    });
-
-    if (!validatedFields.success) {
-        return {
-            message: 'Validation failed',
-            errors: validatedFields.error.flatten().fieldErrors,
-            workflow: null,
-        };
-    }
-
-    try {
-        const result = await generateAutomationWorkflow(validatedFields.data);
-        return { message: "success", workflow: result.workflow, errors: {} };
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { message: `An error occurred while generating the workflow: ${errorMessage}`, workflow: null, errors: {} };
-    }
-}
 
 const personaAvatarSchema = z.object({
     personaName: z.string().min(3, { message: "Persona name must be at least 3 characters long." }),
@@ -258,35 +226,6 @@ export async function createVoiceCloneAction(prevState: any, formData: FormData)
   }
 }
 
-const videoFromUrlSchema = z.object({
-  url: z.string().url({ message: "Please enter a valid URL." }),
-  topic: z.string().min(10, { message: "Topic must be at least 10 characters long." }),
-});
-
-export async function generateVideoFromUrlAction(prevState: any, formData: FormData) {
-  const validatedFields = videoFromUrlSchema.safeParse({
-    url: formData.get('url'),
-    topic: formData.get('topic'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      message: 'Validation failed',
-      errors: validatedFields.error.flatten().fieldErrors,
-      script: null,
-    };
-  }
-
-  try {
-    const result = await generateVideoFromUrl(validatedFields.data);
-    return { message: "success", script: result.script, errors: {} };
-  } catch (error) {
-    console.error(error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-    return { message: `An error occurred while generating the script: ${errorMessage}`, script: null, errors: {} };
-  }
-}
-
 const stockMediaSchema = z.object({
   prompt: z.string().min(3, { message: "Search prompt must be at least 3 characters long." }),
 });
@@ -391,16 +330,17 @@ export async function generatePipelineVideoAction(prevState: any, formData: Form
             message: 'Validation failed',
             errors: validatedFields.error.flatten().fieldErrors,
             video: null,
+            jobId: null,
         };
     }
 
     try {
         const result = await generatePipelineVideo(validatedFields.data);
-        return { message: "success", video: result.videoUrl, errors: {} };
+        return { message: "success", video: null, jobId: result.jobId, errors: {} };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { message: `An error occurred while generating the video: ${errorMessage}`, video: null, errors: {} };
+        return { message: `An error occurred while generating the video: ${errorMessage}`, video: null, jobId: null, errors: {} };
     }
 }
 
@@ -668,6 +608,35 @@ export async function shareVideoToSocialsAction(prevState: any, formData: FormDa
     // For now, we just simulate a success.
     console.log('Sharing video to:', validatedFields.data.platforms);
     return { message: 'success', errors: {} };
+}
+
+const automationWorkflowSchema = z.object({
+  prompt: z.string().min(10, { message: "Prompt must be at least 10 characters long." }),
+  platform: z.enum(['n8n', 'Make.com'], { message: "Please select a platform." }),
+});
+
+export async function generateAutomationWorkflowAction(prevState: any, formData: FormData) {
+  const validatedFields = automationWorkflowSchema.safeParse({
+    prompt: formData.get('prompt'),
+    platform: formData.get('platform'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      message: 'Validation failed',
+      errors: validatedFields.error.flatten().fieldErrors,
+      workflow: null,
+    };
+  }
+
+  try {
+    const result = await generateAutomationWorkflow(validatedFields.data);
+    return { message: "success", workflow: result.workflow, errors: {} };
+  } catch (error) {
+    console.error(error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { message: `An error occurred while generating the automation workflow: ${errorMessage}`, workflow: null, errors: {} };
+  }
 }
 
 export async function findViralClips(input: { videoId: string; }): Promise<{ clips: { id: number; title: string; startTime: number; endTime: number; reason: string; score: number; }[]; }> {

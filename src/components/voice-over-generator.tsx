@@ -113,7 +113,7 @@ export function VoiceOverGenerator() {
     setAudio(null);
   }
 
-  const singleSpeakerError = state.errors?.speakers?.[0] as unknown as { voice: string[] } | undefined;
+  const singleSpeakerError = 'speakers' in state.errors ? state.errors.speakers?.[0] as unknown as { voice: string[] } | undefined : undefined;
   
   return (
     <div className="grid md:grid-cols-2 gap-8 items-start">
@@ -129,7 +129,7 @@ export function VoiceOverGenerator() {
                 rows={8}
                 required
             />
-            {state.errors?.script && <p className="text-sm text-destructive">{state.errors.script as string}</p>}
+            {'script' in state.errors && <p className="text-sm text-destructive">{state.errors.script?.[0] as string}</p>}
         </div>
         
         <div className="flex items-center space-x-2">

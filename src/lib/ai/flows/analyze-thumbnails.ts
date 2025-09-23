@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { getAvailableImageGenerator } from '../api-service-manager';
+import { getAvailableImageGenerator, generateImageWithProvider } from '../api-service-manager';
 
 const AnalyzeThumbnailsInputSchema = z.object({
   thumbnailA_DataUri: z
@@ -57,8 +57,6 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     outputSchema: AnalyzeThumbnailsOutputSchema,
   },
   async input => {
-    const llm = await getAvailableImageGenerator();
-    
     const prompt = ai.definePrompt({
       name: 'analyzeThumbnailsPrompt',
       input: {schema: AnalyzeThumbnailsInputSchema},
@@ -87,12 +85,23 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     `,
     });
     
-    const {output} = await llm.generate(prompt, input);
+    // Prepare the messages for the AI using the correct Message type
+    const messages = [
+      {
+        role: 'user' as const,
+        content: [{ text: `Analyze these two thumbnails for a video titled "${input.videoTitle}" with target audience "${input.targetAudience}".
+        
+Thumbnail A: {{media url=${input.thumbnailA_DataUri}}}
+Thumbnail B: {{media url=${input.thumbnailB_DataUri}}}` }]
+      }
+    ];
+
+    // Use the generateImageWithProvider function to generate the response
+    const { output } = await generateImageWithProvider({ messages });
+    
     if (!output) {
         throw new Error("The AI failed to generate a thumbnail analysis.");
     }
     return output;
   }
 );
-
-    

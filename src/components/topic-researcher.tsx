@@ -15,7 +15,15 @@ import { Badge } from './ui/badge';
 import type { ResearchVideoTopicOutput } from '@/server/ai/flows/research-video-topic';
 import { Separator } from './ui/separator';
 
-const initialState = {
+type ResearchActionState = {
+  message: string;
+  ideas: string[];
+  errors: {
+    topic?: string[];
+  };
+};
+
+const initialState: ResearchActionState = {
   message: '',
   ideas: [],
   errors: {},
@@ -30,39 +38,24 @@ function SubmitButton({ pending }: { pending: boolean }) {
   );
 }
 
-const IdeaCard = ({ idea, index }: { idea: ResearchVideoTopicOutput['ideas'][0], index: number }) => {
+const IdeaCard = ({ idea, index }: { idea: string, index: number }) => {
     return (
         <Card>
             <CardHeader>
-                <div className="flex justify-between items-start gap-2">
-                    <CardTitle className="text-lg">{idea.title}</CardTitle>
-                    <Badge variant={idea.viralityScore > 85 ? 'default' : 'secondary'} className="flex-shrink-0">
-                        <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-                        {idea.viralityScore} / 100
-                    </Badge>
-                </div>
+                <CardTitle className="text-lg">{idea}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-                 <p className="text-sm text-muted-foreground">{idea.description}</p>
-                 <p className="text-sm"><strong className="text-foreground">Reasoning:</strong> {idea.reasoning}</p>
-                 <div>
-                    <h4 className="font-semibold text-sm mb-2">Keywords</h4>
-                    <div className="flex flex-wrap gap-2">
-                        {idea.keywords.map(keyword => (
-                            <Badge key={keyword} variant="outline">{keyword}</Badge>
-                        ))}
-                    </div>
-                 </div>
+            <CardContent>
+                <p className="text-sm text-muted-foreground">This is a suggested video title idea.</p>
             </CardContent>
         </Card>
     );
 }
 
 export function TopicResearcher() {
-  const [state, formAction] = useFormState(researchVideoTopicAction, initialState);
+  const [state, formAction] = useFormState<ResearchActionState, FormData>(researchVideoTopicAction, initialState);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [ideas, setIdeas] = useState<ResearchVideoTopicOutput['ideas']>([]);
+  const [ideas, setIdeas] = useState<ResearchVideoTopicOutput['titleIdeas']>([]);
 
   useEffect(() => {
     if (state.message === 'success' && state.ideas) {
@@ -119,7 +112,7 @@ export function TopicResearcher() {
                 </Card>
             ))
         ) : ideas.length > 0 ? (
-            ideas.map((idea, index) => <IdeaCard key={idea.title} idea={idea} index={index} />)
+            ideas.map((idea, index) => <IdeaCard key={index} idea={idea} index={index} />)
         ) : (
             <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-md">
                 <Lightbulb className="h-12 w-12 mx-auto mb-4" />

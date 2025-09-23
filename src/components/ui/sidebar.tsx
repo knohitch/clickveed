@@ -692,17 +692,14 @@ const SidebarMenuSub = React.forwardRef<
   React.ComponentProps<typeof CollapsibleContent>
 >(({ className, ...props }, ref) => {
     return (
-        <CollapsibleContent asChild>
+        <CollapsibleContent className={cn("block", className)} {...props}>
           <ul
             ref={ref}
             data-sidebar="menu-sub"
             className={cn(
-              "data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up overflow-hidden",
               "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-1",
-              "group-data-[collapsible=icon]:hidden",
-              className
+              "group-data-[collapsible=icon]:hidden"
             )}
-            {...props}
           />
         </CollapsibleContent>
   )

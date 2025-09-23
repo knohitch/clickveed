@@ -15,7 +15,18 @@ import { Input } from './ui/input';
 import { Skeleton } from './ui/skeleton';
 import { generateScriptAction } from '@/lib/actions';
 
-const initialState = {
+type ScriptActionState = {
+  message: string;
+  script: string | null;
+  errors: {
+    prompt?: string[];
+    videoType?: string[];
+    tone?: string[];
+    duration?: string[];
+  };
+};
+
+const initialState: ScriptActionState = {
   message: '',
   script: null,
   errors: {},
@@ -43,7 +54,7 @@ function SubmitButton() {
 }
 
 function ScriptGeneratorForm() {
-    const [state, formAction] = useFormState(generateScriptAction, initialState);
+    const [state, formAction] = useFormState<ScriptActionState, FormData>(generateScriptAction, initialState);
     const { toast } = useToast();
     const promptRef = useRef<HTMLTextAreaElement>(null);
     const [videoType, setVideoType] = useState<VideoType | ''>('');
@@ -108,7 +119,7 @@ function ScriptGeneratorForm() {
                         rows={4}
                         required
                     />
-                    {state.errors?.prompt && <p className="text-sm text-destructive">{state.errors.prompt as string}</p>}
+                    {state.errors?.prompt && <p className="text-sm text-destructive">{state.errors.prompt[0]}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -126,7 +137,7 @@ function ScriptGeneratorForm() {
                                 <SelectItem value="Product Review">Product Review</SelectItem>
                             </SelectContent>
                         </Select>
-                         {state.errors?.videoType && <p className="text-sm text-destructive">{state.errors.videoType as string}</p>}
+                         {state.errors?.videoType && <p className="text-sm text-destructive">{state.errors.videoType[0]}</p>}
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="tone">Tone of Voice</Label>
@@ -142,14 +153,14 @@ function ScriptGeneratorForm() {
                                 <SelectItem value="Dramatic">Dramatic</SelectItem>
                             </SelectContent>
                         </Select>
-                         {state.errors?.tone && <p className="text-sm text-destructive">{state.errors.tone as string}</p>}
+                         {state.errors?.tone && <p className="text-sm text-destructive">{state.errors.tone[0]}</p>}
                     </div>
                 </div>
 
                 <div className="space-y-2">
                     <Label htmlFor="duration">Target Duration</Label>
                     <Input id="duration" name="duration" placeholder="e.g., 30 seconds" required />
-                    {state.errors?.duration && <p className="text-sm text-destructive">{state.errors.duration as string}</p>}
+                    {state.errors?.duration && <p className="text-sm text-destructive">{state.errors.duration[0]}</p>}
                 </div>
 
                 <SubmitButton />

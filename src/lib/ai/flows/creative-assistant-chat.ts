@@ -4,7 +4,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import {CreativeAssistantChatSchema} from '@/lib/types';
 import type {CreativeAssistantChatRequest} from '@/lib/types';
-import { getAvailableTextGenerator } from '../api-service-manager';
+import { generateStreamWithProvider } from '../api-service-manager';
 
 // Define request types locally as they are no longer exported from genkit
 type MessageRole = 'user' | 'model' | 'system' | 'tool';
@@ -43,18 +43,25 @@ const creativeAssistantChatFlow = ai.defineFlow(
     outputSchema: z.any(),
   },
   async ({ history, message }) => {
-    const llm = await getAvailableTextGenerator();
-
-    const historyForAi: GenerateRequest['history'] = history?.map(h => ({
-      role: h.role,
-      content: [{text: h.content}],
-    })) || [];
+    // Construct the messages array properly for the AI request
+    const messages: Message[] = [
+      {
+        role: 'system',
+        content: [{ text: systemPrompt }]
+      },
+      {
+        role: 'user',
+        content: [{ text: message }]
+      },
+      ...(history?.map(h => ({
+        role: h.role,
+        content: [{text: h.content}]
+      })) || [])
+    ];
     
-    // Get the stream from the LLM
-    const streamResult = await llm.stream({
-        prompt: message,
-        history: historyForAi,
-        system: systemPrompt,
+    // Get the stream from the LLM using the proper provider function
+    const streamResult = await generateStreamWithProvider({
+        messages: messages,
     });
     
     // Transform the stream of structured chunks into a simple string stream
@@ -62,12 +69,10 @@ const creativeAssistantChatFlow = ai.defineFlow(
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
-          const iterator = streamResult[Symbol.asyncIterator]();
-          while (true) {
-            const { value, done } = await iterator.next();
-            if (done) break;
-            if (value.content) {
-              controller.enqueue(encoder.encode(value.content[0].text));
+          // For Genkit streaming responses, we need to handle the stream properly
+          for await (const chunk of streamResult) {
+            if (chunk.content) {
+              controller.enqueue(encoder.encode(chunk.content[0].text));
             }
           }
         } catch(e) {

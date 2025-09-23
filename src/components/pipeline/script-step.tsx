@@ -15,11 +15,33 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generatePipelineScriptAction } from '@/lib/actions';
 
-const initialState = {
+type Errors = {
+    prompt?: string[];
+    videoType?: string[];
+    tone?: string[];
+    duration?: string[];
+};
+
+type State = {
+    message: string;
+    script: string | null;
+    errors: Errors | {};
+};
+
+const initialState: State = {
   message: '',
   script: null,
   errors: {},
 };
+
+// Helper function to safely access error properties
+function getError(state: State, field: keyof Errors): string | undefined {
+    if (typeof state.errors === 'object' && state.errors !== null && field in state.errors) {
+        const errors = (state.errors as Errors)[field];
+        return errors && errors.length > 0 ? errors[0] : undefined;
+    }
+    return undefined;
+}
 
 const examplePrompts = {
     "Commercial": "A 30-second ad for 'Sparkle Brew,' a new cold brew coffee that boosts creativity. Show a writer overcoming writer's block after one sip.",
@@ -108,7 +130,7 @@ export function ScriptStep({ onScriptGenerated }: ScriptStepProps) {
                 rows={4}
                 required
             />
-            {state.errors?.prompt && <p className="text-sm text-destructive">{state.errors.prompt as string}</p>}
+            {getError(state, 'prompt') && <p className="text-sm text-destructive">{getError(state, 'prompt')}</p>}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -126,7 +148,7 @@ export function ScriptStep({ onScriptGenerated }: ScriptStepProps) {
                         <SelectItem value="Product Review">Product Review</SelectItem>
                     </SelectContent>
                 </Select>
-                 {state.errors?.videoType && <p className="text-sm text-destructive">{state.errors.videoType as string}</p>}
+                 {getError(state, 'videoType') && <p className="text-sm text-destructive">{getError(state, 'videoType')}</p>}
             </div>
              <div className="space-y-2">
                 <Label htmlFor="tone">Tone of Voice</Label>
@@ -142,14 +164,14 @@ export function ScriptStep({ onScriptGenerated }: ScriptStepProps) {
                         <SelectItem value="Dramatic">Dramatic</SelectItem>
                     </SelectContent>
                 </Select>
-                 {state.errors?.tone && <p className="text-sm text-destructive">{state.errors.tone as string}</p>}
+                 {getError(state, 'tone') && <p className="text-sm text-destructive">{getError(state, 'tone')}</p>}
             </div>
         </div>
 
         <div className="space-y-2">
             <Label htmlFor="duration">Target Duration</Label>
             <Input id="duration" name="duration" placeholder="e.g., 30 seconds" required />
-            {state.errors?.duration && <p className="text-sm text-destructive">{state.errors.duration as string}</p>}
+            {getError(state, 'duration') && <p className="text-sm text-destructive">{getError(state, 'duration')}</p>}
         </div>
 
         <SubmitButton />

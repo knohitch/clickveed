@@ -63,9 +63,9 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
 
     if (!hasCreatedTicket.current) {
         createTicket({
-            userName: user.displayName?.toString() || 'User',
+            userName: user.name || 'User',
             userEmail: user.email || 'No email provided',
-            userAvatar: user.avatarUrl?.toString() || '',
+            userAvatar: '', // next-auth User type doesn't have avatarUrl
             subject: `Chat: ${userInput.substring(0, 50)}...`,
             initialMessage: userInput,
         });
@@ -82,7 +82,7 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
     formRef.current?.reset();
     
     formData.append('history', JSON.stringify(history));
-    formAction(formData as any);
+    formAction(formData);
   }
 
    useEffect(() => {
@@ -107,7 +107,11 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
                 const { value, done } = await reader.read();
                 if (done) break;
                 
-                fullResponse += decoder.decode(value, { stream: true });
+                // Check if value exists before decoding
+                if (value) {
+                    const chunk = decoder.decode(value as unknown as Uint8Array);
+                    fullResponse += chunk;
+                }
 
                 setMessages(prev => {
                     const newMessages = [...prev];
