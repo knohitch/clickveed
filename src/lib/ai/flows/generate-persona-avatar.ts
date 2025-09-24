@@ -11,7 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { getAvailableVideoGenerator, getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
+import { getAvailableVideoGenerator, generateVideoWithProvider, generateImageWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
@@ -45,13 +45,14 @@ export async function generatePersonaAvatar(
 
 async function generateVideoInBackground(userId: string, personaName: string, avatarImageDataUri: string, script: string) {
     try {
-        const videoGenerator = await getAvailableVideoGenerator();
+        const providerInfo = await getAvailableVideoGenerator();
         const videoPrompt = [
             { text: `Animate this avatar to speak the following script in a natural way. Script: "${script}"` },
             { media: { url: avatarImageDataUri } }
         ];
 
-        let { operation } = await videoGenerator.generate({
+        const result = await ai.generate({
+            model: providerInfo.model,
             prompt: videoPrompt,
             config: {
                 durationSeconds: 8,
@@ -60,25 +61,16 @@ async function generateVideoInBackground(userId: string, personaName: string, av
             }
         });
 
-        if (!operation) {
-            throw new Error('Expected the video model to return an operation.');
+        if (!result.output?.message?.content) {
+            throw new Error('Video generation failed. No content was returned.');
         }
 
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            operation = await videoGenerator.checkOperation(operation);
-        }
-
-        if (operation.error) {
-            throw new Error(`Video generation failed: ${operation.error.message}`);
-        }
-
-        const videoMediaPart = operation.output?.message?.content.find((p) => !!p.media);
-        if (!videoMediaPart?.media) {
+        const videoMediaContent = result.output.message.content.find((p: any) => !!p.media);
+        if (!videoMediaContent?.media) {
             throw new Error('Video generation failed. No media was returned in the final operation.');
         }
 
-        const { publicUrl, sizeMB } = await uploadToWasabi(videoMediaPart.media.url, 'videos');
+        const { publicUrl, sizeMB } = await uploadToWasabi(videoMediaContent.media.url, 'videos');
 
         await prisma.mediaAsset.create({
             data: {
@@ -103,7 +95,6 @@ const generatePersonaAvatarFlow = ai.defineFlow(
     outputSchema: GeneratePersonaAvatarOutputSchema,
   },
   async (input) => {
-    const imageGenerator = await getAvailableImageGenerator();
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -111,15 +102,21 @@ const generatePersonaAvatarFlow = ai.defineFlow(
     }
 
     // Step 1: Generate the static avatar image first and return it immediately.
-    const { media: imageMedia } = await imageGenerator.generate({
-        prompt: input.avatarDescription,
+    const imageResult = await generateImageWithProvider({
+        messages: [{ role: 'user', content: [{ text: input.avatarDescription }] }],
         config: { responseModalities: ['TEXT', 'IMAGE'] }
     });
 
-    if (!imageMedia || !imageMedia[0]?.url) {
+    if (!imageResult.output?.message?.content) {
         throw new Error("Failed to generate the initial avatar image.");
     }
-    const avatarImageDataUri = imageMedia[0].url;
+
+    const imageMediaContent = imageResult.output.message.content.find((p: any) => !!p.media);
+    if (!imageMediaContent?.media) {
+        throw new Error("Failed to generate the initial avatar image - no media returned.");
+    }
+
+    const avatarImageDataUri = imageMediaContent.media.url;
     
     // Sequential upload and DB write to prevent orphaned files
     const { publicUrl: avatarImageUrl, sizeMB: avatarImageSize } = await uploadToWasabi(avatarImageDataUri, 'images');

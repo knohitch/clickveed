@@ -1,32 +1,50 @@
 
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
-import { RateLimiter } from '@/lib/rate-limiter';
 
 // Custom middleware logic to handle special cases
 export default auth(async (req) => {
-  // Redis-based rate limiting for AI routes
+  // Server-side rate limiting for AI routes (Edge Runtime compatible)
   if (req.nextUrl.pathname.startsWith('/api/ai')) {
     const ip = req.ip || 'unknown';
     const clientIP = req.headers.get('x-forwarded-for') || ip;
     const rateKey = `ai:${clientIP}`;
     
-    const { isLimited, resetTime } = await RateLimiter.isRateLimited(rateKey, 60000, 10);
-    
-    if (isLimited) {
-      const headers = new Headers();
-      const rateLimitHeaders = RateLimiter.getRateLimitHeaders(true, resetTime);
-      Object.entries(rateLimitHeaders).forEach(([key, value]) => {
-        headers.set(key, value);
+    try {
+      // Call the server-side rate limiting API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/rate-limit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: rateKey,
+          windowMs: 60000,
+          maxRequests: 10
+        }),
       });
       
-      return new NextResponse(
-        JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }), 
-        { 
-          status: 429,
-          headers
+      const { isLimited, resetTime } = await response.json();
+      
+      if (isLimited) {
+        const headers = new Headers();
+        if (resetTime) {
+          headers.set('X-RateLimit-Limit', '10');
+          headers.set('X-RateLimit-Remaining', '0');
+          headers.set('X-RateLimit-Reset', Math.ceil(resetTime / 1000).toString());
         }
-      );
+        
+        return new NextResponse(
+          JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }), 
+          { 
+            status: 429,
+            headers
+          }
+        );
+      }
+    } catch (error) {
+      // If rate limiting API fails, allow the request through
+      console.error('Rate limiting API error:', error);
     }
   }
 

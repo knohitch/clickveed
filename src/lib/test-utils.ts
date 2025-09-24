@@ -74,42 +74,6 @@ export async function testDatabaseConnection(): Promise<{
   }
 }
 
-/**
- * Test Redis connection (if configured)
- */
-export async function testRedisConnection(): Promise<{ 
-  connected: boolean; 
-  error?: string 
-}> {
-  try {
-    if (!process.env.REDIS_URL) {
-      return {
-        connected: false,
-        error: 'REDIS_URL not configured'
-      };
-    }
-    
-    // Try to create a Redis client to test connection
-    const IORedis = await import('ioredis');
-    const redis = new IORedis.default(process.env.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      lazyConnect: true,
-    });
-    
-    // Test connection
-    await redis.ping();
-    await redis.quit();
-    
-    return {
-      connected: true
-    };
-  } catch (error) {
-    return {
-      connected: false,
-      error: (error as Error).message
-    };
-  }
-}
 
 /**
  * Test API endpoint accessibility

@@ -51,11 +51,12 @@ const generateStockMediaFlow = ai.defineFlow(
     }
     
     let promptText = input.prompt;
-    if (generator.name === 'gemini') {
+    if (generator.provider === 'gemini') {
         promptText = `Photorealistic stock photo: ${input.prompt}. High quality, professional, clean, for commercial use.`
     }
     
-    const { media } = await generator.generate({
+    const { media } = await ai.generate({
+      model: generator.model,
       prompt: promptText,
       config: {
           count: 4,
