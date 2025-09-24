@@ -40,7 +40,9 @@ const nextConfig = {
     // Configure Next.js for production
     productionBrowserSourceMaps: false,
     // Disable automatic static optimization for better control
-    staticPageGenerationTimeout: 60
+    staticPageGenerationTimeout: 60,
+    // Enable standalone output for Docker deployment
+    output: 'standalone'
 };
 
 export default nextConfig;
