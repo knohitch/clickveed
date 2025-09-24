@@ -116,11 +116,39 @@ const generateAutomationWorkflowFlow = ai.defineFlow(
       },
     ];
 
-    const { output } = await generateWithProvider({ messages });
-
-    if (!output?.workflow) {
+    // Use type assertion to handle the union type returned by generateWithProvider
+    const response: any = await generateWithProvider({ messages });
+    
+    // Extract content from the response - matches pattern used in other files
+    let content = '';
+    
+    // Check if response has output property (Genkit format)
+    if (response.output) {
+      // For Genkit responses, we need to stringify the output to get the JSON
+      content = JSON.stringify(response.output);
+    } 
+    // Check if response has result property (OpenAI format)
+    else if (response.result?.content?.[0]?.text) {
+      content = response.result.content[0].text;
+    }
+    
+    if (!content) {
       throw new Error('Failed to generate a valid workflow from the prompt.');
     }
-    return output;
+    
+    try {
+      // Parse the JSON response to get the workflow object
+      // If content is already a stringified object, we parse it
+      // If it's a JSON string from the AI, we also parse it
+      const workflow = typeof content === 'string' ? JSON.parse(content) : content;
+      
+      if (!workflow) {
+        throw new Error('Failed to generate a valid workflow from the prompt.');
+      }
+      
+      return { workflow };
+    } catch (error) {
+      throw new Error('Failed to parse the generated workflow JSON.');
+    }
   }
 );
