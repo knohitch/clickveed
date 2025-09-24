@@ -39,18 +39,12 @@ const generateVideoFromUrlFlow = ai.defineFlow(
     outputSchema: GenerateVideoFromUrlOutputSchema,
   },
   async (input) => {
-    const llm = await getAvailableTextGenerator();
-    
-    const prompt = ai.definePrompt({
-      name: 'generateVideoFromUrlPrompt',
-      input: {schema: GenerateVideoFromUrlInputSchema},
-      output: {schema: GenerateVideoFromUrlOutputSchema},
-      prompt: `You are an expert video scriptwriter who specializes in converting web content into engaging videos.
+    const prompt = `You are an expert video scriptwriter who specializes in converting web content into engaging videos.
 
     Your task is to create a short video script (around 1 minute) based on the content found at the following URL and focused on the given topic.
 
-    - URL: {{{url}}}
-    - Topic: {{{topic}}}
+    - URL: ${input.url}
+    - Topic: ${input.topic}
 
     First, conceptually summarize the key points of the content from the URL related to the topic.
     Then, use that summary to write a complete video script. The script should include scene descriptions, voiceover text, and suggested visuals.
@@ -58,15 +52,12 @@ const generateVideoFromUrlFlow = ai.defineFlow(
     IMPORTANT: Since you cannot access external URLs directly, you must act as if you have read the content at the URL. Base your script on the general knowledge you have about the provided topic and assume it reflects the content of the URL.
 
     For example, if the URL is about 'eco-friendly-gardening' and the topic is 'composting for beginners', generate a script that explains composting basics, assuming that information is in the article.
+    `;
 
-    Respond ONLY with the JSON object containing the final script.
-    `,
-    });
-    
     // In a real implementation with URL scraping capabilities,
     // you would first fetch and parse the content from input.url.
     // For now, the prompt instructs the model to simulate this.
-    const {output} = await llm.generate(prompt, input);
+    const {output} = await ai.generate({prompt, output: {schema: GenerateVideoFromUrlOutputSchema}});
 
     if (!output?.script) {
         throw new Error("The AI failed to generate a script from the provided URL and topic.");
@@ -74,5 +65,3 @@ const generateVideoFromUrlFlow = ai.defineFlow(
     return output;
   }
 );
-
-    

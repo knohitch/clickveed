@@ -43,29 +43,26 @@ const researchVideoTopicFlow = ai.defineFlow(
     inputSchema: ResearchVideoTopicInputSchema,
     outputSchema: ResearchVideoTopicOutputSchema,
   },
-  async input => {
-    const llm = await getAvailableTextGenerator();
-    const prompt = ai.definePrompt({
-        name: 'researchVideoTopicPrompt',
-        input: {schema: ResearchVideoTopicInputSchema},
-        output: {schema: ResearchVideoTopicOutputSchema},
-        prompt: `You are an expert YouTube content strategist and trend analyst.
-        Your task is to take a user's topic and generate a list of 3-5 specific, engaging, and potentially viral video ideas.
+  async ({topic}) => {
+    const prompt = `You are an expert YouTube content strategist and trend analyst.
+    Your task is to take a user's topic and generate a list of 3-5 specific, engaging, and potentially viral video ideas.
 
-        **Topic:** "{{{topic}}}"
+    **Topic:** "${topic}"
 
-        For each idea, you must provide:
-        1.  **Title:** A compelling, clickable title that is optimized for search.
-        2.  **Description:** A short paragraph outlining the video's content and angle.
-        3.  **Keywords:** A list of 5-7 keywords to help with YouTube SEO.
-        4.  **Virality Score:** A score from 0-100 indicating its potential for high engagement. A score of 85+ is considered excellent.
-        5.  **Reasoning:** A brief justification for the idea and its score, explaining why it would appeal to viewers (e.g., "addresses a common pain point," "taps into a current trend," "has high emotional potential").
+    For each idea, you must provide:
+    1.  **Title:** A compelling, clickable title that is optimized for search.
+    2.  **Description:** A short paragraph outlining the video's content and angle.
+    3.  **Keywords:** A list of 5-7 keywords to help with YouTube SEO.
+    4.  **Virality Score:** A score from 0-100 indicating its potential for high engagement. A score of 85+ is considered excellent.
+    5.  **Reasoning:** A brief justification for the idea and its score, explaining why it would appeal to viewers (e.g., "addresses a common pain point," "taps into a current trend," "has high emotional potential").
 
-        Think about what makes content shareable: controversy, novelty, strong emotion, high utility, etc. Generate a diverse set of ideas.
-        `,
+    Think about what makes content shareable: controversy, novelty, strong emotion, high utility, etc. Generate a diverse set of ideas.
+    `;
+
+    const {output} = await ai.generate({
+        prompt,
+        output: {schema: ResearchVideoTopicOutputSchema}
     });
-
-    const {output} = await llm.generate(prompt, input);
     if (!output?.ideas || output.ideas.length === 0) {
         throw new Error("The AI failed to generate any video ideas for this topic.");
     }
@@ -74,5 +71,3 @@ const researchVideoTopicFlow = ai.defineFlow(
     return output;
   }
 );
-
-    

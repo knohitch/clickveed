@@ -69,15 +69,12 @@ const findViralClipsFlow = ai.defineFlow(
     const { transcript } = videoData;
 
     // Step 2: Use the transcript to find viral clips.
-    const prompt = ai.definePrompt({
-        name: 'findViralClipsPrompt',
-        input: { schema: z.object({ transcript: z.string() }) },
-        output: { schema: FindViralClipsOutputSchema },
-        prompt: promptTemplate,
+    const prompt = promptTemplate.replace('{{{transcript}}}', transcript);
+
+    const { output } = await ai.generate({
+        prompt,
+        output: { schema: FindViralClipsOutputSchema }
     });
-    
-    const llm = await getAvailableTextGenerator();
-    const { output } = await llm.generate(prompt, { transcript });
     
     if (!output || !output.clips || output.clips.length === 0) {
         throw new Error("AI failed to generate viral clip suggestions from the transcript.");

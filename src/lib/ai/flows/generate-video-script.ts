@@ -28,32 +28,26 @@ const GenerateVideoScriptOutputSchema = z.object({
 
 export type GenerateVideoScriptOutput = z.infer<typeof GenerateVideoScriptOutputSchema>;
 
-export async function generateVideoScript(input: GenerateVideoScriptInput): Promise<GenerateVideoScriptOutput> {
-  const llm = await getAvailableTextGenerator();
-  
-  const prompt = ai.definePrompt({
-    name: 'generateVideoScriptPrompt',
-    input: {schema: GenerateVideoScriptInputSchema},
-    output: {schema: GenerateVideoScriptOutputSchema},
-    prompt: `You are an expert AI video scriptwriter. Your task is to generate a compelling and well-structured video script based on the user's requirements.
+export async function generateVideoScript({prompt, videoType, tone, duration}: GenerateVideoScriptInput): Promise<GenerateVideoScriptOutput> {
+  const scriptPrompt = `You are an expert AI video scriptwriter. Your task is to generate a compelling and well-structured video script based on the user's requirements.
 
   Pay close attention to all the details provided:
 
-  - **Core Idea:** {{{prompt}}}
-  - **Video Type:** {{{videoType}}}
-  - **Desired Tone:** {{{tone}}}
-  - **Target Duration:** {{{duration}}}
+  - **Core Idea:** ${prompt}
+  - **Video Type:** ${videoType}
+  - **Desired Tone:** ${tone}
+  - **Target Duration:** ${duration}
 
   Based on this, create a complete script. The script should include scene descriptions, dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.
-  `,
-  });
+  `;
 
-  const {output} = await llm.generate(prompt, input);
+  const {output} = await ai.generate({
+    prompt: scriptPrompt,
+    output: {schema: GenerateVideoScriptOutputSchema}
+  });
   
   if (!output?.script) {
       throw new Error("The AI failed to generate a script based on the provided inputs.");
   }
   return output;
 }
-
-    
