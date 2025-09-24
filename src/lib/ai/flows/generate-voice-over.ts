@@ -1,5 +1,3 @@
-
-
 'use server';
 /**
  * @fileOverview An AI agent that generates a voice over from a script and uploads it to Wasabi.
@@ -71,7 +69,7 @@ const generateVoiceOverFlow = ai.defineFlow(
     outputSchema: GenerateVoiceOverOutputSchema,
   },
   async ({script, speakers}) => {
-    const ttsProvider = await getAvailableTTSProvider();
+    const ttsProviderInfo = await getAvailableTTSProvider();
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -101,7 +99,9 @@ const generateVoiceOverFlow = ai.defineFlow(
         };
     }
     
-    const {media} = await ttsProvider.generate({
+    // Use the ai.generate function directly with the correct model
+    const {media} = await ai.generate({
+      model: ttsProviderInfo.model,
       prompt: script,
       config: {
         responseModalities: ['AUDIO'],
