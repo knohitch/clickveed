@@ -39,23 +39,21 @@ const summarizeVideoContentFlow = ai.defineFlow(
     outputSchema: SummarizeVideoContentOutputSchema,
   },
   async input => {
-    const llm = await getAvailableTextGenerator();
-    const prompt = ai.definePrompt({
-      name: 'summarizeVideoContentPrompt',
-      input: {schema: SummarizeVideoContentInputSchema},
-      output: {schema: SummarizeVideoContentOutputSchema},
-      prompt: `You are an expert summarizer of video content.
+    const prompt = `You are an expert summarizer of video content.
 
 You will be given a video transcript and your job is to summarize the video content in a concise and informative way, extracting the key points.
 
-Video Transcript: {{{transcript}}}
-`,
+Video Transcript: ${input.transcript}
+`;
+
+    // Generate the summary using the AI service
+    const { output } = await ai.generate({
+      prompt,
+      output: { schema: SummarizeVideoContentOutputSchema }
     });
     
-    const {output} = await llm.generate(prompt, input);
-    
     if (!output?.summary) {
-        throw new Error("The AI failed to generate a summary for this content.");
+      throw new Error("The AI failed to generate a summary for this content.");
     }
     
     return output;

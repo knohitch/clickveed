@@ -71,6 +71,9 @@ interface AdminSettingsContextType extends AllSettings {
   isMakeConfigured: boolean;
   isGoogleAIConfigured: boolean;
   isStripeConfigured: boolean;
+  isElevenLabsConfigured: boolean;
+  isPikaConfigured: boolean;
+  isRunwayMLConfigured: boolean;
   loading: boolean;
 }
 
@@ -206,6 +209,9 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     isMakeConfigured: !!settings.apiKeys.make,
     isGoogleAIConfigured: !!settings.apiKeys.gemini,
     isStripeConfigured: !!settings.apiKeys.stripeSecretKey && !!settings.apiKeys.stripePublishableKey,
+    isElevenLabsConfigured: !!settings.apiKeys.elevenlabs,
+    isPikaConfigured: !!settings.apiKeys.pika,
+    isRunwayMLConfigured: !!settings.apiKeys.runwayml,
     loading: loading,
   }), [settings, loading, handleSettingChange]);
 

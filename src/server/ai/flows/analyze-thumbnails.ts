@@ -57,22 +57,16 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     outputSchema: AnalyzeThumbnailsOutputSchema,
   },
   async input => {
-    const llm = await getAvailableImageGenerator();
-    
-    const prompt = ai.definePrompt({
-      name: 'analyzeThumbnailsPrompt',
-      input: {schema: AnalyzeThumbnailsInputSchema},
-      output: {schema: AnalyzeThumbnailsOutputSchema},
-      prompt: `You are a world-class YouTube strategy expert with a keen eye for what makes a thumbnail successful.
+    const prompt = `You are a world-class YouTube strategy expert with a keen eye for what makes a thumbnail successful.
     Your task is to analyze two competing thumbnails for a video and determine which is more likely to get a higher click-through rate (CTR).
 
     **Video Context:**
-    - **Title:** "{{{videoTitle}}}"
-    - **Target Audience:** "{{{targetAudience}}}"
+    - **Title:** "${input.videoTitle}"
+    - **Target Audience:** "${input.targetAudience}"
 
     **Thumbnails for Analysis:**
-    - **Thumbnail A:** {{media url=thumbnailA_DataUri}}
-    - **Thumbnail B:** {{media url=thumbnailB_DataUri}}
+    - **Thumbnail A:** ${input.thumbnailA_DataUri}
+    - **Thumbnail B:** ${input.thumbnailB_DataUri}
 
     **Your Analysis Criteria:**
     Evaluate each thumbnail based on the following principles. For each, provide a score from 0-100, a list of 2-3 pros, and 2-3 cons.
@@ -83,16 +77,17 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     4.  **Relevance to Context:** How well does the thumbnail align with the video title and target audience? Does it accurately represent the video's content and promise?
 
     **Final Recommendation:**
-    After analyzing both, provide a final recommendation ('A' or 'B') and a brief, conclusive reasoning for your choice.
-    `,
+    After analyzing both, provide a final recommendation ('A' or 'B') and a brief, conclusive reasoning for your choice.`;
+
+    const {output} = await ai.generate({
+      prompt,
+      output: {schema: AnalyzeThumbnailsOutputSchema}
     });
     
-    const {output} = await llm.generate(prompt, input);
     if (!output) {
-        throw new Error("The AI failed to generate a thumbnail analysis.");
+      throw new Error("The AI failed to generate a thumbnail analysis.");
     }
+    
     return output;
   }
 );
-
-    

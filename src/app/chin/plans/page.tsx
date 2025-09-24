@@ -23,6 +23,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 
 // Define types
 type PlanFeature = {
@@ -41,6 +42,13 @@ type Plan = {
   features: PlanFeature[];
   createdAt: Date;
   updatedAt: Date;
+  videoExports?: number | null;
+  aiCredits?: number | null;
+  storageGB?: number | null;
+  stripeProductId?: string | null;
+  stripePriceIdMonthly?: string | null;
+  stripePriceIdQuarterly?: string | null;
+  stripePriceIdYearly?: string | null;
 };
 
 const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { 
@@ -225,66 +233,26 @@ export default function ChinPlansPage() {
   const [editingPlan, setEditingPlan] = React.useState<Partial<Plan> | null>(null);
   const [planToDelete, setPlanToDelete] = React.useState<Plan | null>(null);
 
-  // Simulate loading data
+  // Fetch real data from the database
   React.useEffect(() => {
-    setTimeout(() => {
-      // Sample data
-      const samplePlans: Plan[] = [
-        {
-          id: 'plan_free',
-          name: 'Free',
-          description: 'Perfect for getting started',
-          priceMonthly: 0,
-          priceQuarterly: 0,
-          priceYearly: 0,
-          features: [
-            { id: 'free_1', text: 'Basic video editing tools', planId: 'plan_free' },
-            { id: 'free_2', text: 'Up to 2 projects', planId: 'plan_free' },
-            { id: 'free_3', text: 'Standard resolution export', planId: 'plan_free' },
-          ],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: 'plan_pro',
-          name: 'Pro',
-          description: 'For professional creators',
-          priceMonthly: 29.99,
-          priceQuarterly: 79.99,
-          priceYearly: 299.99,
-          features: [
-            { id: 'pro_1', text: 'Advanced AI video editing tools', planId: 'plan_pro' },
-            { id: 'pro_2', text: 'Unlimited projects', planId: 'plan_pro' },
-            { id: 'pro_3', text: '4K resolution export', planId: 'plan_pro' },
-            { id: 'pro_4', text: 'Priority support', planId: 'plan_pro' },
-            { id: 'pro_5', text: 'Cloud storage (1TB)', planId: 'plan_pro' },
-          ],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: 'plan_enterprise',
-          name: 'Enterprise',
-          description: 'For large teams and organizations',
-          priceMonthly: 99.99,
-          priceQuarterly: 269.99,
-          priceYearly: 999.99,
-          features: [
-            { id: 'ent_1', text: 'All Pro features', planId: 'plan_enterprise' },
-            { id: 'ent_2', text: 'Team collaboration tools', planId: 'plan_enterprise' },
-            { id: 'ent_3', text: 'Custom AI model training', planId: 'plan_enterprise' },
-            { id: 'ent_4', text: 'Dedicated account manager', planId: 'plan_enterprise' },
-            { id: 'ent_5', text: '24/7 premium support', planId: 'plan_enterprise' },
-            { id: 'ent_6', text: 'Unlimited cloud storage', planId: 'plan_enterprise' },
-          ],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-      ];
-      setPlans(samplePlans);
-      setLoading(false);
-    }, 800);
-  }, []);
+    async function fetchPlans() {
+      try {
+        setLoading(true);
+        const settings = await getAdminSettings();
+        setPlans(settings.plans);
+      } catch (error) {
+        console.error("Failed to fetch plans:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load subscription plans. Please try again.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPlans();
+  }, [toast]);
 
   const handleEdit = (plan: Plan) => {
     setEditingPlan(plan);

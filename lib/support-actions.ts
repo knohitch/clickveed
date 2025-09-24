@@ -25,7 +25,7 @@ export interface SupportTicket {
     id: string;
     userName: string;
     userEmail: string;
-    userAvatar: string;
+    userAvatar: string | null;
     subject: string;
     preview: string;
     status: TicketStatus;
@@ -83,70 +83,94 @@ export async function createPendingAdminUser(userData: { fullName: string; email
 }
 
 
-// --- Ticket Actions (To be migrated to Prisma) ---
-const mockTickets: SupportTicket[] = [
-    {
-        id: 'TKT-001',
-        userName: 'Alice Johnson',
-        userEmail: 'alice@example.com',
-        userAvatar: 'https://placehold.co/40x40.png',
-        subject: 'Problem with video export',
-        preview: 'Hi, I was trying to export my video but it keeps failing at 99%...',
-        status: 'Open',
-        lastUpdate: '15m ago',
-        conversation: [
-            { sender: 'user', text: 'Hi, I was trying to export my video but it keeps failing at 99%. Can you help?', timestamp: '10:30 AM' },
-        ]
-    },
-     {
-        id: 'TKT-002',
-        userName: 'Bob Williams',
-        userEmail: 'bob@example.com',
-        userAvatar: 'https://placehold.co/40x40.png',
-        subject: 'Billing question',
-        preview: 'I have a question about my last invoice. I was charged twice...',
-        status: 'Open',
-        lastUpdate: '45m ago',
-        conversation: [
-             { sender: 'user', text: 'I have a question about my last invoice. I was charged twice and I need a refund for one of them.', timestamp: '9:45 AM' },
-        ]
-    },
-];
-
 export async function getTickets(): Promise<SupportTicket[]> {
-    return JSON.parse(JSON.stringify(mockTickets.sort((a,b) => a.id < b.id ? 1 : -1)));
+    const tickets = await prisma.supportTicket.findMany({
+        orderBy: {
+            createdAt: 'desc'
+        }
+    });
+
+    return tickets.map(ticket => ({
+        id: ticket.id,
+        userName: ticket.userName,
+        userEmail: ticket.userEmail,
+        userAvatar: ticket.userAvatar || '',
+        subject: ticket.subject,
+        preview: ticket.preview,
+        status: ticket.status as TicketStatus,
+        lastUpdate: getTimeAgo(ticket.updatedAt),
+        conversation: Array.isArray(ticket.conversation) ? ticket.conversation : JSON.parse(JSON.stringify(ticket.conversation))
+    }));
+}
+
+// Helper function to format time ago
+function getTimeAgo(date: Date): string {
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / 60000);
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
 }
 
 export async function createTicket(data: Omit<SupportTicket, 'id' | 'status' | 'lastUpdate' | 'preview' | 'conversation'> & { initialMessage: string }): Promise<SupportTicket> {
-    const newTicket: SupportTicket = {
-        id: `TKT-${String(Date.now()).slice(-6)}`,
-        ...data,
-        status: 'Open',
-        lastUpdate: 'Just now',
-        preview: data.initialMessage.substring(0, 100) + '...',
-        conversation: [
-            {
-                sender: 'user',
-                text: data.initialMessage,
-                timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-            }
-        ]
-    };
-    mockTickets.push(newTicket);
+    const newTicket = await prisma.supportTicket.create({
+        data: {
+            userName: data.userName,
+            userEmail: data.userEmail,
+            userAvatar: data.userAvatar,
+            subject: data.subject,
+            preview: data.initialMessage.substring(0, 100) + '...',
+            status: 'Open',
+            conversation: [
+                {
+                    sender: 'user',
+                    text: data.initialMessage,
+                    timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                }
+            ]
+        }
+    });
     
     console.log(`Email Sent: New support ticket ${newTicket.id} created by ${data.userName}.`);
     
-    return newTicket;
+    return {
+        id: newTicket.id,
+        userName: newTicket.userName,
+        userEmail: newTicket.userEmail,
+        userAvatar: newTicket.userAvatar || '',
+        subject: newTicket.subject,
+        preview: newTicket.preview,
+        status: newTicket.status as TicketStatus,
+        lastUpdate: 'Just now',
+        conversation: Array.isArray(newTicket.conversation) ? newTicket.conversation : JSON.parse(JSON.stringify(newTicket.conversation))
+    };
 }
 
 export async function updateTicket(ticketId: string, updates: Partial<SupportTicket>): Promise<SupportTicket> {
-    const ticketIndex = mockTickets.findIndex(t => t.id === ticketId);
-    if (ticketIndex === -1) {
-        throw new Error("Ticket not found");
-    }
+    // Prepare the data for Prisma update
+    const updateData: any = {};
     
-    const updatedTicket = { ...mockTickets[ticketIndex], ...updates };
-    mockTickets[ticketIndex] = updatedTicket;
+    if (updates.status) updateData.status = updates.status;
+    if (updates.preview) updateData.preview = updates.preview;
+    if (updates.conversation) updateData.conversation = updates.conversation;
     
-    return updatedTicket;
+    const updatedTicket = await prisma.supportTicket.update({
+        where: { id: ticketId },
+        data: updateData
+    });
+    
+    return {
+        id: updatedTicket.id,
+        userName: updatedTicket.userName,
+        userEmail: updatedTicket.userEmail,
+        userAvatar: updatedTicket.userAvatar || '',
+        subject: updatedTicket.subject,
+        preview: updatedTicket.preview,
+        status: updatedTicket.status as TicketStatus,
+        lastUpdate: getTimeAgo(updatedTicket.updatedAt),
+        conversation: Array.isArray(updatedTicket.conversation) ? updatedTicket.conversation : JSON.parse(JSON.stringify(updatedTicket.conversation))
+    };
 }

@@ -37,19 +37,6 @@ export async function generateTimedTranscript(
   return generateTimedTranscriptFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'generateTimedTranscriptPrompt',
-  input: {schema: GenerateTimedTranscriptInputSchema},
-  output: {schema: GenerateTimedTranscriptOutputSchema},
-  prompt: `You are a highly accurate video transcription service that provides word-level timestamps.
-Analyze the following video and provide a complete and accurate transcript.
-For each word, provide its start and end time in seconds.
-
-Video for transcription:
-{{media url=videoUrl}}
-`,
-});
-
 const generateTimedTranscriptFlow = ai.defineFlow(
   {
     name: 'generateTimedTranscriptFlow',
@@ -57,11 +44,20 @@ const generateTimedTranscriptFlow = ai.defineFlow(
     outputSchema: GenerateTimedTranscriptOutputSchema,
   },
   async (input) => {
-    const llm = await getAvailableTextGenerator();
+    const prompt = `You are a highly accurate video transcription service that provides word-level timestamps.
+Analyze the following video and provide a complete and accurate transcript.
+For each word, provide its start and end time in seconds.
 
-    const {output} = await llm.generate(prompt, input);
+Video for transcription:
+${input.videoUrl}`;
+
+    const {output} = await ai.generate({
+      prompt,
+      output: {schema: GenerateTimedTranscriptOutputSchema}
+    });
+    
     if (!output?.transcript) {
-        throw new Error("The AI failed to generate a timed transcript.");
+      throw new Error("The AI failed to generate a timed transcript.");
     }
     return output;
   }

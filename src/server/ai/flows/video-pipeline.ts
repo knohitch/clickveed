@@ -29,30 +29,26 @@ const GeneratePipelineScriptOutputSchema = z.object({
 export type GeneratePipelineScriptOutput = z.infer<typeof GeneratePipelineScriptOutputSchema>;
 
 export async function generatePipelineScript(input: GeneratePipelineScriptInput): Promise<GeneratePipelineScriptOutput> {
-  const llm = await getAvailableTextGenerator();
-  
-  const prompt = ai.definePrompt({
-    name: 'generatePipelineScriptPrompt',
-    input: {schema: GeneratePipelineScriptInputSchema},
-    output: {schema: GeneratePipelineScriptOutputSchema},
-    prompt: `You are an expert AI video scriptwriter. Your task is to generate a compelling and well-structured video script based on the user's requirements.
+  const prompt = `You are an expert AI video scriptwriter. Your task is to generate a compelling and well-structured video script based on the user's requirements.
 
   Pay close attention to all the details provided:
 
-  - **Core Idea:** {{{prompt}}}
-  - **Video Type:** {{{videoType}}}
-  - **Desired Tone:** {{{tone}}}
-  - **Target Duration:** {{{duration}}}
+  - **Core Idea:** ${input.prompt}
+  - **Video Type:** ${input.videoType}
+  - **Desired Tone:** ${input.tone}
+  - **Target Duration:** ${input.duration}
 
-  Based on this, create a complete script. The script should include scene descriptions (like "[SCENE: A programmer's desk with code on screen]"), dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.
-  `,
+  Based on this, create a complete script. The script should include scene descriptions (like "[SCENE: A programmer's desk with code on screen]"), dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.`;
+
+  const {output} = await ai.generate({
+    prompt,
+    output: {schema: GeneratePipelineScriptOutputSchema}
   });
-
-  const {output} = await llm.generate(prompt, input);
-    if (!output?.script) {
-        throw new Error("The AI failed to generate a script based on the provided inputs.");
-    }
-    return output;
+    
+  if (!output?.script) {
+    throw new Error("The AI failed to generate a script based on the provided inputs.");
+  }
+  return output;
 }
 
 
@@ -99,7 +95,6 @@ async function toWav(
 }
 
 export async function generatePipelineVoiceOver(input: GeneratePipelineVoiceOverInput): Promise<GeneratePipelineVoiceOverOutput> {
-    const ttsProvider = await getAvailableTTSProvider();
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -111,8 +106,12 @@ export async function generatePipelineVoiceOver(input: GeneratePipelineVoiceOver
     ? input.script.split(/Voiceover:|VO:|Narrator:|Dialogue:/).slice(1).join(' ').replace(/\[.*?\]/g, '')
     : input.script; // Fallback to using the whole script if no cues are found.
 
-  const {media} = await ttsProvider.generate({
+  // Get the provider info and extract just the model string
+  const providerInfo = await getAvailableTTSProvider();
+  
+  const {media} = await ai.generate({
       prompt: voiceOverText,
+      model: providerInfo.model, // Use just the model string, not the full provider info
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
@@ -165,10 +164,9 @@ const GeneratePipelineVideoInputSchema = z.object({
 export type GeneratePipelineVideoInput = z.infer<typeof GeneratePipelineVideoInputSchema>;
 
 const GeneratePipelineVideoOutputSchema = z.object({
-  jobId: z.string().describe('The job ID for the async video generation task. Poll for status.'),
+  videoUrl: z.string().describe('The public URL of the generated video.'),
 });
 export type GeneratePipelineVideoOutput = z.infer<typeof GeneratePipelineVideoOutputSchema>;
-
 
 export async function generatePipelineVideo(input: GeneratePipelineVideoInput): Promise<GeneratePipelineVideoOutput> {
     const session = await auth();
@@ -177,10 +175,32 @@ export async function generatePipelineVideo(input: GeneratePipelineVideoInput): 
         throw new Error("User must be authenticated to generate media.");
     }
 
-    // Add job to BullMQ queue for async processing
-    // const job = await addAITask('generate-video', { input, userId: session.user.id });
+    // Extract scene descriptions from the script to create a visual prompt
+    const sceneDescriptions = input.script.match(/\[SCENE:.*?\]/g) || [];
+    const visualPrompt = sceneDescriptions.length > 0 
+        ? sceneDescriptions.join(' ').replace(/\[SCENE:/g, '').replace(/\]/g, '')
+        : input.script.substring(0, 200); // Fallback to first 200 characters
+
+    // For now, we'll use a placeholder image URL since we don't have actual images in the pipeline
+    // In a real implementation, this would be replaced with actual generated or provided images
+    const placeholderImageUrl = "https://placehold.co/1920x1080/000000/FFFFFF/png?text=Generated+Video+Scene";
     
-    return {
-      jobId: job.id,
-    };
+    // Import the video generation function
+    const { generateVideoFromImage } = await import('./generate-video-from-image');
+    
+    try {
+        // Generate video using the real video generation API
+        const result = await generateVideoFromImage({
+            photoUrl: placeholderImageUrl,
+            musicPrompt: "Energetic background music",
+            videoDescription: visualPrompt
+        });
+        
+        return {
+            videoUrl: result.videoUrl,
+        };
+    } catch (error) {
+        console.error("Video generation failed:", error);
+        throw new Error(`Failed to generate video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }

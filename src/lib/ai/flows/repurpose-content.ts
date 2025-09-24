@@ -69,18 +69,13 @@ const repurposeContentFlow = ai.defineFlow(
     outputSchema: RepurposeContentOutputSchema,
   },
   async ({ transcript, format }) => {
-    const llm = await getAvailableTextGenerator();
-    
     const promptTemplate = getPromptForFormat(format);
+    const prompt = promptTemplate.replace('{{{transcript}}}', transcript);
 
-    const prompt = ai.definePrompt({
-        name: `repurposeContentPrompt-${format}`,
-        input: { schema: z.object({ transcript: z.string() }) },
-        output: { schema: RepurposeContentOutputSchema },
-        prompt: promptTemplate,
+    const { output } = await ai.generate({
+        prompt,
+        output: { schema: RepurposeContentOutputSchema }
     });
-
-    const { output } = await llm.generate(prompt, { transcript });
     
     if (!output?.content) {
         throw new Error(`Failed to generate content for the format: ${format}`);
@@ -89,5 +84,3 @@ const repurposeContentFlow = ai.defineFlow(
     return output;
   }
 );
-
-    

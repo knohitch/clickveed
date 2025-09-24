@@ -45,6 +45,7 @@ model User {
   supportTickets        SupportTicket[]
   brandKit              BrandKit?
   usage                 UserUsage?
+  voiceClones           VoiceClone[]    // Added
   planId                String?
   plan                  Plan?           @relation(fields: [planId], references: [id])
 }
@@ -224,6 +225,19 @@ model SocialConnection {
   @@unique([userId, platform])
 }
 
+// Voice Clone model for storing voice cloning results
+model VoiceClone {
+  id          String   @id @default(cuid())
+  voiceId     String   @unique // The ID returned by the voice cloning provider
+  name        String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  provider    String   // elevenlabs, respeecher, etc.
+  status      String   @default("processing") // processing, completed, failed
+  sampleUrls  String[] // URLs to the original audio samples used
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
 // ==================================
 //         Admin Models

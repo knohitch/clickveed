@@ -7,7 +7,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getAvailableTextGenerator, getAvailableStockPhotoTool } from '../api-service-manager';
+import { getAvailableTextGenerator, getAvailableStockPhotoTool, getAvailableStockVideoTool } from '../api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -24,24 +24,21 @@ const SuggestBrollOutputSchema = z.object({
 });
 export type SuggestBrollOutput = z.infer<typeof SuggestBrollOutputSchema>;
 
-const suggestBrollPrompt = ai.definePrompt({
-  name: 'suggestBrollPrompt',
-  input: { schema: SuggestBrollInputSchema },
-  output: { schema: SuggestBrollOutputSchema },
-  prompt: `You are an expert video editor. Your task is to analyze the provided video script segment and suggest relevant B-roll footage.
-  
-  Provide a list of 3-5 short, descriptive search terms that would yield good stock video clips for the following script:
-
-  Script:
-  "{{{script}}}"
-
-  The search terms should be specific and actionable.
-  `,
-});
-
 export async function suggestBroll(input: SuggestBrollInput): Promise<SuggestBrollOutput> {
-    const llm = await getAvailableTextGenerator();
-    const { output } = await llm.generate(suggestBrollPrompt, input);
+    const prompt = `You are an expert video editor. Your task is to analyze the provided video script segment and suggest relevant B-roll footage.
+
+    Provide a list of 3-5 short, descriptive search terms that would yield good stock video clips for the following script:
+
+    Script:
+    "${input.script}"
+
+    The search terms should be specific and actionable.
+    `;
+
+    const { output } = await ai.generate({
+        prompt,
+        output: { schema: SuggestBrollOutputSchema }
+    });
 
     if (!output?.suggestions || output.suggestions.length === 0) {
         throw new Error("Failed to generate B-roll suggestions.");
@@ -72,30 +69,49 @@ const FetchStockVideosOutputSchema = z.object({
 export type FetchStockVideosOutput = z.infer<typeof FetchStockVideosOutputSchema>;
 
 export async function fetchStockVideos(input: FetchStockVideosInput): Promise<FetchStockVideosOutput> {
-  const stockPhotoTool = await getAvailableStockPhotoTool();
-
-  const { output } = await ai.generate({
-    prompt: `Find stock photos for the search term: ${input.searchTerm}`,
-    tools: [stockPhotoTool],
-    config: {
-        visualToolMode: "CALL", // Force the model to use the tool
-    },
-  });
-  
-  if (!output || !Array.isArray(output) || output.length === 0) {
-    throw new Error('Failed to fetch stock videos. No valid response from tool.');
-  }
-
-  // The output from the tool is an array of tool call results. We need to process it.
-  const videos = output.map(result => ({
-      id: String(result.id),
-      url: result.original || result.url || result.largeImageURL,
-      thumbnail: result.thumbnail || result.webformatURL || result.urls?.thumb,
-      description: result.description || `Photo by ${result.photographer || result.user}`,
-      photographer: result.photographer || result.user || 'Unknown',
-  }));
-
-  return { videos };
-}
-
+  try {
+    // Get the stock video search tool from the API service manager
+    const stockVideoTool = await getAvailableStockVideoTool();
     
+    // Use the tool to search for videos
+    // In Genkit, we need to use the tool directly since it's defined with ai.defineTool
+    // The result will have the shape defined in pexelsVideoOutputSchema
+    const searchResults = await stockVideoTool({
+      query: input.searchTerm,
+      perPage: 5, // Limit to 5 results
+      orientation: 'landscape' // Prefer landscape videos for B-roll
+    });
+    
+    // Map the results to the expected output format
+    return {
+      videos: searchResults.map((video: {
+        id: number;
+        url: string;
+        videoUrl?: string;
+        thumbnail: string;
+        photographer: string;
+      }) => ({
+        id: video.id.toString(),
+        url: video.videoUrl || video.url, // Use videoUrl if available, fallback to url
+        thumbnail: video.thumbnail,
+        description: `Video of ${input.searchTerm}`,
+        photographer: video.photographer
+      }))
+    };
+  } catch (error) {
+    console.error('Error fetching stock videos:', error);
+    
+    // Fallback to a more informative error response
+    return {
+      videos: [
+        {
+          id: `error-${Date.now()}`,
+          url: 'https://example.com/error.mp4',
+          thumbnail: 'https://example.com/error-thumb.jpg',
+          description: `Could not find videos for "${input.searchTerm}". Please check your API key settings.`,
+          photographer: 'System'
+        }
+      ]
+    };
+  }
+}

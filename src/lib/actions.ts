@@ -336,7 +336,7 @@ export async function generatePipelineVideoAction(prevState: any, formData: Form
 
     try {
         const result = await generatePipelineVideo(validatedFields.data);
-        return { message: "success", video: null, jobId: result.jobId, errors: {} };
+        return { message: "success", video: result.videoUrl, jobId: null, errors: {} };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
