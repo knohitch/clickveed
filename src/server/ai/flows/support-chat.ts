@@ -4,8 +4,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { type GenerateRequest } from 'genkit/generate';
-import { getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
+import { generateStreamWithProvider } from '@/lib/ai/api-service-manager';
 
 const SupportChatSchema = z.object({
   history: z.array(z.object({
@@ -35,17 +34,21 @@ const supportChatFlow = ai.defineFlow(
     outputSchema: z.any(),
   },
   async ({ history, message }) => {
-    const llm = await getAvailableTextGenerator();
+    // Format messages properly for Genkit
+    const formattedHistory = (history || []).map(h => ({
+      role: h.role === 'assistant' ? 'model' as 'model' : 'user' as 'user',
+      content: [{ text: h.content }]
+    }));
 
-    const historyForAi: GenerateRequest['history'] = history?.map(h => ({
-      role: h.role,
-      content: [{ text: h.content }],
-    })) || [];
+    // Combine system prompt, history, and user message
+    const messages = [
+      { role: 'system' as 'user' | 'model', content: [{ text: systemPrompt }] },
+      { role: 'user' as 'user' | 'model', content: [{ text: message }] },
+      ...formattedHistory
+    ];
 
-    const { stream, response } = await llm.stream({
-      prompt: message,
-      history: historyForAi,
-      system: systemPrompt,
+    const { stream, response } = await generateStreamWithProvider({
+      messages: messages
     });
 
     const encoder = new TextEncoder();

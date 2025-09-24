@@ -4,6 +4,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { CreativeAssistantChatSchema } from '@/lib/types';
 import type { CreativeAssistantChatRequest } from '@/lib/types';
+import { generateStreamWithProvider } from '@/lib/ai/api-service-manager';
+
 
 const systemPrompt = `You are an expert creative assistant and video production strategist named 'ClickVid AI'.
 Your goal is to help users brainstorm, refine, and create compelling video content.
@@ -39,8 +41,7 @@ const creativeAssistantChatFlow = ai.defineFlow(
     ];
     
     // Call the Genkit API with the correct parameters directly
-    const response = await ai.generateStream({
-      model: 'googleai/gemini-1.5-flash',
+    const streamResponse = await generateStreamWithProvider({
       messages: messages
     });
     
@@ -49,8 +50,8 @@ const creativeAssistantChatFlow = ai.defineFlow(
     return new ReadableStream({
       async start(controller) {
         try {
-          // Iterate over the response chunks
-          for await (const chunk of response) {
+          // Iterate over the response chunks using the stream property
+          for await (const chunk of streamResponse.stream) {
             const text = chunk.content?.[0]?.text;
             if (text) {
               controller.enqueue(encoder.encode(text));

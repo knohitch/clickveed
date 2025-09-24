@@ -8,10 +8,10 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {GenerateRequest} from 'genkit/generate';
+
 import {CreativeAssistantChatSchema} from '@/lib/types';
 import type {CreativeAssistantChatRequest} from '@/lib/types';
-import { getAvailableTextGenerator } from '../api-service-manager';
+import { getAvailableTextGenerator, generateStreamWithProvider } from '../api-service-manager';
 
 
 const systemPrompt = `You are a friendly and helpful AI Support Assistant for ClickVid Pro.
@@ -38,17 +38,21 @@ const supportChatFlow = ai.defineFlow(
     outputSchema: z.any(), // The output is a stream, so we use z.any() here.
   },
   async ({ history, message }) => {
-    const llm = await getAvailableTextGenerator();
+    // Format messages properly for Genkit
+    const formattedHistory = (history || []).map(h => ({
+      role: h.role as 'user' | 'model',
+      content: [{ text: h.content }]
+    }));
 
-    const historyForAi: GenerateRequest['history'] = history?.map(h => ({
-      role: h.role,
-      content: [{text: h.content}],
-    })) || [];
-    
-    const { stream, response } = await llm.stream({
-        prompt: message,
-        history: historyForAi,
-        system: systemPrompt,
+    // Combine system prompt, history, and user message
+    const messages = [
+      { role: 'system' as 'user' | 'model', content: [{ text: systemPrompt }] },
+      { role: 'user' as 'user' | 'model', content: [{ text: message }] },
+      ...formattedHistory
+    ];
+
+    const { stream, response } = await generateStreamWithProvider({
+      messages: messages
     });
     
     const encoder = new TextEncoder();
@@ -73,5 +77,3 @@ const supportChatFlow = ai.defineFlow(
     return transformStream;
   }
 );
-
-    
