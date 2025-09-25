@@ -38,17 +38,21 @@ export const searchPexelsTool = ai.defineTool(
     const client = createClient(pexelsApiKey);
 
     try {
-        const response: PhotosWithTotalResults = await client.photos.search({ 
+        const response = await client.photos.search({ 
             query: input.query,
             per_page: input.perPage,
             orientation: input.orientation,
         });
 
+        // Check if response is an error
         if ('error' in response) {
             throw new Error(`Pexels API Error: ${response.error}`);
         }
         
-        return response.photos.map(photo => ({
+        // At this point, we know it's a PhotosWithTotalResults object
+        const photosResponse = response as PhotosWithTotalResults;
+        
+        return photosResponse.photos.map(photo => ({
             id: photo.id,
             url: photo.url,
             photographer: photo.photographer,

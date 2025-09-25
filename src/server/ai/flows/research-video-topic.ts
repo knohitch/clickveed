@@ -60,7 +60,10 @@ const researchVideoTopicFlow = ai.defineFlow(
         content: [{ text: `Topic: ${input.topic}\nPlatform: ${input.platform}\nAudience: ${input.audience || 'general'}` }],
       },
     ];
-    const { output } = await generateWithProvider({ messages });
+    const response = await generateWithProvider({ messages });
+    
+    // Handle both possible response formats
+    const output = 'output' in response ? response.output : response.result;
 
     if (!output) {
       throw new Error('Failed to research video topic.');

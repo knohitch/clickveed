@@ -44,7 +44,7 @@ export async function createTicket(
     userAvatar: data.userAvatar,
     subject: data.subject,
     preview: data.initialMessage.substring(0, 100) + '...',
-    status: 'Open' as TicketStatus,
+    status: 'Open',
     conversation: [
       {
         sender: 'user' as const,
@@ -85,8 +85,9 @@ export async function createTicket(
 
   return {
     ...newTicket,
+    status: newTicket.status as TicketStatus,
     lastUpdate: formatDistanceToNow(newTicket.updatedAt, { addSuffix: true }),
-    conversation: newTicket.conversation as Message[], // Cast to correct type
+    conversation: newTicket.conversation ? (newTicket.conversation as unknown as Message[]) : [],
   };
 }
 
@@ -97,7 +98,8 @@ export async function getTickets(): Promise<SupportTicket[]> {
 
     return dbTickets.map(ticket => ({
         ...ticket,
-        conversation: ticket.conversation as Message[],
+        status: ticket.status as TicketStatus,
+        conversation: ticket.conversation ? (ticket.conversation as unknown as Message[]) : [],
         lastUpdate: formatDistanceToNow(ticket.updatedAt, { addSuffix: true }),
     }))
 }
@@ -117,7 +119,8 @@ export async function updateTicket(ticketId: string, updates: Partial<SupportTic
 
     return {
         ...updatedTicketDb,
-        conversation: updatedTicketDb.conversation as Message[],
+        status: updatedTicketDb.status as TicketStatus,
+        conversation: updatedTicketDb.conversation ? (updatedTicketDb.conversation as unknown as Message[]) : [],
         lastUpdate: formatDistanceToNow(updatedTicketDb.updatedAt, { addSuffix: true }),
     };
 }
