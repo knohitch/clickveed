@@ -32,11 +32,6 @@ const nextConfig = {
     eslint: {
         ignoreDuringBuilds: true
     },
-    // Optimize CSS for production
-    css: {
-        // Enable CSS optimization
-        minimize: true
-    },
     // Configure Next.js for production
     productionBrowserSourceMaps: false,
     // Disable automatic static optimization for better control
