@@ -71,8 +71,11 @@ const repurposeContentFlow = ai.defineFlow(
   async ({ transcript, format }) => {
     const promptTemplate = getPromptForFormat(format);
     const prompt = promptTemplate.replace('{{{transcript}}}', transcript);
+    
+    const textGenerator = await getAvailableTextGenerator();
 
     const { output } = await ai.generate({
+        model: textGenerator.model,
         prompt,
         output: { schema: RepurposeContentOutputSchema }
     });

@@ -14,7 +14,7 @@ export type UserWithRole = Partial<User> & {
     name?: string | null;
     email?: string | null;
     image?: string | null;
-    emailVerified?: Date | null;
+    emailVerified?: boolean | null;
     role: UserRole;
     status: UserStatus;
     plan?: string;
@@ -32,9 +32,9 @@ export async function getUsers(): Promise<UserWithRole[]> {
 
     return users.map(user => ({
         id: user.id,
-        name: user.name,
+        name: user.displayName,
         email: user.email,
-        image: user.image,
+        image: user.avatarUrl,
         emailVerified: user.emailVerified,
         role: user.role as UserRole,
         status: user.status as UserStatus,
@@ -98,7 +98,7 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     // In a real app, you would hash the password here before saving
     const newUser = await prisma.user.create({
         data: {
-            name: userData.fullName,
+            displayName: userData.fullName,
             email: userData.email,
             role: userData.role || 'Admin',
             status: 'Pending',
@@ -111,7 +111,7 @@ export async function createPendingAdminUser(userData: { fullName: string; email
 
     return {
         id: newUser.id,
-        name: newUser.name,
+        name: newUser.displayName,
         email: newUser.email,
         role: newUser.role as UserRole,
         status: newUser.status as UserStatus,
@@ -119,8 +119,10 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     };
 }
 
-type UpsertUserData = Partial<Pick<User, 'id' | 'email' | 'name' | 'image' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'stripeSubscriptionStatus' | 'stripePriceId' | 'stripeCurrentPeriodEnd' | 'onboardingComplete' | 'planId'>> & {
+type UpsertUserData = Partial<Pick<User, 'id' | 'email' | 'displayName' | 'avatarUrl' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'stripeSubscriptionStatus' | 'stripePriceId' | 'stripeCurrentPeriodEnd' | 'onboardingComplete' | 'planId'>> & {
     onboardingData?: Record<string, any>;
+    name?: string; // For compatibility with external interfaces
+    image?: string; // For compatibility with external interfaces
 };
 
 /**
@@ -131,7 +133,12 @@ export async function upsertUser(data: UpsertUserData) {
         throw new Error("User ID or email is required to upsert user.");
     }
     
-    const { onboardingData, ...userData } = data;
+    // Map name and image to the correct field names if provided
+    const { onboardingData, name, image, ...userData } = data;
+    
+    // Add the mapped fields back with correct names
+    if (name !== undefined) userData.displayName = name;
+    if (image !== undefined) userData.avatarUrl = image;
 
     const finalUserData: any = { ...userData };
     if (onboardingData) {

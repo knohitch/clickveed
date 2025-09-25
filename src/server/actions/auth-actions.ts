@@ -52,7 +52,6 @@ export async function signUp(prevState: any, formData: FormData) {
 
         await prisma.user.create({
             data: {
-                name,
                 email,
                 passwordHash,
                 role,
@@ -124,7 +123,7 @@ export async function requestPasswordResetAction(prevState: any, formData: FormD
                 templateKey: 'passwordReset',
                 data: {
                     appName,
-                    name: user.name || 'User',
+                    name: user.displayName || 'User',
                     resetLink: resetLink,
                 }
             });

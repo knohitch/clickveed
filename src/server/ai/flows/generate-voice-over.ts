@@ -100,13 +100,17 @@ const generateVoiceOverFlow = ai.defineFlow(
         };
     }
     
-    const {media} = await ttsProvider.generate({
+    const generateResponse = await ai.generate({
+      model: ttsProvider.model,
       prompt: script,
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: speechConfig
       }
     });
+    
+    // Type assertion to access the media property
+    const media = (generateResponse as any).media;
 
     if (!media) {
       throw new Error('Audio generation failed. No media was returned.');

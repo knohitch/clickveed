@@ -55,12 +55,16 @@ const removeImageBackgroundFlow = ai.defineFlow(
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
     const dataUri = `data:${contentType};base64,${Buffer.from(imageBuffer).toString('base64')}`;
 
-    const {media} = await imageGenerator.generate({
+    const generateResponse = await ai.generate({
+      model: imageGenerator.model,
       prompt: `Please remove the background from this image. The subject should be perfectly isolated with a transparent background. Image: {{media url=dataUri}}`,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
     });
+    
+    // Type assertion to access the media property
+    const media = (generateResponse as any).media;
 
     if (!media || !media[0]?.url) {
       throw new Error('Image processing failed. No media was returned.');

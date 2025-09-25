@@ -96,7 +96,18 @@ const generateVideoFromImageFlow = ai.defineFlow(
     }
 
     // Step 1: Generate the voiceover script from the video description
-    const { output: scriptOutput } = await textGenerator.generate(generateVideoScriptPrompt, { videoDescription: input.videoDescription });
+    const generateResponse = await ai.generate({
+        model: textGenerator.model,
+        prompt: `You are an expert video creator. Create a very short, compelling voiceover script (1-2 sentences) for a video based on the following description.
+
+Video Description: ${input.videoDescription}
+
+Respond ONLY with the JSON object containing the voiceoverScript.`,
+        output: {schema: z.object({ voiceoverScript: z.string().describe("A concise voiceover script (1-2 sentences) that describes the scene or adds a call-to-action.") })}
+    });
+    
+    // Type assertion to access the output property
+    const scriptOutput = (generateResponse as any).output;
     const voiceoverScript = scriptOutput?.voiceoverScript;
     if (!voiceoverScript) {
         throw new Error('Failed to generate voiceover script.');
@@ -104,7 +115,8 @@ const generateVideoFromImageFlow = ai.defineFlow(
     
     // Step 2: Generate Video and Audio in parallel
     const [videoGenPromise, audioGenPromise] = await Promise.all([
-      videoGenerator.generate({
+      ai.generate({
+        model: videoGenerator.model,
         prompt: [
             { text: input.videoDescription }, 
             { media: { url: input.photoUrl } }
@@ -114,29 +126,30 @@ const generateVideoFromImageFlow = ai.defineFlow(
           aspectRatio: '16:9',
         }
       }),
-      audioGenerator.generate({ 
-          prompt: voiceoverScript,
-          config: {
+      ai.generate({
+        model: audioGenerator.model,
+        prompt: voiceoverScript,
+        config: {
             responseModalities: ['AUDIO'],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achernar' } } }
-          }
+        }
       })
     ]);
 
     // Step 3: Poll for video completion
-    let { operation } = videoGenPromise;
+    let operation = (videoGenPromise as any).operation;
     if (!operation) {
         throw new Error('Expected the video model to return an operation.');
     }
     while (!operation.done) {
         await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-        operation = await videoGenerator.checkOperation(operation);
+        operation = await (ai as any).checkOperation(operation);
     }
     if (operation.error) {
         throw new Error(`Video generation failed: ${operation.error.message}`);
     }
 
-    const videoMediaPart = operation.output?.message?.content.find((p) => !!p.media);
+    const videoMediaPart = operation.output?.message?.content.find((p: any) => !!p.media);
     if (!videoMediaPart?.media) {
       throw new Error('Video generation failed. No media was returned in the final operation.');
     }
@@ -166,5 +179,3 @@ const generateVideoFromImageFlow = ai.defineFlow(
     };
   }
 );
-
-    

@@ -50,17 +50,21 @@ const generateStockMediaFlow = ai.defineFlow(
     }
     
     let promptText = input.prompt;
-    if (generator.name === 'gemini') {
+    if (generator.provider === 'gemini') {
         promptText = `Photorealistic stock photo: ${input.prompt}. High quality, professional, clean, for commercial use.`
     }
     
-    const { media } = await generator.generate({
+    const generateResponse = await ai.generate({
+      model: generator.model,
       prompt: promptText,
       config: {
           count: 4,
           responseModalities: ['TEXT', 'IMAGE'], // Required for Gemini Image Gen
       }
     });
+    
+    // Type assertion to access the media property
+    const media = (generateResponse as any).media;
 
     if (!media || !Array.isArray(media) || media.length === 0) {
       throw new Error('Image generation failed. No media was returned.');

@@ -23,13 +23,27 @@ export async function createVideoWithTranscript(videoFile: File) {
     const videoDataUri = `data:${videoFile.type};base64,${Buffer.from(await videoFile.arrayBuffer()).toString('base64')}`;
     const { publicUrl: videoUrl, sizeMB } = await uploadToWasabi(videoDataUri, 'videos');
     
-    // 2. Create the initial video record in the database
+    // 2. Create a default project for the user if one doesn't exist
+    let project = await prisma.project.findFirst({
+        where: { userId }
+    });
+    
+    if (!project) {
+        project = await prisma.project.create({
+            data: {
+                title: "Default Project",
+                userId,
+            }
+        });
+    }
+    
+    // 3. Create the initial video record in the database
     const video = await prisma.video.create({
         data: {
             name: videoFile.name,
             url: videoUrl,
             size: sizeMB,
-            userId,
+            projectId: project.id,
         }
     });
     

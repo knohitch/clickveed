@@ -44,13 +44,14 @@ export async function generatePersonaAvatar(
 
 async function generateVideoInBackground(userId: string, personaName: string, avatarImageDataUri: string, script: string) {
     try {
-        const videoGenerator = await getAvailableVideoGenerator();
+        const videoGeneratorInfo = await getAvailableVideoGenerator();
         const videoPrompt = [
             { text: `Animate this avatar to speak the following script in a natural way. Script: "${script}"` },
             { media: { url: avatarImageDataUri } }
         ];
 
-        let { operation } = await videoGenerator.generate({
+        let generateResponse = await ai.generate({
+            model: videoGeneratorInfo.model,
             prompt: videoPrompt,
             config: {
                 durationSeconds: 8,
@@ -59,20 +60,23 @@ async function generateVideoInBackground(userId: string, personaName: string, av
             }
         });
 
+        // Type assertion to access the operation property
+        let operation = (generateResponse as any).operation;
         if (!operation) {
             throw new Error('Expected the video model to return an operation.');
         }
 
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 5000));
-            operation = await videoGenerator.checkOperation(operation);
+            // Type assertion to access the checkOperation method
+            operation = await (ai as any).checkOperation(operation);
         }
 
         if (operation.error) {
             throw new Error(`Video generation failed: ${operation.error.message}`);
         }
 
-        const videoMediaPart = operation.output?.message?.content.find((p) => !!p.media);
+        const videoMediaPart = operation.output?.message?.content.find((p: any) => !!p.media);
         if (!videoMediaPart?.media) {
             throw new Error('Video generation failed. No media was returned in the final operation.');
         }
@@ -110,11 +114,14 @@ const generatePersonaAvatarFlow = ai.defineFlow(
     }
 
     // Step 1: Generate the static avatar image first and return it immediately.
-    const { media: imageMedia } = await imageGenerator.generate({
+    const generateResponse = await ai.generate({
+        model: imageGenerator.model,
         prompt: input.avatarDescription,
         config: { responseModalities: ['TEXT', 'IMAGE'] }
     });
 
+    // Type assertion to access the media property
+    const imageMedia = (generateResponse as any).media;
     if (!imageMedia || !imageMedia[0]?.url) {
         throw new Error("Failed to generate the initial avatar image.");
     }

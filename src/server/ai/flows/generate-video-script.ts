@@ -82,7 +82,10 @@ Provide a suggested video title and estimated duration. Keep it concise and enga
       // No user message in this case, the system prompt contains all necessary info.
     ];
 
-    const { output } = await generateWithProvider({ messages });
+    const generateResponse = await generateWithProvider({ messages });
+
+    // Type assertion to access the output property
+    const output = (generateResponse as any).output;
 
     if (!output?.script) {
       throw new Error('Failed to generate video script.');
