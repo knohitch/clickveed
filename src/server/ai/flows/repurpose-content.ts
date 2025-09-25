@@ -4,7 +4,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
+import { getAvailableTextGenerator, generateWithProvider } from '@/lib/ai/api-service-manager';
 
 const RepurposeContentInputSchema = z.object({
   originalContent: z.string().describe('The original video script or description to repurpose.'),
@@ -53,8 +53,27 @@ const repurposeContentFlow = ai.defineFlow(
     outputSchema: RepurposeContentOutputSchema,
   },
   async (input) => {
-    const { model } = await getAvailableTextGenerator();
-    const { output } = await model.generate(repurposeContentPrompt, input);
+    const messages = [
+      {
+        role: 'system' as const,
+        content: [{ text: `You are a content repurposing expert. Take the original content and adapt it for ${input.targetPlatform} in ${input.format} format.
+
+Original Content: ${input.originalContent}
+
+Generate 3-5 repurposed items, each with:
+- Type (e.g., "TikTok clip", "LinkedIn post")
+- Content (script/caption)
+- Estimated length (if applicable)
+
+Include 2-3 tips for optimization on the platform.` }],
+      },
+    ];
+
+    // Use generateWithProvider instead of model.generate
+    const response = await generateWithProvider({ messages });
+    
+    // Handle both possible response formats
+    const output = 'output' in response ? response.output : response.result;
 
     if (!output?.repurposedItems || output.repurposedItems.length === 0) {
       throw new Error('Failed to repurpose content.');
