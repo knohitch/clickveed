@@ -68,4 +68,5 @@ ENV PORT 3000
 # set hostname to localhost
 ENV HOSTNAME "0.0.0.0"
 
+# Use the startup script as the entrypoint
 CMD ["./startup.sh"]
