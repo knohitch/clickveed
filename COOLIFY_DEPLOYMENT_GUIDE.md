@@ -1,136 +1,65 @@
-# Coolify Deployment Guide for ClickVid
+# Coolify Deployment Guide
 
-## Overview
-This guide will help you deploy your ClickVid application to Coolify using the Docker configuration we've set up.
+## Prerequisites
+Before deploying, ensure you have:
+1. A PostgreSQL database set up and accessible
+2. The following environment variables configured in Coolify:
+   - `DATABASE_URL` - Connection string to your PostgreSQL database
+   - `NEXTAUTH_URL` - The canonical URL of your site
+   - `NEXTAUTH_SECRET` - A strong secret for NextAuth.js
 
-## Files Created/Modified
+## Deployment Steps
 
-### 1. Dockerfile
-- **Location**: Project root (`/Dockerfile`)
-- **Purpose**: Multi-stage Docker build optimized for Next.js production deployment
-- **Features**:
-  - Uses Node.js 18 Alpine base image
-  - Multi-stage build for smaller final image size
-  - Includes Prisma client generation
-  - Configured for standalone Next.js output
-  - Runs as non-root user for security
-  - Exposes port 3000
-
-### 2. .dockerignore
-- **Location**: Project root (`/.dockerignore`)
-- **Purpose**: Excludes unnecessary files from Docker build context
-- **Benefits**: Faster build times and smaller image sizes
-
-### 3. next.config.mjs
-- **Modification**: Added `output: 'standalone'` configuration
-- **Purpose**: Enables Next.js standalone output for Docker deployment
-
-## Coolify Deployment Steps
-
-### 1. Commit Your Changes
-Make sure all the new files are committed to your Git repository:
-
-```bash
-git add Dockerfile .dockerignore next.config.mjs
-git commit -m "Add Docker configuration for Coolify deployment"
-git push origin main
-```
-
-### 2. Coolify Configuration
-In your Coolify dashboard:
-
-1. **Application Setup**:
-   - Select your Git repository (`nohitchweb/clickvidev`)
-   - Choose the `main` branch
-   - Set the application name (e.g., "ClickVid Develops")
-
-2. **Build Configuration**:
-   - **Build Pack**: Select "Dockerfile"
-   - **Dockerfile Path**: `Dockerfile` (default)
-   - **Build Context**: `.` (default)
-
-3. **Environment Variables**:
-   Make sure to set these required environment variables:
-   ```bash
-   NODE_ENV=production
-   DATABASE_URL=your_database_url
-   NEXTAUTH_URL=your_app_url
-   NEXTAUTH_SECRET=your_secret_key
-   # Add any other required environment variables from your .env file
+### 1. Configure Environment Variables in Coolify
+1. Go to your Coolify application
+2. Navigate to the "Environment Variables" section
+3. Add the following variables:
+   ```
+   DATABASE_URL=your-postgresql-connection-string
+   NEXTAUTH_URL=https://your-domain.com
+   NEXTAUTH_SECRET=your-super-strong-secret
    ```
 
-4. **Port Configuration**:
-   - **Container Port**: 3000
-   - **Public Port**: Any available port (Coolify will suggest one)
+### 2. Add Pre-Deployment Command for Database Migrations
+This is the critical step to fix the "User table does not exist" error:
 
-5. **Health Check** (Optional but recommended):
-   - **Path**: `/api/health`
-   - **Interval**: 30 seconds
-   - **Timeout**: 10 seconds
-   - **Retries**: 3
+1. In your Coolify application, go to the "Deployment" settings
+2. Find the "Pre-deployment" or "Command" section
+3. Add the following command to run database migrations:
+   ```
+   npx prisma migrate deploy
+   ```
 
-### 3. Deploy
-Click the "Deploy" button in Coolify. The build process will:
-1. Pull your code from the repository
-2. Build the Docker image using the Dockerfile
-3. Generate Prisma client
-4. Build the Next.js application in standalone mode
-5. Start the container
+This command will ensure that all database migrations are applied before your application starts, creating all the necessary tables including `User`.
+
+### 3. Configure the Main Deployment
+1. Make sure your source is correctly set (GitHub repository)
+2. Ensure the build pack is set to "Dockerfile"
+3. Set the port to 3000 (or whatever port your application uses)
+
+### 4. Deploy the Application
+1. Click "Deploy" in Coolify
+2. The deployment process will:
+   - Run the pre-deployment command (`npx prisma migrate deploy`) to create database tables
+   - Build your Docker image
+   - Start your application
 
 ## Troubleshooting
 
-### Common Issues
+### If you still get the "User table does not exist" error:
+1. Verify that your `DATABASE_URL` environment variable is correctly set in Coolify
+2. Check that your database is accessible from the Coolify environment
+3. Ensure the pre-deployment command is correctly configured
 
-1. **Build Failures**:
-   - Check the build logs in Coolify for specific error messages
-   - Ensure all dependencies are properly listed in package.json
-   - Verify that your database URL is correct and accessible
-
-2. **Runtime Errors**:
-   - Check that all environment variables are set correctly
-   - Verify database connectivity
-   - Check the application logs in Coolify
-
-3. **Prisma Issues**:
-   - The Dockerfile automatically runs `prisma generate` during build
-   - If you make schema changes, you may need to run migrations manually
-
-### Useful Commands
-
-If you need to debug locally (with Docker installed):
-
-```bash
-# Build the image
-docker build -t clickvid .
-
-# Run the container
-docker run -p 3000:3000 --env-file .env clickvid
-
-# View logs
-docker logs <container_id>
+### To manually verify database tables:
+If you have direct access to your database, you can check if the tables were created:
+```sql
+SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
 ```
 
-## Post-Deployment
+This should show all the required tables including `User`, `Account`, `Session`, etc.
 
-1. **Database Migrations**:
-   - You may need to run database migrations after deployment
-   - This can be done through Coolify's terminal or by connecting directly to your database
-
-2. **Monitoring**:
-   - Check the health endpoint: `https://your-app-url/api/health`
-   - Monitor application logs in Coolify
-   - Set up any external monitoring if needed
-
-3. **Backups**:
-   - Ensure your database backups are configured
-   - Consider setting up automated backups through Coolify or your database provider
-
-## Support
-
-If you encounter any issues during deployment:
-1. Check the Coolify documentation
-2. Review the build and application logs
-3. Verify all configuration settings
-4. Ensure your Git repository has all the necessary files
-
-The Docker configuration is optimized for production deployment and should work seamlessly with Coolify's deployment process.
+## Additional Notes
+- The initial deployment may take some time (up to 20+ minutes) due to the size of the application
+- Monitor the deployment logs in Coolify for any additional errors
+- If you make changes to your Prisma schema in the future, new migrations will be automatically applied during deployment

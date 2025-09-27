@@ -31,7 +31,9 @@ Before deploying the application, ensure that database migrations are run to cre
 
 ### For Coolify Deployment
 
-In Coolify, add a "Command" deployment step to run migrations before starting the application:
+Refer to the detailed [Coolify Deployment Guide](COOLIFY_DEPLOYMENT_GUIDE.md) for step-by-step instructions.
+
+The key step is to add a "Command" deployment step to run migrations before starting the application:
 
 1. In the Coolify deployment settings, add a "Command" step:
    ```
