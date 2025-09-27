@@ -8,6 +8,14 @@ Before deploying, ensure you have:
    - `NEXTAUTH_URL` - The canonical URL of your site
    - `NEXTAUTH_SECRET` - A strong secret for NextAuth.js
 
+## Recent Fixes Applied
+
+Important fixes have been applied to resolve previous deployment issues:
+
+1. **Dockerfile SSL Library Installation**: Updated to install `libssl3` in both build and runtime stages to resolve OpenSSL compatibility issues
+2. **Prisma Binary Targets**: Verified correct configuration for Alpine Linux compatibility
+3. **Startup Script**: Confirmed `startup.sh` exists and has proper permissions
+
 ## Deployment Steps
 
 ### 1. Configure Environment Variables in Coolify
@@ -20,12 +28,17 @@ Before deploying, ensure you have:
    NEXTAUTH_SECRET=your-super-strong-secret
    ```
 
-### 2. Database Migrations and Seeding
-With the updated Dockerfile, database migrations and seeding will run automatically when the container starts, so you no longer need to add pre-deployment commands for this.
+### 2. Pre/Post Deployment Commands
+**No pre-deployment commands are needed** because:
+- Database migrations and seeding are handled automatically by the `startup.sh` script
+- The script runs when the container starts, executing:
+  1. `npx prisma migrate deploy` (migrations)
+  2. `npx prisma db seed` (seeding)
+  3. `node server.js` (application start)
 
-The Dockerfile has been updated to:
-1. Install devDependencies (including `tsx` needed for seeding)
-2. Run migrations and seeding automatically at startup via `startup.sh`
+**No post-deployment commands are needed** because:
+- The application starts automatically after migrations and seeding
+- All necessary setup is handled within the container
 
 ### 3. Configure the Main Deployment
 1. Make sure your source is correctly set (GitHub repository)
@@ -35,16 +48,20 @@ The Dockerfile has been updated to:
 ### 4. Deploy the Application
 1. Click "Deploy" in Coolify
 2. The deployment process will:
-   - Run the pre-deployment command (`npx prisma migrate deploy`) to create database tables
-   - Build your Docker image
+   - Build your Docker image with all required dependencies
+   - Run database migrations and seeding automatically via startup script
    - Start your application
 
 ## Troubleshooting
 
+### If you encounter build errors:
+1. Check that the build logs don't show "startup.sh not found" errors
+2. Verify that SSL library installation is working correctly
+
 ### If you still get the "User table does not exist" error:
 1. Verify that your `DATABASE_URL` environment variable is correctly set in Coolify
 2. Check that your database is accessible from the Coolify environment
-3. Ensure the pre-deployment command is correctly configured
+3. Monitor the application logs to ensure the startup script runs successfully
 
 ### To manually verify database tables:
 If you have direct access to your database, you can check if the tables were created:
@@ -58,3 +75,4 @@ This should show all the required tables including `User`, `Account`, `Session`,
 - The initial deployment may take some time (up to 20+ minutes) due to the size of the application
 - Monitor the deployment logs in Coolify for any additional errors
 - If you make changes to your Prisma schema in the future, new migrations will be automatically applied during deployment
+- These fixes maintain compatibility with both local development and Coolify deployment

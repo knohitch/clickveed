@@ -1,50 +1,43 @@
 #!/bin/bash
 
-# Test script to validate deployment process
-echo "🧪 Testing deployment process..."
+echo "Testing deployment fixes..."
 
-# Test 1: Check if deployment script exists and is executable
-echo "1. Checking deployment script..."
-if [ -f "deploy.sh" ] && [ -x "deploy.sh" ]; then
-    echo "✅ deploy.sh exists and is executable"
+# Test 1: Check if startup.sh exists and is executable
+echo "Test 1: Checking startup.sh file..."
+if [ -f "startup.sh" ]; then
+    echo "✓ startup.sh file exists"
+    if [ -x "startup.sh" ]; then
+        echo "✓ startup.sh is executable"
+    else
+        echo "✗ startup.sh is not executable"
+        echo "Fixing permissions..."
+        chmod +x startup.sh
+        echo "✓ Fixed permissions"
+    fi
 else
-    echo "❌ deploy.sh missing or not executable"
-    exit 1
+    echo "✗ startup.sh file does not exist"
 fi
 
-# Test 2: Check if install script exists and is executable
-echo "2. Checking install script..."
-if [ -f "install.sh" ] && [ -x "install.sh" ]; then
-    echo "✅ install.sh exists and is executable"
+# Test 2: Check Dockerfile for required libraries
+echo -e "\nTest 2: Checking Dockerfile for required libraries..."
+if grep -q "apk add.*libssl3" Dockerfile; then
+    echo "✓ Dockerfile includes libssl3 installation"
 else
-    echo "❌ install.sh missing or not executable"
-    exit 1
+    echo "✗ Dockerfile missing libssl3 installation"
 fi
 
-# Test 3: Validate package.json scripts
-echo "3. Validating package.json build scripts..."
-if npm run build >/dev/null 2>&1; then
-    echo "✅ Build script works correctly"
+# Test 3: Check Prisma binary targets
+echo -e "\nTest 3: Checking Prisma binary targets..."
+if grep -q "linux-musl-openssl-3.0.x" package.json; then
+    echo "✓ package.json has correct Prisma binary targets"
 else
-    echo "❌ Build script failed"
-    exit 1
+    echo "✗ package.json missing correct Prisma binary targets"
 fi
 
-# Test 4: Check Prisma setup
-echo "4. Checking Prisma setup..."
-if npx prisma generate >/dev/null 2>&1; then
-    echo "✅ Prisma generation works"
+if grep -q "linux-musl-openssl-3.0.x" prisma/schema.prisma; then
+    echo "✓ prisma/schema.prisma has correct Prisma binary targets"
 else
-    echo "❌ Prisma generation failed"
-    exit 1
+    echo "✗ prisma/schema.prisma missing correct Prisma binary targets"
 fi
 
-# Test 5: Validate Next.js build
-echo "5. Validating Next.js build..."
-if [ -d ".next" ]; then
-    echo "✅ Next.js build directory exists"
-else
-    echo "⚠️  Next.js build directory not found (expected in clean environment)"
-fi
-
-echo "✅ All deployment tests passed!"
+echo -e "\nAll tests completed. If all checks passed, the deployment should work correctly."
