@@ -1,4 +1,5 @@
 # Use the official Node.js runtime as the base image
+ARG CACHE_BUST=1
 FROM node:18-alpine AS base
 
 # Install dependencies only when needed
