@@ -9,7 +9,8 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Install both dependencies and devDependencies for seeding
+RUN npm ci --include=dev
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -54,6 +55,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
+# Copy startup script
+COPY --from=builder /app/startup.sh ./startup.sh
+RUN chmod +x ./startup.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -62,4 +67,4 @@ ENV PORT 3000
 # set hostname to localhost
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["./startup.sh"]

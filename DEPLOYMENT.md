@@ -33,14 +33,11 @@ Before deploying the application, ensure that database migrations are run to cre
 
 Refer to the detailed [Coolify Deployment Guide](COOLIFY_DEPLOYMENT_GUIDE.md) for step-by-step instructions.
 
-The key step is to add a "Command" deployment step to run migrations before starting the application:
+With the updated Dockerfile, database migrations and seeding will run automatically when the container starts, so you no longer need to add pre-deployment commands for this.
 
-1. In the Coolify deployment settings, add a "Command" step:
-   ```
-   npx prisma migrate deploy
-   ```
-
-2. Then proceed with the normal container deployment.
+The Dockerfile has been updated to:
+1. Install devDependencies (including `tsx` needed for seeding)
+2. Run migrations and seeding automatically at startup via `startup.sh`
 
 ### Verification
 

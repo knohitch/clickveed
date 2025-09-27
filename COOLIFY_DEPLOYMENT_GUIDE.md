@@ -20,17 +20,12 @@ Before deploying, ensure you have:
    NEXTAUTH_SECRET=your-super-strong-secret
    ```
 
-### 2. Add Pre-Deployment Command for Database Migrations
-This is the critical step to fix the "User table does not exist" error:
+### 2. Database Migrations and Seeding
+With the updated Dockerfile, database migrations and seeding will run automatically when the container starts, so you no longer need to add pre-deployment commands for this.
 
-1. In your Coolify application, go to the "Deployment" settings
-2. Find the "Pre-deployment" or "Command" section
-3. Add the following command to run database migrations:
-   ```
-   npx prisma migrate deploy
-   ```
-
-This command will ensure that all database migrations are applied before your application starts, creating all the necessary tables including `User`.
+The Dockerfile has been updated to:
+1. Install devDependencies (including `tsx` needed for seeding)
+2. Run migrations and seeding automatically at startup via `startup.sh`
 
 ### 3. Configure the Main Deployment
 1. Make sure your source is correctly set (GitHub repository)
