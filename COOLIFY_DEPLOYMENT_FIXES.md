@@ -16,15 +16,27 @@ The Dockerfile has been updated to ensure proper SSL library installation:
 
 ```dockerfile
 # In the deps stage
-RUN apk add --no-cache libc6-compat openssl libssl3
+RUN apk add --no-cache libc6-compat openssl libssl1.1
 
 # In the runner stage  
-RUN apk add --no-cache openssl libssl3
+RUN apk add --no-cache openssl libssl1.1
 ```
 
 These changes ensure that the required SSL libraries are available during both build and runtime stages.
 
-### 2. Prisma Binary Targets Configuration
+### 2. .dockerignore Updates
+
+The .dockerignore file was updated to include the startup.sh file in the Docker build context:
+
+```dockerignore
+# Scripts
+*.sh
+!startup.sh
+```
+
+This allows the startup.sh file to be included in the Docker build while still excluding other shell scripts.
+
+### 3. Prisma Binary Targets Configuration
 
 Verified that the correct binary targets are configured in both `package.json` and `prisma/schema.prisma`:
 
@@ -44,11 +56,11 @@ generator client {
 }
 ```
 
-### 3. Startup Script Availability
+### 4. Startup Script Availability
 
 Confirmed that `startup.sh` exists in the root directory and has proper executable permissions.
 
-### 4. Prisma Client Regeneration
+### 5. Prisma Client Regeneration
 
 Ran the fix script to regenerate the Prisma client with the correct binary targets:
 ```bash

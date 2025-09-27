@@ -116,6 +116,7 @@ docs/
 
 # Scripts
 *.sh
+!startup.sh
 
 # Test files
 **/*.test.*

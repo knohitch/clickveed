@@ -71,7 +71,7 @@ docker run -p 3000:3000 --env-file .env clickvidev-app
 
 The fixes should resolve OpenSSL errors, but if you still encounter issues:
 
-1. Verify that `libssl3` is installed in both `deps` and `runner` stages of the Dockerfile
+1. Verify that `libssl1.1` is installed in both `deps` and `runner` stages of the Dockerfile
 2. Ensure Prisma binary targets include `linux-musl-openssl-3.0.x`
 3. Re-run the fix script: `./fix-prisma-alpine.sh`
 
