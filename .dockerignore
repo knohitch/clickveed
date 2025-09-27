@@ -114,11 +114,10 @@ Dockerfile
 README.md
 docs/
 
-# Scripts
-
 # Test files
 **/*.test.*
 **/*.spec.*
 test/
 tests/
 __tests__/
+!startup.sh
