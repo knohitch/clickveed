@@ -9,8 +9,8 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-# Install both dependencies and devDependencies for seeding
-RUN npm ci --include=dev
+# Install all dependencies including devDependencies for build process
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
