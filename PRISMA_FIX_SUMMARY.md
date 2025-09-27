@@ -30,9 +30,9 @@ The issue had two components:
 3. **Updated Dockerfile to Install Required Libraries**
    - Added installation of SSL libraries in the runner stage of the Dockerfile:
      ```dockerfile
-     RUN apk add --no-cache openssl libssl1.1
+     RUN apk add --no-cache openssl libssl3
      ```
-   - This ensures that the required SSL libraries are available in the final container image
+   - This ensures that the required SSL libraries are available in the final container image (using libssl3 for Alpine 3.21+ compatibility)
 
 4. **Verification**
    - Confirmed that `libquery_engine-linux-musl.so.node` is now present in `node_modules/.prisma/client/`
