@@ -13,4 +13,7 @@ Update the Prisma configuration to properly support Alpine Linux by adding the `
 - [x] Update src/prisma/schema.prisma to include linux-musl binary target
 - [x] Run the fix script to regenerate Prisma client
 - [x] Verify the fix by checking generated files
-- [x] Test the application to ensure the error is resolved
+- [x] Update Dockerfile to install required SSL libraries
+- [x] Update documentation with the additional fixes
+- [ ] Push the updated files to GitHub repositories
+- [ ] Test the application to ensure the error is resolved
