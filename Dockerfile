@@ -29,8 +29,8 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-# Install required SSL libraries for Prisma
-RUN apk add --no-cache openssl libssl3
+# Install required SSL libraries for Prisma and postgresql client for seeding
+RUN apk add --no-cache openssl libssl3 postgresql-client
 
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
@@ -56,8 +56,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Copy startup script
+# Copy startup script and fallback seed
 COPY --from=builder /app/startup.sh ./startup.sh
+COPY --from=builder /app/seed-fallback.sql ./seed-fallback.sql
 RUN chmod +x ./startup.sh
 
 USER nextjs
