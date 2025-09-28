@@ -99,8 +99,60 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  // Ensure the providers array is correctly merged
+  // Ensure the providers array is correctly merged, but override credentials provider
   providers: [
-    ...authConfig.providers,
+    // Filter out the empty credentials provider from authConfig
+    ...authConfig.providers.filter(provider => provider.id !== 'credentials'),
+    // Add the properly implemented credentials provider
+    {
+      id: 'credentials',
+      name: 'credentials',
+      type: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
+      },
+      async authorize(credentials: any) {
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
+        try {
+          const user = await prisma.user.findUnique({
+            where: { 
+              email: credentials.email as string 
+            },
+            include: {
+              plan: true
+            }
+          });
+
+          if (!user || !user.passwordHash) {
+            return null;
+          }
+
+          const isValidPassword = await compare(
+            credentials.password as string,
+            user.passwordHash
+          );
+
+          if (!isValidPassword) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.displayName,
+            role: user.role,
+            onboardingComplete: user.onboardingComplete || false,
+            status: user.status
+          };
+        } catch (error) {
+          console.error('Auth error:', error);
+          return null;
+        }
+      },
+    } as any,
   ],
 });
