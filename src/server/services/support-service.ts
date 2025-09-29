@@ -105,6 +105,14 @@ export async function getTickets(): Promise<SupportTicket[]> {
 }
 
 export async function updateTicket(ticketId: string, updates: Partial<SupportTicket>): Promise<SupportTicket> {
+    const existingTicket = await prisma.supportTicket.findUnique({
+        where: { id: ticketId }
+    });
+    
+    if (!existingTicket) {
+        throw new Error('Ticket not found');
+    }
+    
     const updatedTicketDb = await prisma.supportTicket.update({
         where: { id: ticketId },
         data: {
@@ -116,6 +124,37 @@ export async function updateTicket(ticketId: string, updates: Partial<SupportTic
     
     revalidatePath('/kanri/support');
     revalidatePath('/chin/dashboard/support');
+    
+    // Send email notification if status has changed
+    if (updates.status && updates.status !== existingTicket.status) {
+        await sendEmail({
+            to: existingTicket.userEmail,
+            templateKey: 'userTicketStatusChange',
+            data: {
+                userName: existingTicket.userName,
+                ticketId: ticketId,
+                newStatus: updates.status,
+            }
+        });
+    }
+    
+    // Send email notification if a new message has been added
+    const existingConversation = existingTicket.conversation ? (existingTicket.conversation as unknown as Message[]) : [];
+    const updatedConversation = updates.conversation || [];
+    
+    if (updatedConversation.length > existingConversation.length) {
+        const lastMessage = updatedConversation[updatedConversation.length - 1];
+        if (lastMessage.sender === 'agent') {
+            await sendEmail({
+                to: existingTicket.userEmail,
+                templateKey: 'userTicketReply',
+                data: {
+                    userName: existingTicket.userName,
+                    ticketId: ticketId,
+                }
+            });
+        }
+    }
 
     return {
         ...updatedTicketDb,

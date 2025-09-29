@@ -18,6 +18,7 @@ export interface EmailSettings {
   smtpPass: string;
   fromAdminEmail: string;
   fromSupportEmail: string;
+  fromName: string;
 }
 
 export interface EmailTemplate {
@@ -27,6 +28,7 @@ export interface EmailTemplate {
 
 export interface EmailTemplates {
     userSignup: EmailTemplate;
+    emailVerification: EmailTemplate;
     passwordReset: EmailTemplate;
     subscriptionActivated: EmailTemplate;
     subscriptionRenewal: EmailTemplate;
@@ -90,11 +92,12 @@ export function useAdminSettings() {
 const defaultEmailSettings: EmailSettings = {
     id: 1,
     smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
-    fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com'
+    fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com', fromName: 'ClickVid Pro'
 };
 
 const defaultEmailTemplates: EmailTemplates = {
     userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
+    emailVerification: { subject: 'Verify Your Email Address', body: 'Hello {{name}}, please verify your email address by clicking the link below: {{verificationLink}}' },
     passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
     subscriptionActivated: { subject: 'Subscription Activated', body: 'Thanks for subscribing to {{planName}}.' },
     subscriptionRenewal: { subject: 'Subscription Renewal', body: 'Your plan {{planName}} will renew on {{renewalDate}}.' },
@@ -111,7 +114,7 @@ const defaultEmailTemplates: EmailTemplates = {
 export const initialApiKeysObject: ApiKeys = {
   gemini: '', openai: '', claude: '', azureOpenai: '', openrouter: '', deepseek: '', grok: '', qwen: '', perplexity: '', mistral: '', cohere: '',
   stableDiffusion: '', midjourney: '', dalle: '', imagen: '', dreamstudio: '', leonardo: '', magnific: '',
-  googleVeo: '', kling: '', sora: '', wan: '', skyReels: '', pika: '', luma: '', synthesia: '', colossyan: '', runwayml: '', heygen: '', modelscope: '', stableVideo: '', animateDiff: '', videoFusion: '',
+  googleVeo: '', kling: '', sora: '', wan: '', seedance: '', skyReels: '', pika: '', luma: '', synthesia: '', colossyan: '', runwayml: '', heygen: '', modelscope: '', stableVideo: '', animateDiff: '', videoFusion: '',
   elevenlabs: '', azureTts: '', myshell: '', coqui: '', assemblyai: '', deepgram: '', suno: '', udio: '', lalalai: '',
   n8n: '', make: '', replicate: '', huggingface: '',
   modelslab: '', pexels: '', pixabay: '', unsplash: '',

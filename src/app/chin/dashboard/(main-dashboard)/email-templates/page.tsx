@@ -18,10 +18,16 @@ type TemplateKey = keyof EmailTemplates;
 
 const templateInfo: Record<TemplateKey, { title: string; description: string; icon: React.ElementType, placeholders: string[] }> = {
     userSignup: { 
-        title: "Welcome & Verification", 
+        title: "Welcome", 
         icon: UserPlus,
         description: "Sent to new users upon successful signup.",
         placeholders: ["{{name}}", "{{appName}}"]
+    },
+    emailVerification: { 
+        title: "Email Verification", 
+        icon: BadgeCheck,
+        description: "Sent to new users to verify their email address.",
+        placeholders: ["{{name}}", "{{verificationLink}}"]
     },
     passwordReset: { 
         title: "Password Reset", 
@@ -173,6 +179,7 @@ export default function AdminEmailTemplatesPage() {
                 <CardTitle className="mb-4">User-Facing Emails</CardTitle>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                     <TemplateEditor templateKey="userSignup" template={localTemplates.userSignup} onChange={handleTemplateChange} />
+                    <TemplateEditor templateKey="emailVerification" template={localTemplates.emailVerification} onChange={handleTemplateChange} />
                     <TemplateEditor templateKey="passwordReset" template={localTemplates.passwordReset} onChange={handleTemplateChange} />
                     <TemplateEditor templateKey="subscriptionActivated" template={localTemplates.subscriptionActivated} onChange={handleTemplateChange} />
                     <TemplateEditor templateKey="subscriptionRenewal" template={localTemplates.subscriptionRenewal} onChange={handleTemplateChange} />

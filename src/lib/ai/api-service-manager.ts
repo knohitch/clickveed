@@ -16,6 +16,7 @@ import { searchPexelsVideosTool } from '@/server/ai/tools/pexels-video-tool';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { initialApiKeysObject } from '@/contexts/admin-settings-context';
 import OpenAI from 'openai';
+import { createProviderClient } from './provider-clients';
 
 // Define request types locally as they are no longer exported from genkit
 type MessageRole = 'user' | 'model' | 'system' | 'tool';
@@ -46,21 +47,67 @@ interface ProviderInfo {
     apiKey: string;
 }
 
+// LLM Providers Priority List
 const llmProviderPriority: ProviderConfig[] = [
+    // OpenAI providers
     { name: 'openai', model: 'openai/gpt-4o' },
+    { name: 'azureOpenai', model: 'openai/gpt-4o' },
+    
+    // Google AI providers
     { name: 'gemini', model: 'googleai/gemini-1.5-flash' },
+    
+    // Anthropic providers
+    { name: 'claude', model: 'anthropic/claude-3-5-sonnet' },
+    
+    // Other LLM providers
+    { name: 'deepseek', model: 'openai/gpt-4o' },
+    { name: 'grok', model: 'openai/gpt-4o' },
+    { name: 'qwen', model: 'openai/gpt-4o' },
+    { name: 'perplexity', model: 'openai/gpt-4o' },
+    { name: 'openrouter', model: 'openai/gpt-4o' },
+    { name: 'huggingface', model: 'openai/gpt-4o' },
 ];
 
+// Image Generation Providers Priority List
 const imageProviderPriority: ProviderConfig[] = [
+    // Google AI providers
     { name: 'gemini', model: 'googleai/gemini-1.5-flash' },
+    
+    // Other image generation providers
+    { name: 'stableDiffusion', model: 'openai/gpt-4o' },
+    { name: 'midjourney', model: 'openai/gpt-4o' },
+    { name: 'imagen', model: 'openai/gpt-4o' },
+    { name: 'dreamstudio', model: 'openai/gpt-4o' },
+    { name: 'replicate', model: 'openai/gpt-4o' },
+    { name: 'modelslab', model: 'openai/gpt-4o' },
 ];
 
+// Video Generation Providers Priority List
 const videoProviderPriority: ProviderConfig[] = [
+    // Google VEO
     { name: 'googleVeo', model: 'googleai/veo-2.0-generate-001' },
+    
+    // Other video generation providers
+    { name: 'heygen', model: 'openai/gpt-4o' },
+    { name: 'kling', model: 'openai/gpt-4o' },
+    { name: 'seedance', model: 'openai/gpt-4o' },
+    { name: 'wan', model: 'openai/gpt-4o' },
+    { name: 'modelscope', model: 'openai/gpt-4o' },
+    { name: 'stableVideo', model: 'openai/gpt-4o' },
+    { name: 'animateDiff', model: 'openai/gpt-4o' },
+    { name: 'videoFusion', model: 'openai/gpt-4o' },
 ];
 
+// TTS Providers Priority List
 const ttsProviderPriority: ProviderConfig[] = [
+    // Google AI providers
     { name: 'gemini', model: 'googleai/gemini-1.5-flash-tts' as any },
+    
+    // Other TTS providers
+    { name: 'elevenlabs', model: 'openai/gpt-4o' },
+    { name: 'azureTts', model: 'openai/gpt-4o' },
+    { name: 'myshell', model: 'openai/gpt-4o' },
+    { name: 'coqui', model: 'openai/gpt-4o' },
 ];
 
 // This function returns information about the available provider
@@ -138,40 +185,28 @@ export async function getAvailableStockVideoTool() {
 export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) {
     const providerInfo = await getAvailableTextGenerator();
     
-    if (providerInfo.provider === 'openai') {
-        // Use OpenAI directly via the client
-        const openaiClient = getOpenAIClient(providerInfo.apiKey);
-        
-        const { messages, ...rest } = req;
-        
-        // Convert Genkit message format to OpenAI format
-        const openaiMessages = messages.map(msg => {
-            // Handle different role types correctly for OpenAI
-            const role = msg.role === 'model' ? 'assistant' : msg.role;
-            // Ensure role is a valid OpenAI chat role
+    // Use custom client implementations for providers that don't have Genkit plugins
+    const customProviders = ['openai', 'azureOpenai', 'claude', 'huggingface'];
+    
+    if (customProviders.includes(providerInfo.provider)) {
+        try {
+            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const response = await client.generateText(req.messages);
+            
+            // Return in Genkit-compatible format
             return {
-                role: role as OpenAI.ChatCompletionMessageParam["role"],
-                content: msg.content[0].text
+                model: providerInfo.model,
+                result: {
+                    role: 'model' as const,
+                    content: [{ text: response.text }]
+                }
             };
-        });
-        
-        // Call OpenAI API
-        const response = await openaiClient.chat.completions.create({
-            model: 'gpt-4o', // Use appropriate model
-            messages: openaiMessages as OpenAI.ChatCompletionMessageParam[],
-            ...rest
-        });
-        
-        // Return in Genkit-compatible format
-        return {
-            model: providerInfo.model,
-            result: {
-                role: 'model' as const,
-                content: [{ text: response.choices[0].message.content || '' }]
-            }
-        };
+        } catch (error) {
+            console.error(`Error generating text with ${providerInfo.provider}:`, error);
+            throw error;
+        }
     } else {
-        // For other providers like Google AI, use Genkit
+        // For providers with Genkit plugins, use Genkit
         const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
         return genkitInstance.generate({ ...req, model: providerInfo.model });
     }
@@ -180,55 +215,25 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest, 'model'>) {
     const providerInfo = await getAvailableTextGenerator();
     
-    if (providerInfo.provider === 'openai') {
-        // Use OpenAI directly via the client for streaming
-        const openaiClient = getOpenAIClient(providerInfo.apiKey);
-        
-        const { messages, ...rest } = req;
-        
-        // Convert Genkit message format to OpenAI format
-        const openaiMessages = messages.map(msg => {
-            // Handle different role types correctly for OpenAI
-            const role = msg.role === 'model' ? 'assistant' : msg.role;
-            // Ensure role is a valid OpenAI chat role
-            return {
-                role: role as OpenAI.ChatCompletionMessageParam["role"],
-                content: msg.content[0].text
-            };
-        });
-        
+    // Use custom client implementations for providers that support streaming
+    const customProviders = ['openai', 'azureOpenai', 'claude'];
+    
+    if (customProviders.includes(providerInfo.provider)) {
         try {
-            // Call OpenAI API with streaming
-            const stream = await openaiClient.chat.completions.create({
-                model: 'gpt-4o', // Use appropriate model
-                messages: openaiMessages as OpenAI.ChatCompletionMessageParam[],
-                stream: true,
-                ...rest
-            });
+            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const stream = await client.generateTextStream(req.messages);
             
             // Create a Genkit-compatible response
-            const streamIterator = (async function* () {
-                for await (const chunk of stream) {
-                    const content = chunk.choices[0]?.delta?.content || '';
-                    if (content) {
-                        yield {
-                            role: 'model' as const,
-                            content: [{ text: content }]
-                        };
-                    }
-                }
-            })();
-            
             return {
-                stream: streamIterator,
+                stream,
                 response: Promise.resolve(null)
             };
         } catch (error) {
-            console.error("Error streaming from OpenAI:", error);
+            console.error(`Error streaming text with ${providerInfo.provider}:`, error);
             throw error;
         }
     } else {
-        // For other providers like Google AI, use Genkit
+        // For providers with Genkit plugins, use Genkit
         const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
         return genkitInstance.generateStream({ ...req, model: providerInfo.model });
     }
@@ -236,18 +241,99 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
 
 export async function generateImageWithProvider(req: Omit<GenerateRequest, 'model'>) {
     const providerInfo = await getAvailableImageGenerator();
-    // Pass just the model string, not the provider info object
-    return ai.generate({ ...req, model: providerInfo.model });
+    
+    // Use custom client implementations for image providers
+    const customProviders = ['replicate', 'stableDiffusion', 'midjourney', 'imagen'];
+    
+    if (customProviders.includes(providerInfo.provider)) {
+        try {
+            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            // For image generation, we would need to extract the prompt from the request
+            // This is a simplified implementation
+            const prompt = req.messages.map(msg => msg.content[0].text).join(' ');
+            const response = await client.generateImage(prompt);
+            
+            // Return in Genkit-compatible format
+            return {
+                model: providerInfo.model,
+                result: {
+                    role: 'model' as const,
+                    content: [{ text: `Image generated: ${response.imageUrl}` }]
+                }
+            };
+        } catch (error) {
+            console.error(`Error generating image with ${providerInfo.provider}:`, error);
+            throw error;
+        }
+    } else {
+        // For providers with Genkit plugins, use Genkit
+        const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+        return genkitInstance.generate({ ...req, model: providerInfo.model });
+    }
 }
 
 export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'model'>) {
     const providerInfo = await getAvailableVideoGenerator();
-    // Pass just the model string, not the provider info object
-    return ai.generate({ ...req, model: providerInfo.model });
+    
+    // Use custom client implementations for video providers
+    const customProviders = ['heygen', 'kling', 'modelscope', 'seedance', 'wan'];
+    
+    if (customProviders.includes(providerInfo.provider)) {
+        try {
+            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            // For video generation, we would need to extract the prompt from the request
+            // This is a simplified implementation
+            const prompt = req.messages.map(msg => msg.content[0].text).join(' ');
+            const response = await client.generateVideo(prompt);
+            
+            // Return in Genkit-compatible format
+            return {
+                model: providerInfo.model,
+                result: {
+                    role: 'model' as const,
+                    content: [{ text: `Video generated: ${response.videoUrl}` }]
+                }
+            };
+        } catch (error) {
+            console.error(`Error generating video with ${providerInfo.provider}:`, error);
+            throw error;
+        }
+    } else {
+        // For providers with Genkit plugins, use Genkit
+        const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+        return genkitInstance.generate({ ...req, model: providerInfo.model });
+    }
 }
 
 export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'>) {
     const providerInfo = await getAvailableTTSProvider();
-    // Pass just the model string, not the provider info object
-    return ai.generate({ ...req, model: providerInfo.model });
+    
+    // Use custom client implementations for TTS providers
+    const customProviders = ['elevenlabs', 'azureTts', 'myshell'];
+    
+    if (customProviders.includes(providerInfo.provider)) {
+        try {
+            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            // For TTS, we would need to extract the text from the request
+            // This is a simplified implementation
+            const text = req.messages.map(msg => msg.content[0].text).join(' ');
+            const response = await client.generateSpeech(text);
+            
+            // Return in Genkit-compatible format
+            return {
+                model: providerInfo.model,
+                result: {
+                    role: 'model' as const,
+                    content: [{ text: `Speech generated: ${response.audioUrl}` }]
+                }
+            };
+        } catch (error) {
+            console.error(`Error generating TTS with ${providerInfo.provider}:`, error);
+            throw error;
+        }
+    } else {
+        // For providers with Genkit plugins, use Genkit
+        const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+        return genkitInstance.generate({ ...req, model: providerInfo.model });
+    }
 }

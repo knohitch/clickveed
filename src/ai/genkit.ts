@@ -3,6 +3,16 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import OpenAI from 'openai';
 
+// Try to import other available Genkit plugins
+// Note: Not all providers have official Genkit plugins
+try {
+  // These might not exist, so we'll use try/catch
+  // We'll add them as needed
+} catch (error) {
+  // Silently ignore missing plugins
+  console.debug('Some Genkit plugins are not available');
+}
+
 // Define types for our message structures
 type MessageRole = 'user' | 'model' | 'system' | 'tool';
 

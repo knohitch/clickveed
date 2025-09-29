@@ -4,6 +4,23 @@
 import type { Plan, Promotion, ApiKeys, EmailSettings, EmailTemplates } from '@/contexts/admin-settings-context';
 import prisma from '@/server/prisma';
 
+// Define default email templates
+const defaultEmailTemplates: EmailTemplates = {
+    userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
+    emailVerification: { subject: 'Verify Your Email Address', body: 'Hello {{name}}, please verify your email address by clicking the link below: {{verificationLink}}' },
+    passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
+    subscriptionActivated: { subject: 'Subscription Activated', body: 'Thanks for subscribing to {{planName}}.' },
+    subscriptionRenewal: { subject: 'Subscription Renewal', body: 'Your plan {{planName}} will renew on {{renewalDate}}.' },
+    subscriptionCanceled: { subject: 'Subscription Canceled', body: 'Your plan {{planName}} has been canceled.' },
+    adminNewUser: { subject: 'New User Signup', body: 'A new user signed up: {{userEmail}}' },
+    adminSubscriptionCanceled: { subject: 'Subscription Canceled', body: '{{userName}} canceled their plan.' },
+    adminSubscriptionRenewed: { subject: 'Subscription Renewed', body: '{{userName}} renewed their plan.' },
+    userNewTicket: { subject: 'Support Ticket Received', body: 'We received your ticket {{ticketId}}.' },
+    userTicketReply: { subject: 'Reply to your ticket', body: 'An agent replied to your ticket {{ticketId}}.' },
+    userTicketStatusChange: { subject: 'Ticket Status Updated', body: 'Your ticket {{ticketId}} status is now {{newStatus}}.' },
+    adminNewTicket: { subject: 'New Support Ticket', body: 'New ticket from {{userName}}.' },
+};
+
 /**
  * Retrieves all admin settings from the production database.
  */
@@ -15,46 +32,42 @@ export async function getAdminSettings() {
     const plans = await prisma.plan.findMany({ include: { features: true } });
     const promotions = await prisma.promotion.findMany({ include: { applicablePlans: true } });
     
+    const fromName = settings.find(s => s.key === 'fromName')?.value as string || 'ClickVid Pro';
+    
     const defaultEmailSettings: EmailSettings = {
         id: 1,
         smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
-        fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com'
+        fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
+        fromName
     };
-
-    const defaultEmailTemplates: EmailTemplates = {
-        userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
-        passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
-        subscriptionActivated: { subject: 'Subscription Activated', body: 'Thanks for subscribing to {{planName}}.' },
-        subscriptionRenewal: { subject: 'Subscription Renewal', body: 'Your plan {{planName}} will renew on {{renewalDate}}.' },
-        subscriptionCanceled: { subject: 'Subscription Canceled', body: 'Your plan {{planName}} has been canceled.' },
-        adminNewUser: { subject: 'New User Signup', body: 'A new user signed up: {{userEmail}}' },
-        adminSubscriptionCanceled: { subject: 'Subscription Canceled', body: '{{userName}} canceled their plan.' },
-        adminSubscriptionRenewed: { subject: 'Subscription Renewed', body: '{{userName}} renewed their plan.' },
-        userNewTicket: { subject: 'Support Ticket Received', body: 'We received your ticket {{ticketId}}.' },
-        userTicketReply: { subject: 'Reply to your ticket', body: 'An agent replied to your ticket {{ticketId}}.' },
-        userTicketStatusChange: { subject: 'Ticket Status Updated', body: 'Your ticket {{ticketId}} status is now {{newStatus}}.' },
-        adminNewTicket: { subject: 'New Support Ticket', body: 'New ticket from {{userName}}.' },
+  
+    const emailSettings = {
+        ...defaultEmailSettings,
+        ...emailSettingsData
     };
     
-    const emailTemplates = emailTemplatesData.reduce((acc, tpl) => {
+    // Combine default templates with database templates
+    const emailTemplatesFromDb = emailTemplatesData.reduce((acc, tpl) => {
         acc[tpl.key as keyof EmailTemplates] = { subject: tpl.subject, body: tpl.body };
         return acc;
     }, {} as Partial<EmailTemplates>);
-
+    
+    const emailTemplates = { ...defaultEmailTemplates, ...emailTemplatesFromDb };
+    
     return {
         appName: settings.find(s => s.key === 'appName')?.value as string || 'ClickVid Pro',
         logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
         faviconUrl: settings.find(s => s.key === 'faviconUrl')?.value === 'null' ? null : settings.find(s => s.key === 'faviconUrl')?.value as string | null,
-        allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true' || false,
-        isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true' || false,
-        plans: plans.map(p => ({...p, features: p.features || [] })),
+        allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true',
+        isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true',
+        plans,
         promotions: promotions.map(p => ({ ...p, applicablePlanIds: p.applicablePlans.map(ap => ap.planId) })),
         apiKeys: apiKeys.reduce((acc, key) => {
           acc[key.name] = key.value;
           return acc;
         }, {} as Record<string, string>),
-        emailSettings: emailSettingsData || defaultEmailSettings,
-        emailTemplates: { ...defaultEmailTemplates, ...emailTemplates },
+        emailSettings,
+        emailTemplates,
     };
 }
 

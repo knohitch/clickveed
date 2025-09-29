@@ -4,6 +4,8 @@
 import { Stripe } from 'stripe';
 import prisma from '@/server/prisma';
 import { upsertUser } from '@/server/actions/user-actions';
+import { sendEmail } from './email-service';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 
 const getURL = () => {
     const url = process.env.NEXTAUTH_URL;
@@ -99,6 +101,38 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
                 const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
                 
+                // Get user and plan details for email notification
+                const user = await prisma.user.findUnique({ 
+                    where: { id: session.metadata.userId },
+                    include: { plan: true }
+                });
+                
+                if (user && user.plan) {
+                    // Send email to user about subscription activation
+                    const adminSettings = await getAdminSettings();
+                    await sendEmail({
+                        to: user.email!,
+                        templateKey: 'subscriptionActivated',
+                        data: {
+                            appName: adminSettings.appName,
+                            userName: user.displayName || 'User',
+                            planName: user.plan.name,
+                        }
+                    });
+                    
+                    // Send email to admin about new subscription
+                    await sendEmail({
+                        to: 'admin',
+                        templateKey: 'adminNewUser',
+                        data: {
+                            appName: adminSettings.appName,
+                            userEmail: user.email!,
+                            userName: user.displayName || 'User',
+                            planName: user.plan.name,
+                        }
+                    });
+                }
+                
                 await upsertUser({
                     id: session.metadata.userId,
                     email: session.customer_details?.email!,
@@ -116,6 +150,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
             const subscription = event.data.object as Stripe.Subscription;
             const user = await prisma.user.findFirst({
                 where: { stripeSubscriptionId: subscription.id },
+                include: { plan: true }
             });
 
             if (user) {
@@ -129,6 +164,34 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                         ]
                      }
                 });
+                
+                // Check if this is a renewal (active status)
+                if (subscription.status === 'active') {
+                    // Send email to user about subscription renewal
+                    const adminSettings = await getAdminSettings();
+                    await sendEmail({
+                        to: user.email!,
+                        templateKey: 'subscriptionRenewal',
+                        data: {
+                            appName: adminSettings.appName,
+                            userName: user.displayName || 'User',
+                            planName: plan?.name || user.plan?.name || 'Unknown Plan',
+                            renewalDate: new Date(subscription.current_period_end * 1000).toLocaleDateString(),
+                        }
+                    });
+                    
+                    // Send email to admin about subscription renewal
+                    await sendEmail({
+                        to: 'admin',
+                        templateKey: 'adminSubscriptionRenewed',
+                        data: {
+                            appName: adminSettings.appName,
+                            userName: user.displayName || 'User',
+                            userEmail: user.email!,
+                            planName: plan?.name || user.plan?.name || 'Unknown Plan',
+                        }
+                    });
+                }
 
                  await upsertUser({
                     id: user.id,
@@ -145,6 +208,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
             const subscription = event.data.object as Stripe.Subscription;
             const user = await prisma.user.findFirst({
                 where: { stripeSubscriptionId: subscription.id },
+                include: { plan: true }
             });
             if (user) {
                  const freePlan = await prisma.plan.findFirst({
@@ -154,6 +218,31 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                     console.error("Critical: 'Free' plan not found. Cannot downgrade user.");
                     return;
                 }
+                
+                // Send email to user about subscription cancellation
+                const adminSettings = await getAdminSettings();
+                await sendEmail({
+                    to: user.email!,
+                    templateKey: 'subscriptionCanceled',
+                    data: {
+                        appName: adminSettings.appName,
+                        userName: user.displayName || 'User',
+                        planName: user.plan?.name || 'Unknown Plan',
+                    }
+                });
+                
+                // Send email to admin about subscription cancellation
+                await sendEmail({
+                    to: 'admin',
+                    templateKey: 'adminSubscriptionCanceled',
+                    data: {
+                        appName: adminSettings.appName,
+                        userName: user.displayName || 'User',
+                        userEmail: user.email!,
+                        planName: user.plan?.name || 'Unknown Plan',
+                    }
+                });
+                
                  await upsertUser({
                     id: user.id,
                     email: user.email!,

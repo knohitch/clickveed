@@ -188,6 +188,7 @@ async function main() {
 
     const emailTemplates = {
         userSignup: { subject: 'Welcome to ClickVid Pro!', body: 'Hello {{name}}, welcome to our platform!' },
+        emailVerification: { subject: 'Verify Your Email Address', body: 'Hello {{name}}, please verify your email address by clicking the link below: {{verificationLink}}' },
         passwordReset: { subject: 'Reset Your Password', body: 'Click here to reset: {{resetLink}}' },
         subscriptionActivated: { subject: 'Subscription Activated', body: 'Your {{planName}} plan is now active.' },
         subscriptionRenewal: { subject: 'Upcoming Renewal', body: 'Your {{planName}} plan will renew on {{renewalDate}}.' },

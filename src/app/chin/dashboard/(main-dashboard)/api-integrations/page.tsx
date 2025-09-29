@@ -119,6 +119,8 @@ export default function ApiIntegrationsPage() {
                      <ApiCategoryCard title="Image, Video & Audio Generation" icon={ImageIcon}>
                         <ApiKeyInput name="elevenlabs" label="ElevenLabs API Key" value={localApiKeys.elevenlabs} onChange={handleKeyChange}/>
                         <ApiKeyInput name="replicate" label="Replicate API Key" value={localApiKeys.replicate} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="seedance" label="Seedance API Key" value={localApiKeys.seedance} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="wan" label="Wan API Key" value={localApiKeys.wan} onChange={handleKeyChange}/>
                     </ApiCategoryCard>
 
                      <ApiCategoryCard title="Platform & Workflow" icon={Workflow}>
@@ -137,6 +139,3 @@ export default function ApiIntegrationsPage() {
         </div>
     );
 }
-
-    
-

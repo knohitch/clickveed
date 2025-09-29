@@ -49,6 +49,17 @@ export async function signUp(prevState: any, formData: FormData) {
              throw new Error("Default 'Free' plan not found. Please seed the database.");
         }
 
+        const verificationToken = randomBytes(32).toString('hex');
+        const hashedToken = createHash('sha256').update(verificationToken).digest('hex');
+        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        await prisma.verificationToken.create({
+          data: {
+            identifier: email,
+            token: hashedToken,
+            expires: tokenExpires,
+          },
+        });
 
         await prisma.user.create({
             data: {
@@ -56,14 +67,49 @@ export async function signUp(prevState: any, formData: FormData) {
                 displayName: name,
                 passwordHash,
                 role,
-                status: 'Active',
+                status: 'Pending',
+                emailVerified: false,
                 planId: freePlan.id,
             },
         });
 
-        // TODO: Implement email verification logic here.
-        // For now, we'll just log a success message.
-        console.log(`User ${email} signed up successfully.`);
+        // Send verification email
+        const { appName } = await getAdminSettings();
+        const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${verificationToken}`;
+        
+        await sendEmail({
+            to: email,
+            templateKey: 'emailVerification',
+            data: {
+                appName,
+                name,
+                verificationLink: verificationUrl,
+            }
+        });
+        
+        // Send signup confirmation email to user
+        await sendEmail({
+            to: email,
+            templateKey: 'userSignup',
+            data: {
+                appName,
+                name,
+            }
+        });
+
+        console.log(`User ${email} signed up successfully. Verification and confirmation emails sent.`);
+        
+        // Send notification to admin about new user signup
+        const adminSettings = await getAdminSettings();
+        await sendEmail({
+            to: 'admin',
+            templateKey: 'adminNewUser',
+            data: {
+                appName: adminSettings.appName,
+                userEmail: email,
+                userName: name,
+            }
+        });
         
         return { success: true, error: '' };
 
