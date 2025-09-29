@@ -48,6 +48,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   trustHost: process.env.AUTH_TRUST_HOST === 'true',
+  // For multiple domain support
+  ...(process.env.AUTH_URL && { url: process.env.AUTH_URL }),
   pages: {
     signIn: '/login',
     error: '/login',
