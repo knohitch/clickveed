@@ -51,8 +51,11 @@ export async function middleware(request: NextRequest) {
       
       if (session?.user) {
         // Redirect authenticated users away from auth pages
+        console.log('Authenticated user with role:', session.user.role);
         if (session.user.role === 'SUPER_ADMIN') {
-          return NextResponse.redirect(new URL('/chin/dashboard', request.url));
+          const redirectUrl = new URL('/chin/dashboard', request.url);
+          console.log('Redirecting SUPER_ADMIN to:', redirectUrl.toString());
+          return NextResponse.redirect(redirectUrl);
         } else if (session.user.role === 'ADMIN') {
           return NextResponse.redirect(new URL('/kanri/dashboard', request.url));
         } else if (session.user.onboardingComplete) {

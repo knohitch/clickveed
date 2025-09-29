@@ -99,6 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.onboardingComplete !== undefined) {
         session.user.onboardingComplete = token.onboardingComplete as boolean;
       }
+      console.log('Session callback - user role:', session.user.role);
       return session;
     },
   },
