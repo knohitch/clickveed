@@ -34,14 +34,22 @@ export default function AdminSupportPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [replyText, setReplyText] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isDemo, setIsDemo] = useState(false);
 
     useEffect(() => {
         const fetchTickets = async () => {
             setLoading(true);
             const fetchedTickets = await getTickets();
             setTickets(fetchedTickets);
+            
+            // Detect if these are demo tickets
             if (fetchedTickets.length > 0) {
                 setSelectedTicketId(fetchedTickets[0].id);
+                setIsDemo(fetchedTickets.some(t => 
+                    t.id.startsWith('tkt_sample') || 
+                    t.subject.includes('[SAMPLE]') ||
+                    t.userName.includes('(Demo)')
+                ));
             }
             setLoading(false);
         }
@@ -95,6 +103,12 @@ export default function AdminSupportPage() {
                 <p className="text-muted-foreground">
                     View and respond to user support requests.
                 </p>
+                {isDemo && (
+                    <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 rounded-md text-sm">
+                        <strong>Demo Mode:</strong> These are sample tickets for demonstration purposes only. 
+                        In production, this will display real support tickets from your users.
+                    </div>
+                )}
             </div>
             <Card className="mt-6 flex-1 grid lg:grid-cols-12 overflow-hidden">
                 <div className="lg:col-span-4 border-r flex flex-col">

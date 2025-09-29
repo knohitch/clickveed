@@ -10,11 +10,31 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
     React.useEffect(() => {
         setMounted(true)
+        
+        // Ensure theme is applied properly by forcing a check
+        if (typeof window !== 'undefined') {
+            // Read theme from localStorage if available
+            const savedTheme = localStorage.getItem('theme')
+            
+            // Apply saved theme or use default
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme)
+                document.documentElement.classList.toggle('dark', 
+                    savedTheme === 'dark' || 
+                    (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                )
+            }
+        }
     }, [])
 
     if (!mounted) {
         return <>{children}</>
     }
     
-    return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+    return <NextThemesProvider 
+        storageKey="theme"
+        enableSystem={true}
+        enableColorScheme={true}
+        {...props}
+    >{children}</NextThemesProvider>
 }

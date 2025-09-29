@@ -53,6 +53,7 @@ export async function signUp(prevState: any, formData: FormData) {
         await prisma.user.create({
             data: {
                 email,
+                displayName: name,
                 passwordHash,
                 role,
                 status: 'Active',
@@ -74,22 +75,74 @@ export async function signUp(prevState: any, formData: FormData) {
 
 export async function login(prevState: any, formData: FormData) {
     try {
-        await signIn('credentials', Object.fromEntries(formData));
-        // The redirect will be handled automatically by the auth middleware if successful.
-        // This return is mainly for type safety and won't be reached on success.
-        return { success: true, error: ''};
-    } catch (error) {
+        const email = formData.get('email') as string;
+        const password = formData.get('password') as string;
+        
+        if (!email || !password) {
+            return { error: 'Email and password are required.', success: false };
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return { error: 'Please enter a valid email address.', success: false };
+        }
+        
+        console.log(`Login attempt for: ${email}`);
+        
+        // Sign in without a race condition with the middleware
+        const result = await signIn('credentials', {
+            email,
+            password,
+            redirect: false, // Don't redirect here, let middleware handle it
+        });
+        
+        if (result?.error) {
+            return { error: 'Invalid email or password', success: false };
+        }
+        
+        // Successful login - redirect manually
+        return redirect('/dashboard');
+        
+    } catch (error: any) {
+        console.error('Login error:', error);
+        
+        // Handle timeout specifically
+        if (error?.message === 'Login timeout') {
+            return {
+                error: 'Login is taking too long. Please check your connection and try again.',
+                success: false
+            };
+        }
+        
+        // NextAuth throws redirect errors for successful logins
+        if (error?.message?.includes('NEXT_REDIRECT')) {
+            throw error; // Re-throw redirect errors (this is success)
+        }
+        
         if (error instanceof AuthError) {
           switch (error.type) {
             case 'CredentialsSignin':
-              return { error: 'Invalid email or password.', success: false };
+              return { error: 'Invalid email or password. Please check your credentials and try again.', success: false };
+            case 'CallbackRouteError':
+              return { error: 'Authentication callback failed. Please try again.', success: false };
+            case 'AccessDenied':
+              return { error: 'Access denied. Please contact support if this persists.', success: false };
             default:
-              return { error: 'An unknown error occurred.', success: false };
+              console.error('AuthError type:', error.type);
+              return { error: 'An authentication error occurred. Please try again.', success: false };
           }
         }
-        // IMPORTANT: If we re-throw the error, Next.js will redirect to a generic error page.
-        // We return an error message to display it on the login form instead.
-        return { error: 'An unexpected error occurred during login.', success: false };
+        
+        // Handle network/connection errors
+        if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
+            return {
+                error: 'Unable to connect to authentication service. Please check your connection.',
+                success: false
+            };
+        }
+        
+        return { error: 'An unexpected error occurred during login. Please try again.', success: false };
     }
 }
 

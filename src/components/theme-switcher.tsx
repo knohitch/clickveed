@@ -8,7 +8,7 @@ import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 
 export function ThemeSwitcher() {
-  const { setTheme, theme } = useTheme()
+  const { setTheme, theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
@@ -29,7 +29,7 @@ export function ThemeSwitcher() {
   ];
 
   return (
-    <div className="relative flex items-center rounded-full bg-secondary p-1">
+    <div className="relative flex items-center rounded-full bg-secondary p-1" data-theme={theme}>
       <div
         className={cn(
           "absolute h-8 w-8 rounded-full bg-background shadow-md transition-transform duration-300 ease-in-out",
@@ -41,7 +41,14 @@ export function ThemeSwitcher() {
       {themes.map((t) => (
         <button
           key={t.name}
-          onClick={() => setTheme(t.name)}
+          onClick={() => {
+            console.log(`Setting theme to ${t.name} (current: ${theme})`);
+            setTheme(t.name);
+            // Force a localStorage update
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('theme', t.name);
+            }
+          }}
           className={cn(
             "relative z-10 flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
             "transition-colors duration-300",

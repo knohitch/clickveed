@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { SessionProvider } from 'next-auth/react';
 import AppInitializer from '@/components/app-initializer';
+// Removed ThemeProvider import as it's already in AppInitializer
 
 const nunito = Nunito({ 
   subsets: ['latin'], 
@@ -33,10 +34,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={cn("font-body antialiased", nunito.variable, poppins.variable)}>
         <SessionProvider>
-            <AppInitializer>
-              {children}
-            </AppInitializer>
-            <Toaster />
+          <AppInitializer>
+            {children}
+          </AppInitializer>
+          <Toaster />
         </SessionProvider>
       </body>
     </html>

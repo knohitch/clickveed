@@ -203,3 +203,45 @@ export async function upsertBrandKit(data: BrandKit) {
 
     revalidatePath('/dashboard/settings/brand-kit');
 }
+
+/**
+ * Fixes users with missing displayName values.
+ * This function updates users who have a null or empty displayName field.
+ */
+export async function fixUsersWithMissingDisplayName() {
+    // Find users with null or empty displayName
+    const usersToFix = await prisma.user.findMany({
+        where: {
+            OR: [
+                { displayName: null },
+                { displayName: '' }
+            ]
+        },
+        select: {
+            id: true,
+            email: true,
+            displayName: true
+        }
+    });
+
+    // Update each user with a displayName derived from their email
+    const updates = usersToFix.map(async (user) => {
+        // Extract name from email (part before @) if displayName is missing
+        let displayName = user.email ? user.email.split('@')[0] : 'User';
+        
+        // Capitalize first letter
+        displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+        
+        return prisma.user.update({
+            where: { id: user.id },
+            data: { displayName }
+        });
+    });
+
+    await Promise.all(updates);
+    
+    return {
+        message: `Fixed ${usersToFix.length} users with missing display names.`,
+        count: usersToFix.length
+    };
+}

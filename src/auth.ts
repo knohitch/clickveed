@@ -2,13 +2,14 @@
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { z } from 'zod';
-import prisma from '@/lib/prisma'; // Use the raw client for the adapter
+import prisma from '@/lib/prisma'; // Use the raw client for Edge compatibility
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
 import { compare } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import type { Adapter } from '@auth/core/adapters';
+import { findUserForAuth } from '@/lib/db-utils';
 
 
 // Define custom types directly in the auth config for co-location and clarity.
@@ -43,10 +44,9 @@ declare module "next-auth/jwt" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
   adapter: PrismaAdapter(prisma) as any,
-  session: { strategy: 'jwt' }, // Use JWT for session strategy
-  secret: process.env.AUTH_SECRET,
+  session: { strategy: 'jwt' },
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/login',
     error: '/login',
@@ -99,11 +99,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  // Ensure the providers array is correctly merged, but override credentials provider
   providers: [
-    // Filter out the empty credentials provider from authConfig
     ...authConfig.providers.filter(provider => provider.id !== 'credentials'),
-    // Add the properly implemented credentials provider
     {
       id: 'credentials',
       name: 'credentials',
@@ -114,20 +111,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) {
+          console.error('Missing credentials');
           return null;
         }
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { 
-              email: credentials.email as string 
-            },
-            include: {
-              plan: true
-            }
-          });
+          // Use optimized database utility with timeout and retry logic
+          const user = await findUserForAuth(prisma, credentials.email as string);
 
           if (!user || !user.passwordHash) {
+            console.error('User not found or no password hash');
             return null;
           }
 
@@ -137,19 +130,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           );
 
           if (!isValidPassword) {
+            console.error('Invalid password');
             return null;
           }
 
           return {
             id: user.id,
             email: user.email,
-            name: user.displayName,
+            name: user.displayName || '',
             role: user.role,
             onboardingComplete: user.onboardingComplete || false,
             status: user.status
           };
         } catch (error) {
-          console.error('Auth error:', error);
+          console.error('Authorization error:', error);
           return null;
         }
       },

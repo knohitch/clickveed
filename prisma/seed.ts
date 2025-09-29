@@ -210,38 +210,40 @@ async function main() {
     }
   console.log('Seeded email templates...');
 
-  // Seed a sample support ticket
+  // Seed sample support tickets for demonstration purposes only
   await prisma.supportTicket.deleteMany({ where: { id: { startsWith: 'tkt_sample' } } });
   await prisma.supportTicket.createMany({
       data: [
         {
             id: 'tkt_sample_001',
-            userName: 'Alice Johnson',
+            userName: 'Alice Johnson (Demo)',
             userEmail: 'alice@example.com',
             userAvatar: 'https://placehold.co/40x40.png',
-            subject: 'Problem with video export',
+            subject: '[SAMPLE] Problem with video export',
             preview: 'Hi, I was trying to export my video but it keeps failing at 99%...',
             status: 'Open',
             conversation: [
                 { sender: 'user', text: 'Hi, I was trying to export my video but it keeps failing at 99%. Can you help?', timestamp: new Date().toISOString() },
+                { sender: 'user', text: 'NOTE: This is a sample ticket for demonstration purposes only.', timestamp: new Date().toISOString() },
             ]
         },
         {
             id: 'tkt_sample_002',
-            userName: 'Bob Williams',
+            userName: 'Bob Williams (Demo)',
             userEmail: 'bob@example.com',
             userAvatar: 'https://placehold.co/40x40.png',
-            subject: 'Billing question',
+            subject: '[SAMPLE] Billing question',
             preview: 'I have a question about my last invoice. I was charged twice...',
             status: 'Open',
             conversation: [
                 { sender: 'user', text: 'I have a question about my last invoice. I was charged twice and I need a refund for one of them.', timestamp: new Date().toISOString() },
+                { sender: 'user', text: 'NOTE: This is a sample ticket for demonstration purposes only.', timestamp: new Date().toISOString() },
             ]
         }
       ]
   });
 
-  console.log('Seeded sample support tickets...');
+  console.log('Seeded sample support tickets for demonstration...');
 
 
   console.log('Seeding finished.');
