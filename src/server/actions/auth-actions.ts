@@ -101,8 +101,21 @@ export async function login(prevState: any, formData: FormData) {
             return { error: 'Invalid email or password', success: false };
         }
         
-        // Successful login - redirect manually
-        return redirect('/dashboard');
+        // Check user role to determine redirect
+        const user = await prisma.user.findUnique({
+            where: { email },
+            select: { role: true }
+        });
+        
+        // Successful login - redirect based on role
+        if (user?.role === 'SUPER_ADMIN') {
+            console.log('Redirecting SUPER_ADMIN to /chin/dashboard');
+            return redirect('/chin/dashboard');
+        } else if (user?.role === 'ADMIN') {
+            return redirect('/kanri/dashboard');
+        } else {
+            return redirect('/dashboard');
+        }
         
     } catch (error: any) {
         console.error('Login error:', error);
