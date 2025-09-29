@@ -67,6 +67,37 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Protect dashboard routes
+  if (request.nextUrl.pathname.startsWith('/dashboard') ||
+      request.nextUrl.pathname.startsWith('/chin') ||
+      request.nextUrl.pathname.startsWith('/kanri')) {
+    
+    try {
+      const session = await auth();
+      
+      if (!session?.user) {
+        // Redirect unauthenticated users to login
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('callbackUrl', request.url);
+        return NextResponse.redirect(loginUrl);
+      }
+      
+      // Check role-based access
+      if (request.nextUrl.pathname.startsWith('/chin') && session.user.role !== 'SUPER_ADMIN') {
+        return NextResponse.redirect(new URL('/unauthorized', request.url));
+      }
+      
+      if (request.nextUrl.pathname.startsWith('/kanri') && session.user.role !== 'ADMIN') {
+        return NextResponse.redirect(new URL('/unauthorized', request.url));
+      }
+    } catch (error) {
+      console.error('Authentication check failed in middleware:', error);
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   // Add performance monitoring headers
   const response = NextResponse.next();
   const duration = Date.now() - startTime;
