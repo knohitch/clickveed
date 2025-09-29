@@ -109,7 +109,14 @@ const menuSections = [
 
 export function DashboardNav() {
     const pathname = usePathname();
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+        // Initialize all sections as closed
+        const initialOpenSections: Record<string, boolean> = {};
+        menuSections.forEach(section => {
+            initialOpenSections[section.name] = false;
+        });
+        return initialOpenSections;
+    });
 
     const toggleSection = (name: string) => {
         setOpenSections(prev => ({...prev, [name]: !prev[name]}));
