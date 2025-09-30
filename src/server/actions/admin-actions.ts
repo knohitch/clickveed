@@ -32,7 +32,8 @@ export async function getAdminSettings() {
     const plans = await prisma.plan.findMany({ include: { features: true } });
     const promotions = await prisma.promotion.findMany({ include: { applicablePlans: true } });
     
-    const fromName = settings.find(s => s.key === 'fromName')?.value as string || 'ClickVid Pro';
+    const appName = settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator';
+    const fromName = settings.find(s => s.key === 'fromName')?.value as string || '';
     
     const defaultEmailSettings: EmailSettings = {
         id: 1,
@@ -55,7 +56,7 @@ export async function getAdminSettings() {
     const emailTemplates = { ...defaultEmailTemplates, ...emailTemplatesFromDb };
     
     return {
-        appName: settings.find(s => s.key === 'appName')?.value as string || 'ClickVid Pro',
+        appName: settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator',
         logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
         faviconUrl: settings.find(s => s.key === 'faviconUrl')?.value === 'null' ? null : settings.find(s => s.key === 'faviconUrl')?.value as string | null,
         allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true',

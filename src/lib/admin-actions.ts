@@ -18,7 +18,7 @@ export async function getAdminSettings() {
         id: 1,
         smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
         fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
-        fromName: 'ClickVid'
+        fromName: ''
     };
 
     const defaultEmailTemplates: EmailTemplates = {
@@ -43,7 +43,7 @@ export async function getAdminSettings() {
     }, {} as Partial<EmailTemplates>);
 
     return {
-        appName: settings.find(s => s.key === 'appName')?.value as string || 'ClickVid Pro',
+        appName: settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator',
         logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
         allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true',
         isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true',

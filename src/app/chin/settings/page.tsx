@@ -17,7 +17,7 @@ export default function ChinSettingsPage() {
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
   const [settings, setSettings] = useState({
-    appName: 'ClickVid Pro',
+    appName: 'AI Video Creator',
     allowAdminSignup: true,
     logoUrl: '',
     faviconUrl: '',

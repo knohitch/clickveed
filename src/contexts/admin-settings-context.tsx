@@ -92,7 +92,7 @@ export function useAdminSettings() {
 const defaultEmailSettings: EmailSettings = {
     id: 1,
     smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
-    fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com', fromName: 'ClickVid Pro'
+    fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com', fromName: ''
 };
 
 const defaultEmailTemplates: EmailTemplates = {
@@ -134,7 +134,7 @@ export const initialApiKeysObject: ApiKeys = {
 };
 
 const initialSettings: AllSettings = {
-    appName: 'ClickVid Pro',
+    appName: 'AI Video Creator',
     logoUrl: null,
     faviconUrl: null,
     allowAdminSignup: true,

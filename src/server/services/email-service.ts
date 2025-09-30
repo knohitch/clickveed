@@ -39,6 +39,9 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
         return;
     }
     
+    // Determine the sender name: use fromName if set, otherwise default to appName
+    const senderName = emailSettings.fromName || appName;
+    
     // Add appName to data if not already present
     const finalData = { appName, ...data };
 
@@ -54,7 +57,7 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
     );
 
     const mailOptions = {
-        from: `"${appName}" <${emailSettings.fromAdminEmail}>`,
+        from: `"${senderName}" <${emailSettings.fromAdminEmail}>`,
         to: to === 'admin' ? emailSettings.fromAdminEmail : to,
         subject,
         html,

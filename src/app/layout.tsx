@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { SessionProvider } from 'next-auth/react';
 import AppInitializer from '@/components/app-initializer';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 // Removed ThemeProvider import as it's already in AppInitializer
 
 const nunito = Nunito({ 
@@ -20,10 +21,14 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: 'ClickVid Pro',
-  description: 'The All-in-One AI Video Creation Suite',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { appName } = await getAdminSettings();
+  
+  return {
+    title: appName,
+    description: 'The All-in-One AI Video Creation Suite',
+  };
+}
 
 export default function RootLayout({
   children,
