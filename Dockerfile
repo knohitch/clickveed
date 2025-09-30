@@ -58,6 +58,11 @@ RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0
     dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
     rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
 
+# Verify OpenSSL 1.1 installation
+RUN ls -la /usr/lib/x86_64-linux-gnu/libssl.so* && \
+    ls -la /usr/lib/x86_64-linux-gnu/libcrypto.so* && \
+    openssl version -a
+
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
