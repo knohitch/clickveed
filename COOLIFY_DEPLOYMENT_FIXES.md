@@ -1,124 +1,77 @@
 # Coolify Deployment Fixes
 
-This document outlines the specific fixes applied to resolve deployment issues when deploying to Coolify.
+This document summarizes the fixes applied to resolve the deployment issues encountered when deploying to Coolify.
 
-## Issues Identified from Deployment Logs
+## Issues Identified
 
-1. **Missing startup.sh file**: The Docker build was failing with "failed to calculate checksum of ref ... "/app/startup.sh": not found"
+1. **npm ci failure during Docker build**: The deployment was failing during the `npm ci` step in the Docker build process with the error "Oops something is not okay, are you okay? 😢"
 
-2. **Prisma OpenSSL compatibility issues**: Multiple warnings about "Prisma failed to detect the libssl/openssl version" and errors about "Error loading shared library libssl.so.1.1: No such file or directory"
+2. **Missing devDependencies during build**: The NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needs devDependencies to build properly.
+
+3. **OpenSSL library compatibility**: The Dockerfile was installing `libssl3` but Prisma was looking for `libssl.so.1.1`.
 
 ## Fixes Applied
 
-### 1. Dockerfile Updates for Coolify
+### 1. Fixed NODE_ENV Issue in Dockerfile
 
-The Dockerfile has been updated to ensure proper SSL library installation:
+The main issue was that NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. The application needs devDependencies to build properly.
 
-```dockerfile
-# In the deps stage
-RUN apk add --no-cache libc6-compat openssl libssl1.1
-
-# In the runner stage  
-RUN apk add --no-cache openssl libssl1.1
+**Changes made:**
+```diff
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+# Install all dependencies including devDependencies for build process
+# Temporarily set NODE_ENV to development during build to ensure devDependencies are installed
++ ENV NODE_ENV=development
+RUN npm ci
+# Reset NODE_ENV to production for the rest of the build
++ ENV NODE_ENV=production
 ```
 
-These changes ensure that the required SSL libraries are available during both build and runtime stages.
+This ensures that devDependencies are installed during the build process while maintaining production settings for the runtime.
 
-### 2. .dockerignore Updates
+### 2. Updated OpenSSL Libraries
 
-The .dockerignore file was updated to include the startup.sh file in the Docker build context:
+Updated the Dockerfile to install the correct OpenSSL libraries that Prisma expects.
 
-```dockerignore
-# Scripts
-*.sh
-!startup.sh
+**Changes made:**
+```diff
+# In both deps and runner stages
+- RUN apk add --no-cache libc6-compat openssl libssl3
++ RUN apk add --no-cache libc6-compat openssl libssl1.1
 ```
 
-This allows the startup.sh file to be included in the Docker build while still excluding other shell scripts.
+This ensures that the required OpenSSL libraries are available during both build and runtime stages.
 
-### 3. Prisma Binary Targets Configuration
+## Files Modified
 
-Verified that the correct binary targets are configured in both `package.json` and `prisma/schema.prisma`:
+1. `Dockerfile` - Fixed NODE_ENV issue and updated OpenSSL library installation
 
-```json
-"binaryTargets": [
-  "native",
-  "debian-openssl-3.0.x",
-  "linux-musl",
-  "linux-musl-openssl-3.0.x"
-]
-```
+## Deployment Instructions for Coolify
 
-```prisma
-generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
-}
-```
+1. Ensure the following environment variables are set in Coolify:
+   - `DATABASE_URL` - Your PostgreSQL connection string
+   - `NEXTAUTH_URL` - Your application's URL
+   - `NEXTAUTH_SECRET` - A strong secret for NextAuth.js
 
-### 4. Startup Script Availability
-
-Confirmed that `startup.sh` exists in the root directory and has proper executable permissions.
-
-### 5. Prisma Client Regeneration
-
-Ran the fix script to regenerate the Prisma client with the correct binary targets:
-```bash
-./fix-prisma-alpine.sh
-```
-
-## Coolify Deployment Instructions
-
-### 1. Environment Variables
-
-Ensure the following environment variables are set in Coolify:
-- `DATABASE_URL` - Your PostgreSQL connection string
-- `NEXTAUTH_URL` - Your application's URL
-- `NEXTAUTH_SECRET` - A strong secret for NextAuth.js
-
-### 2. Deployment Configuration
-
-1. Set the build pack to "Dockerfile"
-2. Ensure the source is correctly pointing to your GitHub repository
-3. Set the port to 3000
-
-### 3. Pre-deployment Commands
-
-With the updated Dockerfile, database migrations and seeding will run automatically at startup via `startup.sh`, so no additional pre-deployment commands are needed.
-
-The startup script will:
-1. Run database migrations with `npx prisma migrate deploy`
-2. Run database seeding with `npx prisma db seed`
-3. Start the application with `node server.js`
+2. Set the build pack to "Dockerfile"
+3. Ensure the source is correctly pointing to your GitHub repository
+4. Set the port to 3000
 
 ## Expected Outcome
 
 With these fixes, your Coolify deployment should:
-1. Successfully build the Docker image without the "startup.sh not found" error
-2. Resolve all Prisma OpenSSL compatibility issues
-3. Automatically run database migrations and seeding
-4. Start the application successfully
+1. Successfully build the Docker image without the npm ci failure
+2. Install all required dependencies including devDependencies during build
+3. Resolve all Prisma OpenSSL compatibility issues
+4. Automatically run database migrations and seeding
+5. Start the application successfully
 
-## Troubleshooting for Coolify
+## Troubleshooting
 
-### If You Still Encounter Issues
+If you still encounter issues:
 
-1. **Check Build Logs**: Monitor the Coolify build logs for any specific error messages
-
-2. **Verify Environment Variables**: Ensure all required environment variables are correctly set in Coolify
-
-3. **Database Connectivity**: Confirm that your database is accessible from the Coolify environment
-
-4. **Re-run Fix Script**: If Prisma issues persist, you can re-run the fix script locally before deploying:
-   ```bash
-   ./fix-prisma-alpine.sh
-   ```
-
-### Manual Verification
-
-To manually verify that the fixes are working:
-
-1. Check that the required SSL libraries are installed:
+1. Check that the required SSL libraries are installed in the container:
    ```bash
    docker run --rm your-image-name apk list | grep openssl
    ```
@@ -130,8 +83,4 @@ To manually verify that the fixes are working:
    ls node_modules/.prisma/client/*.node
    ```
 
-## Additional Notes
-
-- These fixes maintain compatibility with both local development and Coolify deployment
-- No application code changes were required
-- The solution addresses both the immediate deployment failure and the underlying compatibility issues
+3. Check the build logs for any specific error messages during the npm ci step

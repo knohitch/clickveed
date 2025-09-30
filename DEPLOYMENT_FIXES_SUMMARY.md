@@ -8,6 +8,10 @@ This document summarizes the fixes applied to resolve the deployment issues enco
 
 2. **Prisma OpenSSL compatibility issues**: Multiple warnings about "Prisma failed to detect the libssl/openssl version" and errors about "Error loading shared library libssl.so.1.1: No such file or directory"
 
+3. **npm ci failure during Docker build**: The deployment was failing during the `npm ci` step in the Docker build process with the error "Oops something is not okay, are you okay? 😢"
+
+4. **Missing devDependencies during build**: The NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needs devDependencies to build properly.
+
 ## Fixes Applied
 
 ### 1. Fixed .dockerignore to Include startup.sh
@@ -36,7 +40,25 @@ The Dockerfile was installing `libssl3` but the Prisma client was looking for `l
 
 This ensures that the required OpenSSL libraries are available during both build and runtime stages.
 
-### 3. Verified Prisma Configuration
+### 3. Fixed NODE_ENV Issue in Dockerfile
+
+The main issue was that NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. The application needs devDependencies to build properly.
+
+**Changes made:**
+```diff
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+# Install all dependencies including devDependencies for build process
+# Temporarily set NODE_ENV to development during build to ensure devDependencies are installed
++ ENV NODE_ENV=development
+RUN npm ci
+# Reset NODE_ENV to production for the rest of the build
++ ENV NODE_ENV=production
+```
+
+This ensures that devDependencies are installed during the build process while maintaining production settings for the runtime.
+
+### 4. Verified Prisma Configuration
 
 Confirmed that the correct binary targets are configured in both `package.json` and `prisma/schema.prisma`:
 
@@ -59,7 +81,7 @@ generator client {
 ## Files Modified
 
 1. `.dockerignore` - Added exception for startup.sh
-2. `Dockerfile` - Updated OpenSSL library installation
+2. `Dockerfile` - Updated OpenSSL library installation and NODE_ENV configuration
 
 ## Deployment Instructions for Coolify
 
@@ -94,3 +116,4 @@ If you still encounter issues:
    # In your project directory
    npx prisma generate
    ls node_modules/.prisma/client/*.node
+   ```
