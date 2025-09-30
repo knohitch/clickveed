@@ -16,13 +16,7 @@
     "worker": "tsx lib/worker.ts"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts",
-    "binaryTargets": [
-      "native",
-      "debian-openssl-3.0.x",
-      "linux-musl",
-      "linux-musl-openssl-3.0.x"
-    ]
+    "seed": "tsx prisma/seed.ts"
   },
   "engines": {
     "node": ">=18.0.0"
