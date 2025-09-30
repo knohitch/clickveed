@@ -5,12 +5,20 @@ FROM node:18-slim AS base
 # Install dependencies only when needed
 FROM base AS deps
 # Install OpenSSL and other required libraries
-# Note: Debian Bookworm uses OpenSSL 3.x, but we need to ensure compatibility
+# Note: Debian Bookworm uses OpenSSL 3.x, but Prisma specifically needs OpenSSL 1.1
+# We'll install both OpenSSL 1.1 and 3.x for compatibility
 RUN apt-get update && apt-get install -y \
     openssl \
     libssl3 \
     libc6 \
+    ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Download and install OpenSSL 1.1 for Prisma compatibility
+RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
+    dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
+    rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -36,11 +44,19 @@ FROM base AS runner
 WORKDIR /app
 
 # Install required SSL libraries for Prisma and postgresql client for seeding
+# Note: Prisma specifically needs OpenSSL 1.1, so we install both versions
 RUN apt-get update && apt-get install -y \
     openssl \
     libssl3 \
     postgresql-client \
+    ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Download and install OpenSSL 1.1 for Prisma compatibility
+RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
+    dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
+    rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
 
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
