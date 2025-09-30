@@ -10,6 +10,8 @@ This document summarizes the fixes applied to resolve the deployment issues enco
 
 3. **OpenSSL library compatibility**: Prisma was looking for libssl.so.1.1 which is not available in Alpine Linux package repository, causing the error "Error loading shared library libssl.so.1.1: No such file or directory".
 
+4. **Prisma OpenSSL 1.1 requirement**: Even after migrating to Debian Linux, Prisma specifically requires OpenSSL 1.1 (libssl.so.1.1) to function properly, while Debian Bookworm uses OpenSSL 3.x by default.
+
 ## Fixes Applied
 
 ### 1. Fixed NODE_ENV Issue in Dockerfile
@@ -38,6 +40,17 @@ Completely rewrote the Dockerfile to use Debian Linux (node:18-slim) instead of 
 - Maintained all multi-stage build functionality
 
 This ensures that the required OpenSSL libraries are available for Prisma.
+
+### 3. Install Both OpenSSL 1.1 and 3.x for Prisma Compatibility
+
+Even after migrating to Debian Linux, Prisma specifically requires OpenSSL 1.1 (libssl.so.1.1) to function properly. Since Debian Bookworm uses OpenSSL 3.x by default, we need to install both versions.
+
+**Changes made:**
+- Added installation of OpenSSL 1.1 from Debian archives in both `deps` and `runner` stages
+- Kept installation of OpenSSL 3.x for general compatibility
+- Updated package installation to include `ca-certificates` and `wget` for downloading OpenSSL 1.1
+
+This ensures that Prisma can find the required `libssl.so.1.1` library while maintaining compatibility with other components that may need OpenSSL 3.x.
 
 ## Files Modified
 
