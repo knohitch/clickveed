@@ -4,10 +4,11 @@ FROM node:18-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Install OpenSSL 1.1 and other required libraries
+# Install OpenSSL and other required libraries
+# Note: Debian Bookworm uses OpenSSL 3.x, but we need to ensure compatibility
 RUN apt-get update && apt-get install -y \
     openssl \
-    libssl1.1 \
+    libssl3 \
     libc6 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
@@ -37,7 +38,7 @@ WORKDIR /app
 # Install required SSL libraries for Prisma and postgresql client for seeding
 RUN apt-get update && apt-get install -y \
     openssl \
-    libssl1.1 \
+    libssl3 \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 

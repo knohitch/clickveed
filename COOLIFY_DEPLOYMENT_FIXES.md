@@ -34,10 +34,10 @@ Completely rewrote the Dockerfile to use Debian Linux (node:18-slim) instead of 
 **Changes made:**
 - Changed base image from `node:18-alpine` to `node:18-slim`
 - Replaced `apk` package manager with `apt-get`
-- Installed `libssl1.1` which Prisma requires
+- Installed `libssl3` which is available in Debian Bookworm
 - Maintained all multi-stage build functionality
 
-This ensures that Prisma can find the libssl.so.1.1 library it was compiled against.
+This ensures that the required OpenSSL libraries are available for Prisma.
 
 ## Files Modified
 
