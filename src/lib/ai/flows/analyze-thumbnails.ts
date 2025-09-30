@@ -97,11 +97,30 @@ Thumbnail B: {{media url=${input.thumbnailB_DataUri}}}` }]
     ];
 
     // Use the generateImageWithProvider function to generate the response
-    const { output } = await generateImageWithProvider({ messages });
-    
-    if (!output) {
+    const response = await generateImageWithProvider({ messages });
+
+    // Handle different response formats from Genkit vs custom providers
+    let textContent: string | undefined;
+
+    if ('output' in response && response.output?.message?.content) {
+        // Genkit response format
+        textContent = response.output.message.content[0]?.text;
+    } else if ('result' in response && response.result?.content) {
+        // Custom provider response format
+        textContent = response.result.content[0]?.text;
+    }
+
+    if (!textContent) {
         throw new Error("The AI failed to generate a thumbnail analysis.");
     }
-    return output;
+
+    // Parse the JSON response to match the expected output schema
+    try {
+        const parsedResponse = JSON.parse(textContent);
+        return parsedResponse;
+    } catch (error) {
+        console.error("Failed to parse AI response as JSON:", error);
+        throw new Error("The AI response was not in the expected format.");
+    }
   }
 );
