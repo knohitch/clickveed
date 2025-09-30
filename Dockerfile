@@ -5,7 +5,7 @@ FROM node:18-alpine AS base
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat openssl libssl1.1
+RUN apk add --no-cache libc6-compat openssl libssl3
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -31,7 +31,7 @@ FROM base AS runner
 WORKDIR /app
 
 # Install required SSL libraries for Prisma and postgresql client for seeding
-RUN apk add --no-cache openssl libssl1.1 postgresql-client
+RUN apk add --no-cache openssl libssl3 postgresql-client
 
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
