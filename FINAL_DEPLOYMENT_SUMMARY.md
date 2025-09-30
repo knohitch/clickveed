@@ -8,7 +8,7 @@ The deployment was failing due to multiple interconnected issues:
 
 1. **npm ci failure**: The primary cause was that NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needed devDependencies to build properly.
 
-2. **OpenSSL compatibility issues**: The Dockerfile was installing `libssl3` but Prisma was looking for `libssl.so.1.1`, causing runtime errors.
+2. **OpenSSL compatibility issues**: The Dockerfile was trying to install `libssl1.1` which is not available in Alpine Linux package repository.
 
 3. **Missing startup.sh**: The .dockerignore file was excluding all shell scripts, preventing the startup.sh file from being included in the Docker build context.
 
@@ -16,24 +16,21 @@ The deployment was failing due to multiple interconnected issues:
 
 ### 1. Dockerfile NODE_ENV Configuration
 
-Fixed the NODE_ENV issue by temporarily setting it to 'development' during the build process to ensure devDependencies are installed:
+Fixed the NODE_ENV issue by using `npm install` instead of `npm ci` to ensure devDependencies are installed:
 
 ```dockerfile
 # Install all dependencies including devDependencies for build process
-# Temporarily set NODE_ENV to development during build to ensure devDependencies are installed
-ENV NODE_ENV=development
-RUN npm ci
-# Reset NODE_ENV to production for the rest of the build
-ENV NODE_ENV=production
+# Use npm install instead of npm ci to ensure devDependencies are installed
+RUN npm install
 ```
 
 ### 2. OpenSSL Library Updates
 
-Updated the Dockerfile to install the correct OpenSSL libraries that Prisma expects:
+Updated the Dockerfile to use the correct OpenSSL libraries that are available in Alpine Linux:
 
 ```dockerfile
 # In both deps and runner stages
-RUN apk add --no-cache libc6-compat openssl libssl1.1
+RUN apk add --no-cache libc6-compat openssl libssl3
 ```
 
 ### 3. .dockerignore Configuration

@@ -12,6 +12,8 @@ This document summarizes the fixes applied to resolve the deployment issues enco
 
 4. **Missing devDependencies during build**: The NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needs devDependencies to build properly.
 
+5. **OpenSSL library compatibility**: The Dockerfile was trying to install `libssl1.1` which is not available in Alpine Linux package repository.
+
 ## Fixes Applied
 
 ### 1. Fixed .dockerignore to Include startup.sh
@@ -29,13 +31,13 @@ This allows the startup.sh file to be included in the Docker build while still e
 
 ### 2. Updated Dockerfile for OpenSSL Compatibility
 
-The Dockerfile was installing `libssl3` but the Prisma client was looking for `libssl.so.1.1`. We updated the Dockerfile to install the correct OpenSSL libraries.
+The Dockerfile was trying to install `libssl1.1` which is not available in Alpine Linux. We updated the Dockerfile to use the correct OpenSSL libraries.
 
 **Changes made:**
 ```diff
 # In both deps and runner stages
-- RUN apk add --no-cache libc6-compat openssl libssl3
-+ RUN apk add --no-cache libc6-compat openssl libssl1.1
+- RUN apk add --no-cache libc6-compat openssl libssl1.1
++ RUN apk add --no-cache libc6-compat openssl libssl3
 ```
 
 This ensures that the required OpenSSL libraries are available during both build and runtime stages.
@@ -49,14 +51,11 @@ The main issue was that NODE_ENV was set to 'production' during the build proces
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
 # Install all dependencies including devDependencies for build process
-# Temporarily set NODE_ENV to development during build to ensure devDependencies are installed
-+ ENV NODE_ENV=development
-RUN npm ci
-# Reset NODE_ENV to production for the rest of the build
-+ ENV NODE_ENV=production
+# Use npm install instead of npm ci to ensure devDependencies are installed
++ RUN npm install
 ```
 
-This ensures that devDependencies are installed during the build process while maintaining production settings for the runtime.
+This ensures that devDependencies are installed during the build process.
 
 ### 4. Verified Prisma Configuration
 
