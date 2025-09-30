@@ -71,10 +71,9 @@ After deployment, verify the fix by:
 - Prisma's Debian binary requires OpenSSL 1.1 specifically
 
 ## Files Modified
-- `prisma/schema.prisma` - Updated binary targets
-
-## Files Already Configured (No Changes Needed)
-- `Dockerfile` - Already has OpenSSL 1.1 installation
+- `prisma/schema.prisma` - Updated binary targets to `debian-openssl-1.1.x`
+- `package.json` - Removed conflicting Prisma binary targets
+- `Dockerfile` - Added OpenSSL 1.1 verification step for debugging
 
 ## Expected Outcome
 The application will now successfully load the Prisma query engine with the correct OpenSSL 1.1 libraries, eliminating the "libssl.so.1.1: cannot open shared object file" error.
