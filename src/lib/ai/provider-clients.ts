@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * @fileOverview Client implementations for AI providers that don't have Genkit plugins
  * This file contains direct API client implementations for various AI services

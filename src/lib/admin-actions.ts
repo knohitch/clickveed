@@ -17,10 +17,12 @@ export async function getAdminSettings() {
     const defaultEmailSettings: EmailSettings = {
         id: 1,
         smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
-        fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com'
+        fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
+        fromName: 'ClickVid'
     };
 
     const defaultEmailTemplates: EmailTemplates = {
+        emailVerification: { subject: 'Email Verification', body: 'Verify your email at {{verifyLink}}' },
         userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
         passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
         subscriptionActivated: { subject: 'Subscription Activated', body: 'Thanks for subscribing to {{planName}}.' },
