@@ -8,7 +8,7 @@ This document summarizes the fixes applied to resolve the deployment issues enco
 
 2. **Missing devDependencies during build**: The NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needs devDependencies to build properly.
 
-3. **OpenSSL library compatibility**: Attempted to install `libssl1.1` which is not available in Alpine Linux package repository.
+3. **OpenSSL library compatibility**: Prisma was looking for libssl.so.1.1 which is not available in Alpine Linux package repository, causing the error "Error loading shared library libssl.so.1.1: No such file or directory".
 
 ## Fixes Applied
 
@@ -27,18 +27,17 @@ COPY package.json package-lock.json* ./
 
 This ensures that devDependencies are installed during the build process.
 
-### 2. Updated OpenSSL Libraries
+### 2. Migrated from Alpine to Debian Linux
 
-Updated the Dockerfile to use the correct OpenSSL libraries that are available in Alpine Linux.
+Completely rewrote the Dockerfile to use Debian Linux (node:18-slim) instead of Alpine Linux to resolve OpenSSL compatibility issues.
 
 **Changes made:**
-```diff
-# In both deps and runner stages
-- RUN apk add --no-cache libc6-compat openssl libssl1.1
-+ RUN apk add --no-cache libc6-compat openssl libssl3
-```
+- Changed base image from `node:18-alpine` to `node:18-slim`
+- Replaced `apk` package manager with `apt-get`
+- Installed `libssl1.1` which Prisma requires
+- Maintained all multi-stage build functionality
 
-This ensures that the required OpenSSL libraries are available during both build and runtime stages. The Prisma configuration has been verified to use the correct binary targets for OpenSSL 3.0.x.
+This ensures that Prisma can find the libssl.so.1.1 library it was compiled against.
 
 ## Files Modified
 
@@ -70,7 +69,7 @@ If you still encounter issues:
 
 1. Check that the required SSL libraries are installed in the container:
    ```bash
-   docker run --rm your-image-name apk list | grep openssl
+   docker run --rm your-image-name apt list --installed | grep openssl
    ```
 
 2. Verify Prisma client generation:
@@ -80,4 +79,4 @@ If you still encounter issues:
    ls node_modules/.prisma/client/*.node
    ```
 
-3. Check the build logs for any specific error messages during the npm ci step
+3. Check the build logs for any specific error messages during the npm install step

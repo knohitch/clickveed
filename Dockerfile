@@ -1,11 +1,15 @@
 # Use the official Node.js runtime as the base image
 ARG CACHE_BUST=1
-FROM node:18-alpine AS base
+FROM node:18-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat openssl libssl3
+# Install OpenSSL 1.1 and other required libraries
+RUN apt-get update && apt-get install -y \
+    openssl \
+    libssl1.1 \
+    libc6 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -20,7 +24,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client with Alpine-specific binary target
+# Generate Prisma client with Debian-specific binary target
 RUN npx prisma generate
 
 # Build the application
@@ -31,7 +35,11 @@ FROM base AS runner
 WORKDIR /app
 
 # Install required SSL libraries for Prisma and postgresql client for seeding
-RUN apk add --no-cache openssl libssl3 postgresql-client
+RUN apt-get update && apt-get install -y \
+    openssl \
+    libssl1.1 \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.

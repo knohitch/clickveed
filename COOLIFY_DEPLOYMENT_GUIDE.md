@@ -12,10 +12,11 @@ Before deploying, ensure you have:
 
 Important fixes have been applied to resolve previous deployment issues:
 
-1. **Dockerfile SSL Library Installation**: Updated to install `libssl3` in both build and runtime stages to resolve OpenSSL compatibility issues
-2. **Prisma Binary Targets**: Verified correct configuration for Alpine Linux compatibility with OpenSSL 3.0.x
-3. **Startup Script**: Confirmed `startup.sh` exists and has proper permissions
-4. **NODE_ENV Configuration**: Fixed NODE_ENV by using `npm install` instead of `npm ci` to ensure devDependencies are installed
+1. **Dockerfile Base Image**: Migrated from Alpine Linux to Debian Linux (node:18-slim) to resolve OpenSSL compatibility issues
+2. **Dockerfile SSL Library Installation**: Updated to install `libssl1.1` in both build and runtime stages to ensure Prisma compatibility
+3. **Prisma Binary Targets**: Verified correct configuration for Debian Linux compatibility
+4. **Startup Script**: Confirmed `startup.sh` exists and has proper permissions
+5. **NODE_ENV Configuration**: Fixed NODE_ENV by using `npm install` instead of `npm ci` to ensure devDependencies are installed
 
 ## Deployment Steps
 

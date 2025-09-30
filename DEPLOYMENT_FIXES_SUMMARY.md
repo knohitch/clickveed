@@ -12,7 +12,7 @@ This document summarizes the fixes applied to resolve the deployment issues enco
 
 4. **Missing devDependencies during build**: The NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needs devDependencies to build properly.
 
-5. **OpenSSL library compatibility**: Attempted to install `libssl1.1` which is not available in Alpine Linux package repository.
+5. **OpenSSL library compatibility**: Prisma was looking for libssl.so.1.1 which is not available in Alpine Linux package repository.
 
 ## Fixes Applied
 
@@ -29,18 +29,17 @@ The .dockerignore file was excluding all shell scripts with the pattern `*.sh`, 
 
 This allows the startup.sh file to be included in the Docker build while still excluding other shell scripts.
 
-### 2. Updated Dockerfile for OpenSSL Compatibility
+### 2. Migrated from Alpine to Debian Linux
 
-The Dockerfile was attempting to install `libssl1.1` which is not available in Alpine Linux. We updated the Dockerfile to use the correct OpenSSL libraries.
+Completely rewrote the Dockerfile to use Debian Linux (node:18-slim) instead of Alpine Linux to resolve OpenSSL compatibility issues.
 
 **Changes made:**
-```diff
-# In both deps and runner stages
-- RUN apk add --no-cache libc6-compat openssl libssl1.1
-+ RUN apk add --no-cache libc6-compat openssl libssl3
-```
+- Changed base image from `node:18-alpine` to `node:18-slim`
+- Replaced `apk` package manager with `apt-get`
+- Installed `libssl1.1` which Prisma requires
+- Maintained all multi-stage build functionality
 
-This ensures that the required OpenSSL libraries are available during both build and runtime stages. The Prisma configuration has been verified to use the correct binary targets for OpenSSL 3.0.x.
+This ensures that Prisma can find the libssl.so.1.1 library it was compiled against.
 
 ### 3. Fixed NODE_ENV Issue in Dockerfile
 
@@ -80,7 +79,7 @@ generator client {
 ## Files Modified
 
 1. `.dockerignore` - Added exception for startup.sh
-2. `Dockerfile` - Updated OpenSSL library installation and NODE_ENV configuration
+2. `Dockerfile` - Migrated from Alpine to Debian Linux and updated library installation
 
 ## Deployment Instructions for Coolify
 
@@ -107,7 +106,7 @@ If you still encounter issues:
 
 1. Check that the required SSL libraries are installed in the container:
    ```bash
-   docker run --rm your-image-name apk list | grep openssl
+   docker run --rm your-image-name apt list --installed | grep openssl
    ```
 
 2. Verify Prisma client generation:

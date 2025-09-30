@@ -8,7 +8,7 @@ The deployment was failing due to multiple interconnected issues:
 
 1. **npm ci failure**: The primary cause was that NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needed devDependencies to build properly.
 
-2. **OpenSSL compatibility issues**: Attempted to install `libssl1.1` which is not available in Alpine Linux package repository.
+2. **OpenSSL compatibility issues**: Prisma was looking for libssl.so.1.1 which is not available in Alpine Linux package repository, causing the error "Error loading shared library libssl.so.1.1: No such file or directory".
 
 3. **Missing startup.sh**: The .dockerignore file was excluding all shell scripts, preventing the startup.sh file from being included in the Docker build context.
 
@@ -24,16 +24,16 @@ Fixed the NODE_ENV issue by using `npm install` instead of `npm ci` to ensure de
 RUN npm install
 ```
 
-### 2. OpenSSL Library Updates
+### 2. Migrated from Alpine to Debian Linux
 
-Updated the Dockerfile to use the correct OpenSSL libraries that are available in Alpine Linux:
+Completely rewrote the Dockerfile to use Debian Linux (node:18-slim) instead of Alpine Linux to resolve OpenSSL compatibility issues:
 
 ```dockerfile
-# In both deps and runner stages
-RUN apk add --no-cache libc6-compat openssl libssl3
+# Use the official Node.js runtime as the base image
+FROM node:18-slim AS base
 ```
 
-This ensures that the required OpenSSL libraries are available during both build and runtime stages. The Prisma configuration has been verified to use the correct binary targets for OpenSSL 3.0.x.
+This ensures that Prisma can find the libssl.so.1.1 library it was compiled against.
 
 ### 3. .dockerignore Configuration
 
@@ -51,9 +51,9 @@ __tests__/
 
 ## Files Modified
 
-1. `Dockerfile` - Updated NODE_ENV configuration and OpenSSL library installation
+1. `Dockerfile` - Migrated from Alpine to Debian Linux and updated library installation
 2. `.dockerignore` - Added exception for startup.sh
-3. `COOLIFY_DEPLOYMENT_FIXES.md` - Created new documentation
+3. `COOLIFY_DEPLOYMENT_FIXES.md` - Updated documentation
 4. `COOLIFY_DEPLOYMENT_GUIDE.md` - Updated with new fixes
 5. `DEPLOYMENT_FIXES_SUMMARY.md` - Updated with new issues and fixes
 
@@ -87,7 +87,7 @@ If you still encounter issues:
 
 1. Check that the required SSL libraries are installed in the container:
    ```bash
-   docker run --rm your-image-name apk list | grep openssl
+   docker run --rm your-image-name apt list --installed | grep openssl
    ```
 
 2. Verify Prisma client generation:
@@ -96,7 +96,7 @@ If you still encounter issues:
    ls node_modules/.prisma/client/*.node
    ```
 
-3. Check the build logs for any specific error messages during the npm ci step
+3. Check the build logs for any specific error messages during the npm install step
 
 ## Additional Notes
 
