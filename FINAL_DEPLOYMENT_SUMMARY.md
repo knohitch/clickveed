@@ -8,7 +8,7 @@ The deployment was failing due to multiple interconnected issues:
 
 1. **npm ci failure**: The primary cause was that NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needed devDependencies to build properly.
 
-2. **OpenSSL compatibility issues**: The Dockerfile was trying to install `libssl1.1` which is not available in Alpine Linux package repository.
+2. **OpenSSL compatibility issues**: The Prisma query engine was compiled against OpenSSL 1.1, but Coolify's Alpine Linux container uses OpenSSL 3.x, which has different library names and paths. Specifically, Prisma is looking for libssl.so.1.1 but can't find it.
 
 3. **Missing startup.sh**: The .dockerignore file was excluding all shell scripts, preventing the startup.sh file from being included in the Docker build context.
 
@@ -26,12 +26,14 @@ RUN npm install
 
 ### 2. OpenSSL Library Updates
 
-Updated the Dockerfile to use the correct OpenSSL libraries that are available in Alpine Linux:
+Updated the Dockerfile to install OpenSSL 1.1 compatibility libraries that Prisma requires:
 
 ```dockerfile
 # In both deps and runner stages
-RUN apk add --no-cache libc6-compat openssl libssl3
+RUN apk add --no-cache libc6-compat openssl libssl1.1
 ```
+
+This ensures that Prisma can find the libssl.so.1.1 library it was compiled against.
 
 ### 3. .dockerignore Configuration
 

@@ -8,7 +8,7 @@ This document summarizes the fixes applied to resolve the deployment issues enco
 
 2. **Missing devDependencies during build**: The NODE_ENV was set to 'production' during the build process, which caused npm to skip installing devDependencies. However, the application needs devDependencies to build properly.
 
-3. **OpenSSL library compatibility**: The Dockerfile was trying to install `libssl1.1` which is not available in Alpine Linux package repository.
+3. **OpenSSL library compatibility**: The Prisma query engine was compiled against OpenSSL 1.1, but Coolify's Alpine Linux container uses OpenSSL 3.x, which has different library names and paths. Specifically, Prisma is looking for libssl.so.1.1 but can't find it.
 
 ## Fixes Applied
 
@@ -29,16 +29,16 @@ This ensures that devDependencies are installed during the build process.
 
 ### 2. Updated OpenSSL Libraries
 
-Updated the Dockerfile to use the correct OpenSSL libraries that are available in Alpine Linux.
+Updated the Dockerfile to install OpenSSL 1.1 compatibility libraries that Prisma requires.
 
 **Changes made:**
 ```diff
 # In both deps and runner stages
-- RUN apk add --no-cache libc6-compat openssl libssl1.1
-+ RUN apk add --no-cache libc6-compat openssl libssl3
+- RUN apk add --no-cache libc6-compat openssl libssl3
++ RUN apk add --no-cache libc6-compat openssl libssl1.1
 ```
 
-This ensures that the required OpenSSL libraries are available during both build and runtime stages.
+This ensures that Prisma can find the libssl.so.1.1 library it was compiled against.
 
 ## Files Modified
 
