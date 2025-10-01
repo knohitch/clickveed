@@ -16,29 +16,29 @@ export default function ChinSettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
-  const [settings, setSettings] = useState({
-    appName: 'AI Video Creator',
-    allowAdminSignup: true,
-    logoUrl: '',
-    faviconUrl: '',
-    emailSettings: {
-      smtpHost: 'smtp.example.com',
-      smtpPort: '587',
-      smtpUser: 'user@example.com',
-      smtpPass: '••••••••',
-      fromAdminEmail: 'noreply@example.com',
-      fromSupportEmail: 'support@example.com',
-      fromName: 'ClickVid Pro',
-    },
-    storageSettings: {
-      wasabiEndpoint: 's3.us-west-1.wasabisys.com',
-      wasabiRegion: 'us-west-1',
-      wasabiBucket: 'clickvid-media',
-      bunnyCdnUrl: 'https://clickvid.b-cdn.net',
-      wasabiAccessKey: '••••••••',
-      wasabiSecretKey: '••••••••',
-    }
-  });
+    const [settings, setSettings] = useState({
+        appName: 'AI Video Creator',
+        allowAdminSignup: true,
+        logoUrl: '',
+        faviconUrl: '',
+        emailSettings: {
+            smtpHost: 'smtp.example.com',
+            smtpPort: '587',
+            smtpUser: 'user@example.com',
+            smtpPass: '••••••••',
+            fromAdminEmail: 'noreply@example.com',
+            fromSupportEmail: 'support@example.com',
+            fromName: 'ClickVid Pro',
+        },
+        storageSettings: {
+            wasabiEndpoint: 's3.us-west-1.wasabisys.com',
+            wasabiRegion: 'us-west-1',
+            wasabiBucket: 'clickvid-media',
+            bunnyCdnUrl: 'https://clickvid.b-cdn.net',
+            wasabiAccessKey: '••••••••',
+            wasabiSecretKey: '••••••••',
+        }
+    });
 
   const [loading, setLoading] = useState(true);
 

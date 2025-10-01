@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clipboard, Download, FileText, Sparkles, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
+import { useFormStatus } from 'react-dom';
 
 // Dummy state to prevent errors
 const initialState = {
@@ -18,10 +19,10 @@ const initialState = {
 };
 
 function SubmitButton() {
-  // const { pending } = useFormStatus();
-  const pending = false; // Manually set to false
+  const { pending } = useFormStatus();
+  // const pending = false; // Manually set to false
   return (
-    <Button type="submit" disabled className="w-full">
+    <Button type="submit" disabled={pending} className="w-full">
       {pending ? <Sparkles className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
       {pending ? 'Generating Script...' : 'Generate Video Script'}
     </Button>
@@ -29,11 +30,11 @@ function SubmitButton() {
 }
 
 export function VideoFromUrlGenerator() {
-  const [state] = useState(initialState); // Use local state
+  const [state, setState] = useState(initialState); // Use local state
   const { toast } = useToast();
-  // const formRef = useRef<HTMLFormElement>(null); // No longer needed
-  // const { pending } = useFormStatus(); // No longer needed
-  const pending = false; // Manually set to false
+  const formRef = useRef<HTMLFormElement>(null);
+  const { pending } = useFormStatus();
+  // const pending = false; // Manually set to false
 
   const copyToClipboard = () => {
     if (state.script) {

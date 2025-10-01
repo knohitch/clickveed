@@ -14,11 +14,14 @@ export async function getAdminSettings() {
     const plans = await prisma.plan.findMany({ include: { features: true } });
     const promotions = await prisma.promotion.findMany({ include: { applicablePlans: true } });
     
+    const appName = settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator';
+    const fromName = settings.find(s => s.key === 'fromName')?.value as string || '';
+    
     const defaultEmailSettings: EmailSettings = {
         id: 1,
         smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
         fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
-        fromName: 'ClickVid Pro'
+        fromName: fromName || appName || 'AI Video Creator'
     };
 
     const defaultEmailTemplates: EmailTemplates = {

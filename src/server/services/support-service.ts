@@ -151,6 +151,8 @@ export async function updateTicket(ticketId: string, updates: Partial<SupportTic
                 data: {
                     userName: existingTicket.userName,
                     ticketId: ticketId,
+                    ticketSubject: existingTicket.subject,
+                    replyMessage: lastMessage.text,
                 }
             });
         }
