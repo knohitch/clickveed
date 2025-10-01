@@ -19,6 +19,12 @@ RUN apt-get update && apt-get install -y \
 RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
     dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
     rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
+
+# Create symbolic links to ensure OpenSSL 1.1 libraries are found during Prisma generation
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/libssl.so && \
+    ln -sf /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 /usr/lib/x86_64-linux-gnu/libcrypto.so && \
+    ldconfig
+
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -58,10 +64,17 @@ RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0
     dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
     rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
 
-# Verify OpenSSL 1.1 installation
+# Create symbolic links to ensure OpenSSL 1.1 libraries are found
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/libssl.so && \
+    ln -sf /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 /usr/lib/x86_64-linux-gnu/libcrypto.so && \
+    ldconfig
+
+# Verify OpenSSL 1.1 installation and library availability
 RUN ls -la /usr/lib/x86_64-linux-gnu/libssl.so* && \
     ls -la /usr/lib/x86_64-linux-gnu/libcrypto.so* && \
-    openssl version -a
+    openssl version -a && \
+    echo "Testing OpenSSL 1.1 availability:" && \
+    /usr/bin/openssl version
 
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
