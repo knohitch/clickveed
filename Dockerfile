@@ -1,28 +1,22 @@
 # Use the official Node.js runtime as the base image
-# Using Bullseye instead of Bookworm because Bullseye has OpenSSL 1.1 built-in
+# Using Alpine Linux with OpenSSL 1.1 compatibility for Prisma
 ARG CACHE_BUST=1
-FROM node:18-bullseye-slim AS base
+FROM node:18-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Install OpenSSL and other required libraries
-# Note: Debian Bookworm uses OpenSSL 3.x, but Prisma specifically needs OpenSSL 1.1
-# We'll install both OpenSSL 1.1 and 3.x for compatibility
-RUN apt-get update && apt-get install -y \
+# Install OpenSSL 1.1 compatibility and other required libraries
+RUN apk add --no-cache \
     openssl \
-    libc6 \
+    openssl1.1-compat \
     ca-certificates \
     wget \
-    && rm -rf /var/lib/apt/lists/*
-
-# Download and install OpenSSL 1.1 for Prisma compatibility
-RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
-    dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
-    rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
+    libc6-compat \
+    postgresql-client
 
 # Create symbolic links to ensure OpenSSL 1.1 libraries are found during Prisma generation
-RUN ln -sf /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/libssl.so && \
-    ln -sf /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 /usr/lib/x86_64-linux-gnu/libcrypto.so && \
+RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
+    ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so && \
     ldconfig
 
 WORKDIR /app
@@ -39,7 +33,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client with Debian-specific binary target
+# Generate Prisma client with Alpine-specific binary target
 RUN npx prisma generate
 
 # Build the application
@@ -51,26 +45,22 @@ WORKDIR /app
 
 # Install required SSL libraries for Prisma and postgresql client for seeding
 # Note: Prisma specifically needs OpenSSL 1.1, so we install both versions
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     openssl \
-    postgresql-client \
+    openssl1.1-compat \
     ca-certificates \
     wget \
-    && rm -rf /var/lib/apt/lists/*
-
-# Download and install OpenSSL 1.1 for Prisma compatibility
-RUN wget http://archive.debian.org/debian/pool/main/o/openssl/libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
-    dpkg -i libssl1.1_1.1.1w-0+deb11u1_amd64.deb && \
-    rm libssl1.1_1.1.1w-0+deb11u1_amd64.deb
+    libc6-compat \
+    postgresql-client
 
 # Create symbolic links to ensure OpenSSL 1.1 libraries are found
-RUN ln -sf /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/libssl.so && \
-    ln -sf /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 /usr/lib/x86_64-linux-gnu/libcrypto.so && \
+RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
+    ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so && \
     ldconfig
 
 # Verify OpenSSL 1.1 installation and library availability
-RUN ls -la /usr/lib/x86_64-linux-gnu/libssl.so* && \
-    ls -la /usr/lib/x86_64-linux-gnu/libcrypto.so* && \
+RUN ls -la /usr/lib/libssl.so* && \
+    ls -la /usr/lib/libcrypto.so* && \
     openssl version -a && \
     echo "Testing OpenSSL 1.1 availability:" && \
     /usr/bin/openssl version
