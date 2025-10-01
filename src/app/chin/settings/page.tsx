@@ -363,12 +363,12 @@ export default function ChinSettingsPage() {
                   <Input id="smtpPass" name="smtpPass" type="password" placeholder="••••••••••••" value={settings.emailSettings.smtpPass} onChange={(e) => handleNestedChange('emailSettings', e)} />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="fromName">Sender Name</Label>
+                <Input id="fromName" name="fromName" placeholder="ClickVid Pro" value={settings.emailSettings.fromName} onChange={(e) => handleNestedChange('emailSettings', e)} />
+                <p className="text-xs text-muted-foreground">The name that will appear in the "From" field of emails.</p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="fromName">Sender Name</Label>
-                  <Input id="fromName" name="fromName" placeholder="ClickVid Pro" value={settings.emailSettings.fromName} onChange={(e) => handleNestedChange('emailSettings', e)} />
-                  <p className="text-xs text-muted-foreground">The name that will appear in the "From" field of emails.</p>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="fromAdminEmail">Default "From" Email Address</Label>
                   <Input id="fromAdminEmail" name="fromAdminEmail" type="email" placeholder="noreply@example.com" value={settings.emailSettings.fromAdminEmail} onChange={(e) => handleNestedChange('emailSettings', e)} />
