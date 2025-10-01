@@ -158,9 +158,10 @@ async function main() {
   console.log('Seeded promotions...');
 
   // Seed Settings
+  const appName = 'ClickVid Pro';
   await prisma.setting.createMany({
     data: [
-        { key: 'appName', value: 'ClickVid Pro' },
+        { key: 'appName', value: appName },
         { key: 'logoUrl', value: 'null' },
         { key: 'faviconUrl', value: 'null' },
         { key: 'allowAdminSignup', value: 'true' },
@@ -182,7 +183,7 @@ async function main() {
         smtpPass: '',
         fromAdminEmail: 'noreply@example.com',
         fromSupportEmail: 'support@example.com',
-        fromName: 'ClickVid Pro',
+        fromName: appName,
     }
   });
   console.log('Seeded email settings...');
