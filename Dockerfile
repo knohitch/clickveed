@@ -17,10 +17,6 @@ RUN apk add --no-cache \
 RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/main \
     libssl1.1
 
-# Create symbolic links to ensure OpenSSL 1.1 libraries are found during Prisma generation
-RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
-    ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so && \
-    ldconfig
 
 WORKDIR /app
 
@@ -59,10 +55,6 @@ RUN apk add --no-cache \
 RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/main \
     libssl1.1
 
-# Create symbolic links to ensure OpenSSL 1.1 libraries are found
-RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
-    ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so && \
-    ldconfig
 
 # Verify OpenSSL 1.1 installation and library availability
 RUN ls -la /usr/lib/libssl.so* && \
