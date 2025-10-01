@@ -4,7 +4,7 @@
 Fixed the Prisma OpenSSL compatibility issue where the application was trying to use `libquery_engine-debian-openssl-1.1.x.so.node` but couldn't find the required `libssl.so.1.1` library.
 
 ## Root Cause
-The Prisma schema was configured with incorrect binary targets for Alpine Linux (`linux-musl`, `linux-musl-openssl-3.0.x`) instead of Debian targets, even though the Docker image uses a Debian-based Node image (`node:18-slim`).
+The Prisma schema was configured with incorrect binary targets for Alpine Linux (`linux-musl`, `linux-musl-openssl-3.0.x`) instead of Debian targets. Additionally, the Docker image was using Debian Bookworm (`node:18-slim`) which only has OpenSSL 3.x, but Prisma requires OpenSSL 1.1.x.
 
 ## Solution Implemented
 
@@ -28,12 +28,13 @@ generator client {
 ```
 
 ### 2. Enhanced Dockerfile Configuration
-The Dockerfile now has the correct OpenSSL 1.1 installation with runtime fixes:
-- Downloads and installs `libssl1.1_1.1.1w-0+deb11u1_amd64.deb` from Debian archives
-- Installs in both the `deps` and `runner` stages
-- Creates symbolic links from OpenSSL 1.1 libraries to standard locations
-- Runs `ldconfig` to update the dynamic linker cache
-- Includes verification steps to ensure libraries are properly accessible
+The Dockerfile now uses a more robust approach for OpenSSL 1.1 compatibility:
+- **Changed base image** from `node:18-slim` (Bookworm) to `node:18-bullseye-slim` (Bullseye has OpenSSL 1.1 built-in)
+- **Downloads and installs** `libssl1.1_1.1.1w-0+deb11u1_amd64.deb` from Debian archives as backup
+- **Installs in both** the `deps` and `runner` stages for maximum compatibility
+- **Creates symbolic links** from OpenSSL 1.1 libraries to standard locations
+- **Runs `ldconfig`** to update the dynamic linker cache
+- **Includes verification steps** to ensure libraries are properly accessible
 
 ### 3. Regenerated Prisma Client
 Successfully regenerated Prisma Client with the correct binary target for Debian OpenSSL 1.1.x.

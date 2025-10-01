@@ -1,6 +1,7 @@
 # Use the official Node.js runtime as the base image
+# Using Bullseye instead of Bookworm because Bullseye has OpenSSL 1.1 built-in
 ARG CACHE_BUST=1
-FROM node:18-slim AS base
+FROM node:18-bullseye-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
