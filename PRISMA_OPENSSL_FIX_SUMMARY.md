@@ -27,11 +27,13 @@ generator client {
 }
 ```
 
-### 2. Verified Dockerfile Configuration
-The Dockerfile already has the correct OpenSSL 1.1 installation:
+### 2. Enhanced Dockerfile Configuration
+The Dockerfile now has the correct OpenSSL 1.1 installation with runtime fixes:
 - Downloads and installs `libssl1.1_1.1.1w-0+deb11u1_amd64.deb` from Debian archives
 - Installs in both the `deps` and `runner` stages
-- Properly configured for Debian-based images
+- Creates symbolic links from OpenSSL 1.1 libraries to standard locations
+- Runs `ldconfig` to update the dynamic linker cache
+- Includes verification steps to ensure libraries are properly accessible
 
 ### 3. Regenerated Prisma Client
 Successfully regenerated Prisma Client with the correct binary target for Debian OpenSSL 1.1.x.
