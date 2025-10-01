@@ -21,7 +21,6 @@ RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/m
 RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
     ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so
 
-
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -47,7 +46,6 @@ FROM base AS runner
 WORKDIR /app
 
 # Install required SSL libraries for Prisma and postgresql client for seeding
-# Note: Prisma specifically needs OpenSSL 1.1, so we install both versions
 RUN apk add --no-cache \
     openssl \
     ca-certificates \
@@ -63,17 +61,14 @@ RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/m
 RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
     ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so
 
-
 # Verify OpenSSL 1.1 installation and library availability
 RUN ls -la /usr/lib/libssl.so* && \
     ls -la /usr/lib/libcrypto.so* && \
-    openssl version -a && \
-    echo "Testing OpenSSL 1.1 availability:" && \
-    /usr/bin/openssl version
+    openssl version -a
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -104,9 +99,9 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 # set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
+ENV HOSTNAME="0.0.0.0"
 
 # Use the startup script as the entrypoint
 CMD ["./startup.sh"]
