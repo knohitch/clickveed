@@ -365,6 +365,11 @@ export default function ChinSettingsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
+                  <Label htmlFor="fromName">Sender Name</Label>
+                  <Input id="fromName" name="fromName" placeholder="ClickVid Pro" value={settings.emailSettings.fromName} onChange={(e) => handleNestedChange('emailSettings', e)} />
+                  <p className="text-xs text-muted-foreground">The name that will appear in the "From" field of emails.</p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="fromAdminEmail">Default "From" Email Address</Label>
                   <Input id="fromAdminEmail" name="fromAdminEmail" type="email" placeholder="noreply@example.com" value={settings.emailSettings.fromAdminEmail} onChange={(e) => handleNestedChange('emailSettings', e)} />
                   <p className="text-xs text-muted-foreground">Used for general notifications like signups and password resets.</p>
