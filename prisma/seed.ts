@@ -182,6 +182,7 @@ async function main() {
         smtpPass: '',
         fromAdminEmail: 'noreply@example.com',
         fromSupportEmail: 'support@example.com',
+        fromName: 'ClickVid Pro',
     }
   });
   console.log('Seeded email settings...');
