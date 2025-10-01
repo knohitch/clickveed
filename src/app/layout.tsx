@@ -22,10 +22,23 @@ const poppins = Poppins({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { appName } = await getAdminSettings();
-  
+  // Only generate dynamic metadata if DATABASE_URL is available (runtime)
+  if (process.env.DATABASE_URL) {
+    try {
+      const { appName } = await getAdminSettings();
+      return {
+        title: appName,
+        description: 'The All-in-One AI Video Creation Suite',
+      };
+    } catch (error) {
+      // Fallback on database errors during build time
+      console.warn('Failed to fetch dynamic metadata:', error);
+    }
+  }
+
+  // Fallback static metadata for build time
   return {
-    title: appName,
+    title: 'ClickVid',
     description: 'The All-in-One AI Video Creation Suite',
   };
 }
