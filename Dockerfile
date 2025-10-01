@@ -13,13 +13,13 @@ RUN apk add --no-cache \
     libc6-compat \
     postgresql-client
 
-# Install OpenSSL 1.1 from Alpine's v3.15 repository
+# Install OpenSSL 1.1 from Alpine's v3.15 repository and update library cache
 RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/main \
-    libssl1.1
+    libssl1.1 && \
+    ldconfig /usr/lib:/lib
 
-# Create symbolic links to ensure OpenSSL 1.1 libraries are discoverable by Prisma
-RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
-    ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so
+# Set library paths for Prisma
+ENV LD_LIBRARY_PATH=/usr/lib:/lib
 
 WORKDIR /app
 
@@ -34,6 +34,14 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Install OpenSSL 1.1 from Alpine's v3.15 repository and update library cache
+RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/main \
+    libssl1.1 && \
+    ldconfig /usr/lib:/lib
+
+# Set library paths for Prisma
+ENV LD_LIBRARY_PATH=/usr/lib:/lib
 
 # Generate Prisma client with Alpine-specific binary target
 RUN npx prisma generate
@@ -53,18 +61,18 @@ RUN apk add --no-cache \
     libc6-compat \
     postgresql-client
 
-# Install OpenSSL 1.1 from Alpine's v3.15 repository
+# Install OpenSSL 1.1 from Alpine's v3.15 repository and update library cache
 RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.15/main \
-    libssl1.1
-
-# Create symbolic links to ensure OpenSSL 1.1 libraries are discoverable by Prisma
-RUN ln -sf /usr/lib/libssl.so.1.1 /usr/lib/libssl.so && \
-    ln -sf /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so
+    libssl1.1 && \
+    ldconfig /usr/lib:/lib
 
 # Verify OpenSSL 1.1 installation and library availability
 RUN ls -la /usr/lib/libssl.so* && \
     ls -la /usr/lib/libcrypto.so* && \
     openssl version -a
+
+# Set library paths for Prisma
+ENV LD_LIBRARY_PATH=/usr/lib:/lib
 
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
