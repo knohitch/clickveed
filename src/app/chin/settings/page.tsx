@@ -28,6 +28,7 @@ export default function ChinSettingsPage() {
       smtpPass: '••••••••',
       fromAdminEmail: 'noreply@example.com',
       fromSupportEmail: 'support@example.com',
+      fromName: 'ClickVid Pro',
     },
     storageSettings: {
       wasabiEndpoint: 's3.us-west-1.wasabisys.com',

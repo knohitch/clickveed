@@ -18,7 +18,7 @@ export async function getAdminSettings() {
         id: 1,
         smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
         fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
-        fromName: ''
+        fromName: 'ClickVid Pro'
     };
 
     const defaultEmailTemplates: EmailTemplates = {
