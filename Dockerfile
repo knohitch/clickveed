@@ -10,7 +10,6 @@ FROM base AS deps
 # We'll install both OpenSSL 1.1 and 3.x for compatibility
 RUN apt-get update && apt-get install -y \
     openssl \
-    libssl3 \
     libc6 \
     ca-certificates \
     wget \
@@ -54,7 +53,6 @@ WORKDIR /app
 # Note: Prisma specifically needs OpenSSL 1.1, so we install both versions
 RUN apt-get update && apt-get install -y \
     openssl \
-    libssl3 \
     postgresql-client \
     ca-certificates \
     wget \
