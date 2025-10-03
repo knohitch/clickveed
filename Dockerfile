@@ -46,7 +46,8 @@ ENV LD_LIBRARY_PATH=/usr/lib:/lib
 # Generate Prisma client with Alpine-specific binary target
 RUN npx prisma generate
 
-# Build the application
+# Build the application with increased memory limit
+ENV NODE_OPTIONS="--max-old-space-size=6144"
 RUN npm run build
 
 # Production image, copy all the files and run next
