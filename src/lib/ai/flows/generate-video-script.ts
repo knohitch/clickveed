@@ -9,9 +9,8 @@
  * - GenerateVideoScriptOutput - The return type for the generateVideoScript function.
  */
 
-import {ai} from '../../../ai/genkit';
-import {z} from 'genkit';
-import { getAvailableTextGenerator } from '../api-service-manager';
+import { generateWithProvider } from '../api-service-manager';
+import { z } from 'zod';
 
 const GenerateVideoScriptInputSchema = z.object({
   prompt: z.string().describe('The core topic or idea for the video script.'),
@@ -41,13 +40,27 @@ export async function generateVideoScript({prompt, videoType, tone, duration}: G
   Based on this, create a complete script. The script should include scene descriptions, dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.
   `;
 
-  const {output} = await ai.generate({
-    prompt: scriptPrompt,
-    output: {schema: GenerateVideoScriptOutputSchema}
-  });
-  
-  if (!output?.script) {
+  try {
+    // Use the new API service manager
+    const response = await generateWithProvider({
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: scriptPrompt }]
+        }
+      ]
+    });
+
+    // Parse the response to extract the script
+    const script = (response as any).result?.content?.[0]?.text || '';
+
+    if (!script) {
       throw new Error("The AI failed to generate a script based on the provided inputs.");
+    }
+
+    return { script };
+  } catch (error) {
+    console.error('Video script generation error:', error);
+    throw new Error("Failed to generate video script. Please check your AI provider configuration.");
   }
-  return output;
 }

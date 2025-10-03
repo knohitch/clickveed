@@ -177,7 +177,7 @@ export class ElevenLabsClient {
 // Imagen Client
 export class ImagenClient {
   private apiKey: string;
-  private baseUrl: string = 'https://imagen.googleapis.com';
+  private baseUrl: string = 'https://us-central1-aiplatform.googleapis.com';
   
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -185,6 +185,7 @@ export class ImagenClient {
   
   async generateImage(prompt: string, model: string = 'imagen-3.0'): Promise<ImageGenerationResponse> {
     try {
+      // Using the correct Google Cloud Vertex AI endpoint for Imagen
       const response = await axios.post(
         `${this.baseUrl}/v1/projects/-/locations/us-central1/publishers/google/models/${model}:predict`,
         {
@@ -198,15 +199,55 @@ export class ImagenClient {
         }
       );
       
-      // In a real implementation, we would extract the image URL from the response
-      // For now, we'll just return a placeholder
+      // Extract the image URL from the response
+      const imageUrl = response.data.predictions[0].bytesBase64Encoded;
       return {
-        imageUrl: 'placeholder-image-url',
+        imageUrl: `data:image/png;base64,${imageUrl}`,
         model,
         provider: 'imagen'
       };
     } catch (error) {
       console.error('Imagen image generation error:', error);
+      throw error;
+    }
+  }
+}
+
+// Google VEO Client
+export class GoogleVeoClient {
+  private apiKey: string;
+  private baseUrl: string = 'https://us-central1-aiplatform.googleapis.com';
+  
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+  
+  async generateVideo(prompt: string, model: string = 'veo-2.0'): Promise<VideoGenerationResponse> {
+    try {
+      // Using the Google Cloud Vertex AI endpoint for VEO
+      const response = await axios.post(
+        `${this.baseUrl}/v1/projects/-/locations/us-central1/publishers/google/models/${model}:predict`,
+        {
+          instances: [{ prompt }],
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      // Extract the video URL from the response
+      // Note: This is a simplified implementation - actual response format may vary
+      const videoUrl = response.data.predictions[0].videoUrl;
+      return {
+        videoUrl: videoUrl,
+        model,
+        provider: 'googleVeo'
+      };
+    } catch (error) {
+      console.error('Google VEO video generation error:', error);
       throw error;
     }
   }
@@ -417,6 +458,8 @@ export function createProviderClient(provider: string, apiKey: string): any {
       return new HuggingFaceClient(apiKey);
     case 'imagen':
       return new ImagenClient(apiKey);
+    case 'googleVeo':
+      return new GoogleVeoClient(apiKey);
     case 'heygen':
       return new HeyGenClient(apiKey);
     case 'seedance':

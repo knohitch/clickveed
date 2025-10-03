@@ -276,7 +276,7 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
     const providerInfo = await getAvailableVideoGenerator();
     
     // Use custom client implementations for video providers
-    const customProviders = ['heygen', 'kling', 'modelscope', 'seedance', 'wan'];
+    const customProviders = ['heygen', 'kling', 'modelscope', 'seedance', 'wan', 'googleVeo'];
     
     if (customProviders.includes(providerInfo.provider)) {
         try {

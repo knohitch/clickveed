@@ -32,7 +32,7 @@ export function SignupForm() {
 
   useEffect(() => {
     if (state.success) {
-      router.push('/login?signup=success');
+      router.push('/verify-email?signup=success');
     }
   }, [state.success, router]);
 

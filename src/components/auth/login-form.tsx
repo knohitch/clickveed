@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { login } from '@/server/actions/auth-actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 function LoginButton() {
   const { pending } = useFormStatus();
@@ -37,6 +38,7 @@ export function LoginForm() {
   const [state, formAction] = useFormState(login, initialState);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+  const searchParams = useSearchParams();
 
   // Reset retry count on successful state change
   useEffect(() => {
@@ -102,6 +104,16 @@ export function LoginForm() {
           disabled={isRetrying}
         />
       </div>
+
+      {searchParams.get('verified') === 'true' && (
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Email Verified!</AlertTitle>
+          <AlertDescription>
+            Your email has been successfully verified. You can now sign in to your account.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {state?.error && (
         <Alert variant="destructive">

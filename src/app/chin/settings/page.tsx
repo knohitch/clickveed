@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import React, { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAdminSettings, updateAdminSettings, updateEmailSettings } from "@/server/actions/admin-actions";
+import { getStorageSettings, updateStorageSettings, testStorageConnection } from "@/server/actions/storage-actions";
 
 export default function ChinSettingsPage() {
   const { toast } = useToast();
@@ -41,13 +43,51 @@ export default function ChinSettingsPage() {
     });
 
   const [loading, setLoading] = useState(true);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
 
-  // Simulate loading data
+  // Load settings from database
   useEffect(() => {
-    setTimeout(() => {
-      setLoading(false);
-    }, 800);
-  }, []);
+    const loadSettings = async () => {
+      try {
+        const adminSettings = await getAdminSettings();
+        const storageSettings = await getStorageSettings();
+
+        setSettings(prev => ({
+          ...prev,
+          appName: adminSettings.appName,
+          allowAdminSignup: adminSettings.allowAdminSignup,
+          logoUrl: adminSettings.logoUrl || '',
+          faviconUrl: adminSettings.faviconUrl || '',
+          emailSettings: {
+            ...prev.emailSettings,
+            smtpHost: adminSettings.emailSettings?.smtpHost || prev.emailSettings.smtpHost,
+            smtpPort: adminSettings.emailSettings?.smtpPort || prev.emailSettings.smtpPort,
+            smtpUser: adminSettings.emailSettings?.smtpUser || prev.emailSettings.smtpUser,
+            smtpPass: adminSettings.emailSettings?.smtpPass || prev.emailSettings.smtpPass,
+            fromName: adminSettings.emailSettings?.fromName || prev.emailSettings.fromName,
+            fromAdminEmail: adminSettings.emailSettings?.fromAdminEmail || prev.emailSettings.fromAdminEmail,
+            fromSupportEmail: adminSettings.emailSettings?.fromSupportEmail || prev.emailSettings.fromSupportEmail,
+          },
+          storageSettings: {
+            ...prev.storageSettings,
+            ...storageSettings,
+          }
+        }));
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load settings from database.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -105,9 +145,138 @@ export default function ChinSettingsPage() {
     setSettings(prev => ({...prev, faviconUrl: ''}));
   };
 
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+
+    try {
+      const result = await testStorageConnection();
+
+      if (result.success) {
+        toast({
+          title: "Connection Test Successful",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Connection Test Failed",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      toast({
+        title: "Connection Test Failed",
+        description: "Failed to test storage connection. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    const testEmailInput = document.getElementById('testEmail') as HTMLInputElement;
+    const testEmail = testEmailInput?.value;
+
+    if (!testEmail) {
+      toast({
+        title: "Test Email Required",
+        description: "Please enter a test email address.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setTestingEmail(true);
+
+    try {
+      const response = await fetch('/api/test-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ testEmail }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Test Email Sent",
+          description: `Test email sent successfully to ${testEmail}. Check your inbox for the email with the current Sender Name.`,
+        });
+        testEmailInput.value = '';
+      } else {
+        toast({
+          title: "Test Email Failed",
+          description: result.error || "Failed to send test email.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Test email failed:', error);
+      toast({
+        title: "Test Email Failed",
+        description: "Failed to send test email. Please check your SMTP configuration.",
+        variant: "destructive"
+      });
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    toast({ title: "Settings Saved", description: "All settings have been updated successfully." });
+
+    try {
+      // Prepare the settings to save
+      const settingsToSave = {
+        appName: settings.appName,
+        logoUrl: settings.logoUrl || null,
+        faviconUrl: settings.faviconUrl || null,
+        allowAdminSignup: settings.allowAdminSignup.toString(),
+      };
+
+      // Save admin settings to database
+      await updateAdminSettings(settingsToSave);
+
+      // Save email settings to database
+      await updateEmailSettings({
+        id: 1,
+        smtpHost: settings.emailSettings.smtpHost,
+        smtpPort: settings.emailSettings.smtpPort,
+        smtpUser: settings.emailSettings.smtpUser,
+        smtpPass: settings.emailSettings.smtpPass,
+        fromAdminEmail: settings.emailSettings.fromAdminEmail,
+        fromSupportEmail: settings.emailSettings.fromSupportEmail,
+        fromName: settings.emailSettings.fromName,
+      });
+
+      // Save storage settings to database
+      const storageResult = await updateStorageSettings(settings.storageSettings);
+
+      if (!storageResult.success) {
+        toast({
+          title: "Warning",
+          description: `Settings saved but storage configuration failed: ${storageResult.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Settings Saved",
+        description: "All settings have been updated successfully."
+      });
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   if (loading) {
@@ -334,6 +503,17 @@ export default function ChinSettingsPage() {
                   <Input id="wasabiSecretKey" name="wasabiSecretKey" type="password" value={settings.storageSettings.wasabiSecretKey} onChange={(e) => handleNestedChange('storageSettings', e)} />
                 </div>
               </div>
+
+              <div className="flex justify-end pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={testingConnection}
+                >
+                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
           
@@ -378,6 +558,31 @@ export default function ChinSettingsPage() {
                   <Label htmlFor="fromSupportEmail">Support "From" Email Address</Label>
                   <Input id="fromSupportEmail" name="fromSupportEmail" type="email" placeholder="support@example.com" value={settings.emailSettings.fromSupportEmail} onChange={(e) => handleNestedChange('emailSettings', e)} />
                   <p className="text-xs text-muted-foreground">Used for all support ticket correspondence.</p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="testEmail">Test Email Address</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="testEmail"
+                      type="email"
+                      placeholder="test@example.com"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleTestEmail}
+                      disabled={testingEmail}
+                    >
+                      {testingEmail ? 'Sending...' : 'Send Test Email'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Send a test email to verify your SMTP configuration and Sender Name settings.
+                  </p>
                 </div>
               </div>
             </CardContent>

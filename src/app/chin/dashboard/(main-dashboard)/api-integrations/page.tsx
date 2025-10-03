@@ -121,6 +121,8 @@ export default function ApiIntegrationsPage() {
                         <ApiKeyInput name="replicate" label="Replicate API Key" value={localApiKeys.replicate} onChange={handleKeyChange}/>
                         <ApiKeyInput name="seedance" label="Seedance API Key" value={localApiKeys.seedance} onChange={handleKeyChange}/>
                         <ApiKeyInput name="wan" label="Wan API Key" value={localApiKeys.wan} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="imagen" label="Google Imagen API Key" value={localApiKeys.imagen} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="googleVeo" label="Google VEO API Key" value={localApiKeys.googleVeo} onChange={handleKeyChange}/>
                     </ApiCategoryCard>
 
                      <ApiCategoryCard title="Platform & Workflow" icon={Workflow}>

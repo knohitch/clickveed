@@ -54,6 +54,22 @@ export async function getAdminSettings() {
     
     const emailTemplates = { ...defaultEmailTemplates, ...emailTemplatesFromDb };
     
+    // Parse storage settings from database
+    const storageSettings = {
+        wasabiEndpoint: settings.find(s => s.key === 'storageSettings')?.value ?
+            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiEndpoint || 's3.us-west-1.wasabisys.com' : 's3.us-west-1.wasabisys.com',
+        wasabiRegion: settings.find(s => s.key === 'storageSettings')?.value ?
+            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiRegion || 'us-west-1' : 'us-west-1',
+        wasabiBucket: settings.find(s => s.key === 'storageSettings')?.value ?
+            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiBucket || 'clickvid-media' : 'clickvid-media',
+        bunnyCdnUrl: settings.find(s => s.key === 'storageSettings')?.value ?
+            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').bunnyCdnUrl || 'https://clickvid.b-cdn.net' : 'https://clickvid.b-cdn.net',
+        wasabiAccessKey: settings.find(s => s.key === 'storageSettings')?.value ?
+            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiAccessKey || '' : '',
+        wasabiSecretKey: settings.find(s => s.key === 'storageSettings')?.value ?
+            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiSecretKey || '' : '',
+    };
+
     return {
         appName: settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator',
         logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
@@ -68,6 +84,7 @@ export async function getAdminSettings() {
         }, {} as Record<string, string>),
         emailSettings,
         emailTemplates,
+        storageSettings,
     };
 }
 

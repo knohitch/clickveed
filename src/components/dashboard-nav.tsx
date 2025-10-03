@@ -109,7 +109,7 @@ const menuSections = [
 
 export function DashboardNav() {
     const pathname = usePathname();
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
         // Initialize all sections as closed
         const initialOpenSections: Record<string, boolean> = {};
         menuSections.forEach(section => {
@@ -119,9 +119,13 @@ export function DashboardNav() {
     });
 
     const toggleSection = (name: string) => {
-        setOpenSections(prev => ({...prev, [name]: !prev[name]}));
+        setOpenSections(prev => {
+            const newState = {...prev, [name]: !prev[name]};
+            console.log(`Toggling section ${name} to ${newState[name]}`);
+            return newState;
+        });
     }
-    
+
     return (
         <div className="flex flex-col gap-2 px-4 py-2">
             <SidebarMenu className="space-y-1">
@@ -150,7 +154,10 @@ export function DashboardNav() {
                         : pathname.startsWith(section.path);
 
                     return (
-                        <Collapsible key={section.name} open={openSections[section.name] || isSectionActive} onOpenChange={() => toggleSection(section.name)}>
+                        <Collapsible key={section.name} open={openSections[section.name] || isSectionActive} onOpenChange={() => {
+            console.log(`Collapsible onOpenChange for ${section.name}`);
+            toggleSection(section.name);
+        }}>
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
                                     <SidebarMenuButton
