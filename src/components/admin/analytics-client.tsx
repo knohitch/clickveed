@@ -30,7 +30,7 @@ interface AnalyticsClientProps {
 
 const ChartPlaceholder = () => (
     <div className='h-[250px] w-full flex items-center justify-center bg-muted rounded-md'>
-        <p className='text-muted-foreground'>Time-series data coming soon</p>
+        <p className='text-muted-foreground'>No data available</p>
     </div>
 );
 
@@ -112,7 +112,19 @@ export function AnalyticsClient({ initialData }: AnalyticsClientProps) {
                             <CardDescription>Total users on the platform over time.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <ChartPlaceholder />
+                            {data.userGrowthData.length > 0 ? (
+                                <ChartContainer config={{users: {label: "Users"}}} className="h-[250px] w-full">
+                                    <BarChart data={data.userGrowthData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
+                                        <YAxis tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
+                                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                                        <Bar dataKey="users" radius={4} fill="hsl(var(--chart-1))" />
+                                    </BarChart>
+                                </ChartContainer>
+                            ) : (
+                                <ChartPlaceholder />
+                            )}
                         </CardContent>
                     </Card>
                     <Card>
@@ -121,7 +133,19 @@ export function AnalyticsClient({ initialData }: AnalyticsClientProps) {
                             <CardDescription>Monthly Recurring Revenue over time.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                           <ChartPlaceholder />
+                           {data.revenueData.length > 0 ? (
+                                <ChartContainer config={{mrr: {label: "MRR"}}} className="h-[250px] w-full">
+                                    <BarChart data={data.revenueData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
+                                        <YAxis tickLine={false} axisLine={false} tickMargin={10} fontSize={12} />
+                                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                                        <Bar dataKey="mrr" radius={4} fill="hsl(var(--chart-2))" />
+                                    </BarChart>
+                                </ChartContainer>
+                            ) : (
+                                <ChartPlaceholder />
+                            )}
                         </CardContent>
                     </Card>
                      <Card>

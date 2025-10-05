@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
-import { getAdminSettings, updateAdminSettings, updatePlans, updatePromotions, updateApiKeys, updateEmailSettings, updateEmailTemplates } from '@/server/actions/admin-actions';
+import { getAdminSettings, updateAdminSettings, updatePlans, updatePromotions, updateApiKeys, updateEmailSettings, updateEmailTemplates, deletePlan } from '@/server/actions/admin-actions';
 import type { Prisma } from '@prisma/client';
 
 // Use Prisma-generated types for consistency
@@ -131,6 +131,8 @@ export const initialApiKeysObject: ApiKeys = {
   instagramClientId: '', instagramClientSecret: '',
   tiktokClientKey: '', tiktokClientSecret: '',
   snapchatClientId: '', snapchatClientSecret: '',
+  whatsappClientId: '', whatsappClientSecret: '',
+  threadsClientId: '', threadsClientSecret: '',
 };
 
 const initialSettings: AllSettings = {

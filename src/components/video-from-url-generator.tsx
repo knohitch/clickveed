@@ -15,7 +15,7 @@ import { useFormStatus } from 'react-dom';
 const initialState = {
   message: '',
   script: null,
-  errors: {},
+  errors: {} as Record<string, string | string[]>,
 };
 
 function SubmitButton() {
@@ -60,13 +60,68 @@ export function VideoFromUrlGenerator() {
     }
   };
 
+  const handleSubmit = async (formData: FormData) => {
+    const url = formData.get('url') as string;
+    const topic = formData.get('topic') as string;
+
+    if (!url) {
+      toast({
+        title: "Error",
+        description: "Please provide a URL",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setState(prev => ({ ...prev, message: 'Generating script...' }));
+
+    try {
+      // Get session token for authentication
+      const sessionResponse = await fetch('/api/auth/session');
+      const session = await sessionResponse.json();
+      
+      const response = await fetch('/api/video/generate-from-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.accessToken || 'temp-token'}`, // Use session token or temp token
+        },
+        body: JSON.stringify({ url, topic }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setState(prev => ({ ...prev, script: data.script, message: '' }));
+        toast({
+          title: "Success!",
+          description: "Video script generated successfully.",
+        });
+      } else {
+        setState(prev => ({ ...prev, message: '', errors: { general: [data.error] } }));
+        toast({
+          title: "Error",
+          description: data.error || "Failed to generate script",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      setState(prev => ({ ...prev, message: '', errors: { general: ['Network error occurred'] } }));
+      toast({
+        title: "Error",
+        description: "Failed to connect to the server",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="grid md:grid-cols-2 gap-8 items-start">
-      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}> {/* Prevent form submission */}
+      <form className="space-y-4" action={handleSubmit}>
         <div className="space-y-2">
             <Label htmlFor="url">Website or Article URL</Label>
-            <Input id="url" name="url" placeholder="https://example.com/blog/my-awesome-article" disabled />
-            {/* {'url' in state.errors && <p className="text-sm text-destructive">{state.errors.url?.[0] as string}</p>} */}
+            <Input id="url" name="url" placeholder="https://example.com/blog/my-awesome-article" required />
+            {state.errors.url && <p className="text-sm text-destructive">{Array.isArray(state.errors.url) ? state.errors.url[0] : state.errors.url}</p>}
         </div>
         <div className="space-y-2">
             <Label htmlFor="topic">Main Topic or Focus</Label>
@@ -74,12 +129,8 @@ export function VideoFromUrlGenerator() {
                 id="topic"
                 name="topic" 
                 placeholder="Briefly describe the key angle for the video. For example: 'Focus on the section about composting for beginners'." 
-                disabled
             />
-            {/* {'topic' in state.errors && <p className="text-sm text-destructive">{state.errors.topic?.[0] as string}</p>} */}
-        </div>
-        <div className="text-center p-4 border border-dashed rounded-md text-muted-foreground">
-            This feature is currently unavailable.
+            {state.errors.topic && <p className="text-sm text-destructive">{Array.isArray(state.errors.topic) ? state.errors.topic[0] : state.errors.topic}</p>}
         </div>
         <SubmitButton />
       </form>

@@ -46,6 +46,12 @@ const ThreadsIcon = (props: React.SVGProps<SVGSVGElement>) => (
 // As you implement the full OAuth logic for other platforms, add them here.
 const availablePlatforms = [
     { id: 'youtube', name: 'YouTube', icon: Youtube },
+    { id: 'facebook', name: 'Facebook', icon: Facebook },
+    { id: 'instagram', name: 'Instagram', icon: Instagram },
+    { id: 'tiktok', name: 'TikTok', icon: TikTokIcon },
+    { id: 'whatsapp', name: 'WhatsApp', icon: WhatsAppIcon },
+    { id: 'snapchat', name: 'Snapchat', icon: SnapchatIcon },
+    { id: 'threads', name: 'Threads', icon: ThreadsIcon },
 ] as const;
 
 export default function SocialIntegrationsPage() {

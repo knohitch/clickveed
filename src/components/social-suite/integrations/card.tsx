@@ -31,6 +31,8 @@ export function SocialConnectionCard({ platform, isConnected, onConnectionChange
             case 'instagram': return apiKeys.instagramClientId;
             case 'tiktok': return apiKeys.tiktokClientKey;
             case 'snapchat': return apiKeys.snapchatClientId;
+            case 'whatsapp': return apiKeys.whatsappClientId;
+            case 'threads': return apiKeys.threadsClientId;
             default: return null;
         }
     }
@@ -49,7 +51,10 @@ export function SocialConnectionCard({ platform, isConnected, onConnectionChange
                 return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly&response_type=code&access_type=offline&prompt=consent`;
             case 'tiktok':
                  return `https://www.tiktok.com/v2/auth/authorize?client_key=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user.info.basic,video.publish&response_type=code`;
-            // Add other platform URL constructions here
+            case 'whatsapp':
+                return `https://facebook.com/v20.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=whatsapp_business_management,whatsapp_business_messaging`;
+            case 'threads':
+                return `https://www.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=threads_basic,threads_content_publish&response_type=code`;
             default:
                 return '#'; // Fallback for platforms not fully configured
         }

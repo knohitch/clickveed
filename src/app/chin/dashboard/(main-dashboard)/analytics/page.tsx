@@ -35,13 +35,52 @@ async function getAnalyticsData(): Promise<AnalyticsData> {
         select: { displayName: true, email: true, createdAt: true, avatarUrl: true }
     });
 
+    // Generate user growth data for the last 30 days
+    const userGrowthData = [];
+    const revenueData = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        // Count users created on or before this date
+        const usersUpToDate = allUsers.filter(user => 
+            new Date(user.createdAt) <= date
+        ).length;
+        
+        // Calculate MRR up to this date
+        const mrrUpToDate = allUsers
+            .filter(user => 
+                new Date(user.createdAt) <= date && user.plan && user.plan.priceMonthly > 0
+            )
+            .reduce((acc, user) => acc + (user.plan?.priceMonthly || 0), 0);
+        
+        userGrowthData.push({
+            date: dateStr,
+            users: usersUpToDate
+        });
+        
+        revenueData.push({
+            date: dateStr,
+            mrr: mrrUpToDate
+        });
+    }
+
+    // Get actual content generation data
+    const allMediaAssets = await prisma.mediaAsset.findMany();
+    const videoCount = allMediaAssets.filter(m => m.type === 'VIDEO').length;
+    const scriptCount = allMediaAssets.filter(m => m.type === 'SCRIPT').length;
+    const audioCount = allMediaAssets.filter(m => m.type === 'AUDIO').length;
+
     return {
-        userGrowthData: [],
-        revenueData: [],
+        userGrowthData,
+        revenueData,
         contentGenerationData: [ 
-            { name: "Videos", total: 123 },
-            { name: "Scripts", total: 456 },
-            { name: "Voiceovers", total: 789 },
+            { name: "Videos", total: videoCount },
+            { name: "Scripts", total: scriptCount },
+            { name: "Audio", total: audioCount },
         ],
         recentSignups: recentSignups.map(u => ({
             displayName: u.displayName || 'Unnamed User',

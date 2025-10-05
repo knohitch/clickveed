@@ -106,6 +106,20 @@ export async function updateAdminSettings(data: { [key: string]: any }) {
  * Updates the subscription plans in the production database.
  */
 export async function updatePlans(plans: Plan[]) {
+    // Get existing plans to identify which ones to delete
+    const existingPlans = await prisma.plan.findMany();
+    const existingPlanIds = existingPlans.map(p => p.id);
+    const newPlanIds = plans.map(p => p.id);
+    
+    // Delete plans that are no longer in the new list
+    const plansToDelete = existingPlanIds.filter(id => !newPlanIds.includes(id));
+    if (plansToDelete.length > 0) {
+        await prisma.plan.deleteMany({
+            where: { id: { in: plansToDelete } }
+        });
+    }
+    
+    // Upsert the remaining plans
     for (const plan of plans) {
         const planData = {
             name: plan.name,
@@ -130,6 +144,41 @@ export async function updatePlans(plans: Plan[]) {
                 features: { create: plan.features.map(f => ({ text: f.text })) }
             }
         });
+    }
+}
+
+/**
+ * Deletes a specific plan from the database.
+ */
+export async function deletePlan(planId: string) {
+    try {
+        // Check if plan exists and has users
+        const plan = await prisma.plan.findUnique({
+            where: { id: planId },
+            include: {
+                _count: {
+                    select: { users: true }
+                }
+            }
+        });
+
+        if (!plan) {
+            throw new Error('Plan not found');
+        }
+
+        if (plan._count.users > 0) {
+            throw new Error(`Cannot delete plan with ${plan._count.users} active users`);
+        }
+
+        // Delete the plan (features will be deleted due to cascade)
+        await prisma.plan.delete({
+            where: { id: planId }
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting plan:', error);
+        throw error;
     }
 }
 

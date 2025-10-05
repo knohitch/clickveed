@@ -1,85 +1,87 @@
-
-
-"use client";
-
-import { useAuth } from "@/contexts/auth-context";
-import type { Plan } from "@/contexts/admin-settings-context";
-import { cn } from "@/lib/utils";
-import { Lock, Star } from "lucide-react";
-import { Button } from "./ui/button";
-import Link from "next/link";
-import { Skeleton } from "./ui/skeleton";
-
-type PlanName = Plan['name'];
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Lock, Star, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { checkFeatureAccess, getMinimumPlanForFeature } from '@/lib/feature-access';
 
 interface FeatureLockProps {
-  children: React.ReactNode;
-  requiredPlan: PlanName;
-  featureName: string;
+  featureId: string;
+  planName: string | null;
+  title?: string;
+  description?: string;
   className?: string;
 }
 
-const planHierarchy: Record<string, number> = {
-    'Free': 0,
-    'Pro': 1,
-    'Enterprise': 2,
-};
+export function FeatureLock({ 
+  featureId, 
+  planName, 
+  title, 
+  description, 
+  className = '' 
+}: FeatureLockProps) {
+  const featureAccess = checkFeatureAccess(planName, featureId);
+  const minimumPlan = getMinimumPlanForFeature(featureId);
 
-export function FeatureLock({ children, requiredPlan, className, featureName }: FeatureLockProps) {
-    const { subscriptionPlan, loading } = useAuth();
-    
-    if (loading) {
-        return <Skeleton className="w-full h-96" />;
-    }
+  if (featureAccess.canAccess) {
+    return null; // User has access, don't show lock
+  }
 
-    // If there's no plan, assume 'Free' plan.
-    const userLevel = subscriptionPlan ? planHierarchy[subscriptionPlan.name as PlanName] : 0;
-    const requiredLevel = planHierarchy[requiredPlan];
-
-    // If a plan doesn't exist in hierarchy (custom plan), deny access by default for safety.
-    if (userLevel === undefined || requiredLevel === undefined) {
-      return (
-         <div className={cn("relative", className)}>
-            <div className="blur-sm grayscale pointer-events-none select-none">
-                {children}
-            </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 rounded-lg">
-                <div className="p-6 bg-background/90 border rounded-xl shadow-lg text-center flex flex-col items-center">
-                    <p className="font-bold text-lg text-destructive">Configuration Error</p>
-                    <p className="text-muted-foreground text-sm">Plan '{requiredPlan}' not recognized.</p>
-                </div>
-            </div>
+  return (
+    <Card className={`border-yellow-200 bg-yellow-50 ${className}`}>
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
+          <Lock className="h-6 w-6 text-yellow-600" />
         </div>
-      )
-    }
-
-    const hasAccess = userLevel >= requiredLevel;
-
-    if (hasAccess) {
-        return <>{children}</>;
-    }
-
-    return (
-        <div className={cn("relative", className)}>
-            <div className="blur-sm grayscale pointer-events-none select-none">
-                {children}
-            </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 rounded-lg">
-                <div className="p-6 bg-background/90 border rounded-xl shadow-lg text-center flex flex-col items-center">
-                    <div className="p-3 mb-2 rounded-full bg-primary/10">
-                         <Lock className="h-6 w-6 text-primary" />
-                    </div>
-                    <p className="font-bold text-lg">{featureName}</p>
-                    <p className="text-muted-foreground text-sm mb-4">
-                        This feature requires the '{requiredPlan}' plan or higher.
-                    </p>
-                    <Button asChild>
-                       <Link href="/dashboard/settings">
-                           <Star className="mr-2 h-4 w-4" /> Upgrade Plan
-                       </Link>
-                    </Button>
-                </div>
-            </div>
+        <CardTitle className="text-xl text-yellow-800">
+          {title || `${featureAccess.featureName} is Locked`}
+        </CardTitle>
+        <CardDescription className="text-yellow-600">
+          {description || `This feature requires a ${minimumPlan} plan or higher to access.`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-center">
+        <div className="space-y-4">
+          <div className="flex items-center justify-center space-x-2 text-sm text-yellow-700">
+            <Star className="h-4 w-4" />
+            <span>Upgrade to {minimumPlan} to unlock this feature</span>
+          </div>
+          <Button asChild className="bg-yellow-600 hover:bg-yellow-700">
+            <Link href="/dashboard/settings">
+              Upgrade Plan
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
         </div>
-    );
+      </CardContent>
+    </Card>
+  );
+}
+
+interface FeatureGuardProps {
+  featureId: string;
+  planName: string | null;
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}
+
+export function FeatureGuard({ featureId, planName, children, fallback }: FeatureGuardProps) {
+  const featureAccess = checkFeatureAccess(planName, featureId);
+
+  if (featureAccess.canAccess) {
+    return <>{children}</>;
+  }
+
+  if (fallback) {
+    return <>{fallback}</>;
+  }
+
+  return (
+    <FeatureLock 
+      featureId={featureId} 
+      planName={planName}
+      title="Feature Not Available"
+      description="This feature is not included in your current plan."
+    />
+  );
 }
