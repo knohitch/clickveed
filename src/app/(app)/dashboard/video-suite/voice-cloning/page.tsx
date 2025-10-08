@@ -4,9 +4,22 @@ import { VoiceCloningStudio } from '@/components/voice-cloning-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
-export default function VoiceCloningPage() {
-    const { subscriptionPlan } = useAuth();
+export default function VoiceClippingPage() {
+    return (
+        <FeatureGuard featureId="voice-cloning" planName={null} fallback={<VoiceClippingLoading />}>
+            <VoiceClippingContent />
+        </FeatureGuard>
+    );
+}
+
+function VoiceClippingContent() {
+    const { subscriptionPlan, loading } = useAuth();
+
+    if (loading) {
+        return <VoiceClippingLoading />;
+    }
 
     return (
         <FeatureGuard featureId="voice-cloning" planName={subscriptionPlan?.name || null}>
@@ -22,5 +35,21 @@ export default function VoiceCloningPage() {
                 </CardContent>
             </Card>
         </FeatureGuard>
+    );
+}
+
+function VoiceClippingLoading() {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>AI Voice Cloning</CardTitle>
+                <CardDescription>
+                    Create a digital clone of your voice by providing a few audio samples.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+            </CardContent>
+        </Card>
     );
 }
