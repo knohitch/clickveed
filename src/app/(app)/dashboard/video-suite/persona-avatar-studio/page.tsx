@@ -2,11 +2,14 @@
 
 import { PersonaAvatarStudio } from '@/components/persona-avatar-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeatureLock } from '@/components/feature-lock';
+import { FeatureGuard } from '@/components/feature-lock';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function PersonaAvatarStudioPage() {
+    const { subscriptionPlan } = useAuth();
+
     return (
-        <FeatureLock requiredPlan='Enterprise' featureName='Persona & Avatar Studio'>
+        <FeatureGuard featureId="persona-studio" planName={subscriptionPlan?.name || null}>
             <Card>
                 <CardHeader>
                     <CardTitle>AI Persona & Avatar Studio</CardTitle>
@@ -18,6 +21,6 @@ export default function PersonaAvatarStudioPage() {
                     <PersonaAvatarStudio />
                 </CardContent>
             </Card>
-        </FeatureLock>
+        </FeatureGuard>
     );
 }

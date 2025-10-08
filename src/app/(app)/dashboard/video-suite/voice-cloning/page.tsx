@@ -2,11 +2,14 @@
 
 import { VoiceCloningStudio } from '@/components/voice-cloning-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeatureLock } from '@/components/feature-lock';
+import { FeatureGuard } from '@/components/feature-lock';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function VoiceCloningPage() {
+    const { subscriptionPlan } = useAuth();
+
     return (
-        <FeatureLock requiredPlan='Pro' featureName='AI Voice Cloning'>
+        <FeatureGuard featureId="voice-cloning" planName={subscriptionPlan?.name || null}>
             <Card>
                 <CardHeader>
                     <CardTitle>AI Voice Cloning</CardTitle>
@@ -18,6 +21,6 @@ export default function VoiceCloningPage() {
                     <VoiceCloningStudio />
                 </CardContent>
             </Card>
-        </FeatureLock>
+        </FeatureGuard>
     );
 }

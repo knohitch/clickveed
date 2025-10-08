@@ -2,11 +2,14 @@
 
 import { MagicClipsGenerator } from '@/components/magic-clips-generator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeatureLock } from '@/components/feature-lock';
+import { FeatureGuard } from '@/components/feature-lock';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function MagicClipsPage() {
+    const { subscriptionPlan } = useAuth();
+
     return (
-        <FeatureLock requiredPlan='Pro' featureName='Magic Clips Generator'>
+        <FeatureGuard featureId="magic-clips" planName={subscriptionPlan?.name || null}>
             <Card>
                 <CardHeader>
                     <CardTitle>Magic Clips Generator</CardTitle>
@@ -18,6 +21,6 @@ export default function MagicClipsPage() {
                     <MagicClipsGenerator />
                 </CardContent>
             </Card>
-        </FeatureLock>
+        </FeatureGuard>
     );
 }
