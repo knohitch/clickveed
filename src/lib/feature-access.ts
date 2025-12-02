@@ -1,4 +1,5 @@
-import type { Plan } from '@prisma/client';
+import type { Plan, PlanFeature } from '@prisma/client';
+import prisma from './prisma';
 
 export interface FeatureAccess {
   canAccess: boolean;
@@ -6,174 +7,163 @@ export interface FeatureAccess {
   featureName: string;
 }
 
-// Define which features are available per plan
-const PLAN_FEATURES = {
-  'Free': {
-    // AI Assistant
-    'ai-assistant': true,
-    'creative-assistant': true,
-    'topic-researcher': false,
-    'thumbnail-tester': false,
-    
-    // Video Suite
-    'video-suite': false,
-    'video-pipeline': false,
-    'video-editor': false,
-    'magic-clips': false,
-    'script-generator': false,
-    'voice-over': false,
-    'image-to-video': false,
-    'voice-cloning': false,
-    'video-from-url': false,
-    'stock-media': false,
-    'persona-studio': false,
-    
-    // Image Editing
-    'ai-image-generator': false,
-    'flux-pro': false,
-    'background-remover': false,
-    
-    // AI Agents
-    'ai-agents': false,
-    'n8n-integrations': false,
-    
-    // Social Suite
-    'social-analytics': false,
-    'social-scheduler': false,
-    'social-integrations': true, // Basic integrations available for free
-    
-    // Media Management
-    'media-library': true,
-    
-    // Settings
-    'profile-settings': true,
-    'brand-kit': false,
-  },
-  'Starter': {
-    // AI Assistant
-    'ai-assistant': true,
-    'creative-assistant': true,
-    'topic-researcher': true,
-    'thumbnail-tester': false,
-    
-    // Video Suite
-    'video-suite': true,
-    'video-pipeline': true,
-    'video-editor': true,
-    'magic-clips': false,
-    'script-generator': true,
-    'voice-over': false,
-    'image-to-video': false,
-    'voice-cloning': false,
-    'video-from-url': true,
-    'stock-media': true,
-    'persona-studio': false,
-    
-    // Image Editing
-    'ai-image-generator': true,
-    'flux-pro': false,
-    'background-remover': true,
-    
-    // AI Agents
-    'ai-agents': false,
-    'n8n-integrations': false,
-    
-    // Social Suite
-    'social-analytics': true,
-    'social-scheduler': false,
-    'social-integrations': true,
-    
-    // Media Management
-    'media-library': true,
-    
-    // Settings
-    'profile-settings': true,
-    'brand-kit': true,
-  },
-  'Professional': {
-    // AI Assistant
-    'ai-assistant': true,
-    'creative-assistant': true,
-    'topic-researcher': true,
-    'thumbnail-tester': true,
-    
-    // Video Suite
-    'video-suite': true,
-    'video-pipeline': true,
-    'video-editor': true,
-    'magic-clips': true,
-    'script-generator': true,
-    'voice-over': true,
-    'image-to-video': true,
-    'voice-cloning': false,
-    'video-from-url': true,
-    'stock-media': true,
-    'persona-studio': true,
-    
-    // Image Editing
-    'ai-image-generator': true,
-    'flux-pro': true,
-    'background-remover': true,
-    
-    // AI Agents
-    'ai-agents': true,
-    'n8n-integrations': false,
-    
-    // Social Suite
-    'social-analytics': true,
-    'social-scheduler': true,
-    'social-integrations': true,
-    
-    // Media Management
-    'media-library': true,
-    
-    // Settings
-    'profile-settings': true,
-    'brand-kit': true,
-  },
-  'Enterprise': {
-    // All features available
-    'ai-assistant': true,
-    'creative-assistant': true,
-    'topic-researcher': true,
-    'thumbnail-tester': true,
-    'video-suite': true,
-    'video-pipeline': true,
-    'video-editor': true,
-    'magic-clips': true,
-    'script-generator': true,
-    'voice-over': true,
-    'image-to-video': true,
-    'voice-cloning': true,
-    'video-from-url': true,
-    'stock-media': true,
-    'persona-studio': true,
-    'ai-image-generator': true,
-    'flux-pro': true,
-    'background-remover': true,
-    'ai-agents': true,
-    'n8n-integrations': true,
-    'social-analytics': true,
-    'social-scheduler': true,
-    'social-integrations': true,
-    'media-library': true,
-    'profile-settings': true,
-    'brand-kit': true,
-  },
-};
+type PlanWithFeatures = Plan & { features: PlanFeature[] };
 
-// Fallback to Free plan if plan not found
-function getPlanFeatures(planName: string | null) {
-  return PLAN_FEATURES[planName as keyof typeof PLAN_FEATURES] || PLAN_FEATURES.Free;
-}
-
-export function checkFeatureAccess(planName: string | null, featureId: string): FeatureAccess {
-  const features = getPlanFeatures(planName);
-  const canAccess = features[featureId as keyof typeof features] || false;
+/**
+ * Dynamic feature access based on plan features stored in database
+ * This allows admins to create any plans with custom features
+ */
+export async function checkFeatureAccess(
+  userPlan: PlanWithFeatures | null, 
+  featureId: string
+): Promise<FeatureAccess> {
+  // Always allow basic features for all users
+  const alwaysAccessibleFeatures = [
+    'profile-settings',
+    'media-library', // Basic media library access
+  ];
+  
+  if (alwaysAccessibleFeatures.includes(featureId)) {
+    return {
+      canAccess: true,
+      requiresUpgrade: false,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+  
+  // If no plan or Free plan, check if feature is allowed
+  if (!userPlan || userPlan.name.toLowerCase() === 'free') {
+    const freeFeatures = [
+      'ai-assistant',
+      'creative-assistant',
+      'social-integrations', // Basic integrations
+    ];
+    
+    const canAccess = freeFeatures.includes(featureId);
+    return {
+      canAccess,
+      requiresUpgrade: !canAccess,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+  
+  // Check if the user's plan includes this specific feature
+  // This is based on the plan features defined by the admin
+  const hasFeature = userPlan.features.some(feature => {
+    // Match feature text to feature ID (flexible matching)
+    const featureText = feature.text.toLowerCase();
+    const searchId = featureId.toLowerCase().replace('-', ' ');
+    
+    // Direct text matching or keyword matching
+    return featureText.includes(searchId) || 
+           featureText.includes(getFeatureDisplayName(featureId).toLowerCase()) ||
+           matchFeatureKeywords(featureText, featureId);
+  });
   
   return {
-    canAccess,
-    requiresUpgrade: !canAccess,
+    canAccess: hasFeature,
+    requiresUpgrade: !hasFeature,
+    featureName: getFeatureDisplayName(featureId),
+  };
+}
+
+/**
+ * Match feature keywords for better detection
+ */
+function matchFeatureKeywords(featureText: string, featureId: string): boolean {
+  const keywordMap: Record<string, string[]> = {
+    'video-suite': ['video', 'editing', 'creation'],
+    'ai-assistant': ['ai', 'assistant', 'chat'],
+    'voice-cloning': ['voice', 'clone', 'cloning'],
+    'background-remover': ['background', 'remove', 'remover'],
+    'social-analytics': ['social', 'analytics', 'insights'],
+    'social-scheduler': ['social', 'schedule', 'scheduling'],
+    'magic-clips': ['magic', 'clips', 'highlights'],
+    'script-generator': ['script', 'generator', 'writing'],
+    'voice-over': ['voice', 'over', 'voiceover', 'narration'],
+    'image-to-video': ['image', 'video', 'conversion'],
+    'stock-media': ['stock', 'media', 'library'],
+    'ai-agents': ['agent', 'automation', 'workflow'],
+    'brand-kit': ['brand', 'kit', 'branding'],
+  };
+  
+  const keywords = keywordMap[featureId] || [];
+  return keywords.some(keyword => featureText.includes(keyword));
+}
+
+/**
+ * Server-side helper to check user's current plan and feature access
+ */
+export async function checkUserFeatureAccess(userId: string, featureId: string): Promise<FeatureAccess> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        plan: {
+          include: {
+            features: true
+          }
+        }
+      }
+    });
+    
+    return await checkFeatureAccess(user?.plan || null, featureId);
+  } catch (error) {
+    console.error('Error checking feature access:', error);
+    // Fail safely - deny access if there's an error
+    return {
+      canAccess: false,
+      requiresUpgrade: true,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+}
+
+/**
+ * Sync version for client-side use (requires plan to be passed)
+ */
+export function checkFeatureAccessSync(userPlan: PlanWithFeatures | null, featureId: string): FeatureAccess {
+  // Always allow basic features for all users
+  const alwaysAccessibleFeatures = [
+    'profile-settings',
+    'media-library',
+  ];
+  
+  if (alwaysAccessibleFeatures.includes(featureId)) {
+    return {
+      canAccess: true,
+      requiresUpgrade: false,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+  
+  if (!userPlan || userPlan.name.toLowerCase() === 'free') {
+    const freeFeatures = [
+      'ai-assistant',
+      'creative-assistant',
+      'social-integrations',
+    ];
+    
+    const canAccess = freeFeatures.includes(featureId);
+    return {
+      canAccess,
+      requiresUpgrade: !canAccess,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+  
+  const hasFeature = userPlan.features.some(feature => {
+    const featureText = feature.text.toLowerCase();
+    const searchId = featureId.toLowerCase().replace('-', ' ');
+    
+    return featureText.includes(searchId) || 
+           featureText.includes(getFeatureDisplayName(featureId).toLowerCase()) ||
+           matchFeatureKeywords(featureText, featureId);
+  });
+  
+  return {
+    canAccess: hasFeature,
+    requiresUpgrade: !hasFeature,
     featureName: getFeatureDisplayName(featureId),
   };
 }
@@ -211,12 +201,5 @@ function getFeatureDisplayName(featureId: string): string {
   return displayNames[featureId] || featureId;
 }
 
-// Helper function to get the minimum plan required for a feature
-export function getMinimumPlanForFeature(featureId: string): string {
-  for (const [planName, features] of Object.entries(PLAN_FEATURES)) {
-    if (features[featureId as keyof typeof features]) {
-      return planName;
-    }
-  }
-  return 'Enterprise'; // Default to highest tier if not found
-}
+// This function is no longer needed since we use dynamic plan features
+// Admin can create any plan with any features, so there's no fixed minimum

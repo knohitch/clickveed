@@ -257,3 +257,53 @@ export async function testDbConnection() {
         return { success: false, message: e.message || 'An unknown error occurred.' };
     }
 }
+
+/**
+ * Test SMTP email configuration by sending a test email
+ */
+export async function sendTestEmail(testEmail: string) {
+    try {
+        const { emailSettings, appName } = await getAdminSettings();
+        
+        if (!emailSettings.smtpHost) {
+            return { success: false, message: 'SMTP host is not configured. Please configure SMTP settings first.' };
+        }
+
+        const nodemailer = require('nodemailer');
+        
+        const transporter = nodemailer.createTransporter({
+            host: emailSettings.smtpHost,
+            port: Number(emailSettings.smtpPort),
+            secure: Number(emailSettings.smtpPort) === 465,
+            auth: {
+                user: emailSettings.smtpUser,
+                pass: emailSettings.smtpPass,
+            },
+        });
+
+        const senderName = emailSettings.fromName || appName;
+        
+        await transporter.sendMail({
+            from: `"${senderName}" <${emailSettings.fromAdminEmail}>`,
+            to: testEmail,
+            subject: 'SMTP Configuration Test',
+            html: `
+                <h2>SMTP Test Successful!</h2>
+                <p>If you're reading this email, your SMTP configuration is working correctly.</p>
+                <p><strong>Configuration Details:</strong></p>
+                <ul>
+                    <li>SMTP Host: ${emailSettings.smtpHost}</li>
+                    <li>SMTP Port: ${emailSettings.smtpPort}</li>
+                    <li>From Email: ${emailSettings.fromAdminEmail}</li>
+                    <li>Sender Name: ${senderName}</li>
+                </ul>
+                <p>Your email notifications will now be delivered successfully.</p>
+            `,
+        });
+
+        return { success: true, message: `Test email sent successfully to ${testEmail}` };
+    } catch (error: any) {
+        console.error('SMTP Test Error:', error);
+        return { success: false, message: `Failed to send test email: ${error.message}` };
+    }
+}

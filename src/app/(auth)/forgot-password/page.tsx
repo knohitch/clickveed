@@ -11,8 +11,16 @@ import {
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 
-export default function ForgotPasswordPage() {
+export async function generateMetadata() {
+  const { appName } = await getAdminSettings();
+  return {
+    title: `Forgot Password | ${appName}`,
+  };
+}
+
+export default async function ForgotPasswordPage() {
   return (
     <Card className="mx-auto max-w-sm w-full">
       <CardHeader className="text-center">

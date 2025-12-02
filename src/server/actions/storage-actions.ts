@@ -20,12 +20,12 @@ export async function getStorageSettings(): Promise<StorageSettings> {
     const adminSettings = await getAdminSettings();
 
     return {
-      wasabiEndpoint: adminSettings.storageSettings?.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
-      wasabiRegion: adminSettings.storageSettings?.wasabiRegion || 'us-west-1',
-      wasabiBucket: adminSettings.storageSettings?.wasabiBucket || 'clickvid-media',
-      bunnyCdnUrl: adminSettings.storageSettings?.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
-      wasabiAccessKey: adminSettings.storageSettings?.wasabiAccessKey || '',
-      wasabiSecretKey: adminSettings.storageSettings?.wasabiSecretKey || '',
+      wasabiEndpoint: adminSettings.apiKeys.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
+      wasabiRegion: adminSettings.apiKeys.wasabiRegion || 'us-west-1',
+      wasabiBucket: adminSettings.apiKeys.wasabiBucket || 'clickvid-media',
+      bunnyCdnUrl: adminSettings.apiKeys.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
+      wasabiAccessKey: adminSettings.apiKeys.wasabiAccessKey || '',
+      wasabiSecretKey: adminSettings.apiKeys.wasabiSecretKey || '',
     };
   } catch (error) {
     console.error('Failed to get storage settings:', error);
@@ -38,16 +38,19 @@ export async function getStorageSettings(): Promise<StorageSettings> {
  */
 export async function updateStorageSettings(settings: StorageSettings): Promise<{ success: boolean; message: string }> {
   try {
-    // Update admin settings in database
-    await updateAdminSettings({
-      storageSettings: {
-        wasabiEndpoint: settings.wasabiEndpoint,
-        wasabiRegion: settings.wasabiRegion,
-        wasabiBucket: settings.wasabiBucket,
-        bunnyCdnUrl: settings.bunnyCdnUrl,
-        wasabiAccessKey: settings.wasabiAccessKey,
-        wasabiSecretKey: settings.wasabiSecretKey,
-      }
+    // Get current admin settings to preserve other API keys
+    const currentSettings = await getAdminSettings();
+    
+    // Update API keys in the database with storage settings
+    const { updateApiKeys } = await import('./admin-actions');
+    await updateApiKeys({
+      ...currentSettings.apiKeys,
+      wasabiEndpoint: settings.wasabiEndpoint,
+      wasabiRegion: settings.wasabiRegion,
+      wasabiBucket: settings.wasabiBucket,
+      bunnyCdnUrl: settings.bunnyCdnUrl,
+      wasabiAccessKey: settings.wasabiAccessKey,
+      wasabiSecretKey: settings.wasabiSecretKey,
     });
 
     // Update storage manager configuration

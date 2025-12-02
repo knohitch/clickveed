@@ -32,9 +32,17 @@ export function SignupForm() {
 
   useEffect(() => {
     if (state.success) {
-      router.push('/verify-email?signup=success');
+      if (state.isSuperAdmin) {
+        // Super Admin: Direct to login
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+      } else {
+        // Regular User: Direct to verification page
+        router.push('/verify-email?signup=success');
+      }
     }
-  }, [state.success, router]);
+  }, [state.success, state.isSuperAdmin, router]);
 
   return (
     <>
@@ -43,7 +51,9 @@ export function SignupForm() {
           <Check className="h-4 w-4" />
           <AlertTitle>Welcome!</AlertTitle>
           <AlertDescription>
-            Your account has been created. Redirecting you to login...
+            {state.isSuperAdmin 
+              ? 'Your Super Admin account has been created successfully. Redirecting you to login...'
+              : 'Your account has been created. Please check your email to verify your account.'}
           </AlertDescription>
         </Alert>
       ) : (

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import React, { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import type { ApiKeys, EmailSettings } from "@/contexts/admin-settings-context";
+import { sendTestEmail } from "@/server/actions/admin-actions";
 
 export default function AdminSettingsPage() {
     const { 
@@ -26,6 +27,8 @@ export default function AdminSettingsPage() {
     const { toast } = useToast();
     const logoInputRef = useRef<HTMLInputElement>(null);
     const faviconInputRef = useRef<HTMLInputElement>(null);
+    const [testEmail, setTestEmail] = useState('');
+    const [testingEmail, setTestingEmail] = useState(false);
 
     const [localSettings, setLocalSettings] = useState({
         appName: appName,
@@ -99,6 +102,27 @@ export default function AdminSettingsPage() {
             toast({ title: "Settings Saved", description: "All settings have been updated successfully." });
         } catch (error: any) {
             toast({ variant: 'destructive', title: "Error Saving Settings", description: error.message });
+        }
+    };
+
+    const handleTestEmail = async () => {
+        if (!testEmail) {
+            toast({ variant: 'destructive', title: "Email Required", description: "Please enter an email address to send the test email to." });
+            return;
+        }
+        
+        setTestingEmail(true);
+        try {
+            const result = await sendTestEmail(testEmail);
+            if (result.success) {
+                toast({ title: "Test Email Sent", description: result.message });
+            } else {
+                toast({ variant: 'destructive', title: "Test Failed", description: result.message });
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Error", description: error.message || "Failed to send test email" });
+        } finally {
+            setTestingEmail(false);
         }
     };
 
@@ -249,6 +273,31 @@ export default function AdminSettingsPage() {
                             <Input id="fromSupportEmail" name="fromSupportEmail" type="email" placeholder="support@example.com" value={localSettings.emailSettings.fromSupportEmail} onChange={(e) => handleNestedChange('emailSettings', e)} />
                              <p className="text-xs text-muted-foreground">Used for all support ticket correspondence.</p>
                         </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="fromName">Sender Name</Label>
+                        <Input id="fromName" name="fromName" placeholder="Your App Name" value={localSettings.emailSettings.fromName} onChange={(e) => handleNestedChange('emailSettings', e)} />
+                        <p className="text-xs text-muted-foreground">The name that appears in the "From" field of all emails. If not set, app name will be used.</p>
+                    </div>
+                    <div className="space-y-2 pt-4 border-t">
+                        <Label htmlFor="testEmail">Test Email Configuration</Label>
+                        <div className="flex gap-2">
+                            <Input 
+                                id="testEmail" 
+                                type="email" 
+                                placeholder="Enter email to send test to" 
+                                value={testEmail} 
+                                onChange={(e) => setTestEmail(e.target.value)} 
+                            />
+                            <Button 
+                                type="button" 
+                                onClick={handleTestEmail} 
+                                disabled={testingEmail}
+                            >
+                                {testingEmail ? 'Sending...' : 'Send Test Email'}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Send a test email to verify your SMTP configuration is working correctly.</p>
                     </div>
                 </CardContent>
             </Card>

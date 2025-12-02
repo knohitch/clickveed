@@ -94,11 +94,20 @@ export async function createCustomerPortalSession(userId: string, stripeSecretKe
  * Handles incoming Stripe webhook events.
  */
 export async function handleStripeWebhookEvent(event: Stripe.Event) {
+    // Get Stripe configuration from admin settings (preserves existing deployments)
+    const { apiKeys } = await getAdminSettings();
+    const stripeSecretKey = apiKeys.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+    
+    if (!stripeSecretKey) {
+        console.error("Stripe secret key not configured in admin settings or environment variables");
+        throw new Error("Stripe not properly configured");
+    }
+
     switch (event.type) {
         case 'checkout.session.completed': {
             const session = event.data.object as Stripe.Checkout.Session;
              if (session.mode === 'subscription' && session.metadata?.userId) {
-                const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
+                const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
                 const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
                 
                 // Get user and plan details for email notification

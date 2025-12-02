@@ -13,8 +13,16 @@ import { Logo } from '@/components/logo';
 import { Separator } from '@/components/ui/separator';
 import { GoogleIcon } from '@/components/icons/google-icon';
 import { SignupForm } from '@/components/auth/signup-form';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 
-export default function SignupPage() {
+export async function generateMetadata() {
+  const { appName } = await getAdminSettings();
+  return {
+    title: `Sign Up | ${appName}`,
+  };
+}
+
+export default async function SignupPage() {
   return (
     <main className="w-full lg:grid lg:min-h-screen lg:grid-cols-2 xl:min-h-screen">
        <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

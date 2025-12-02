@@ -39,7 +39,8 @@ export async function signUp(prevState: any, formData: FormData) {
 
         // Check if this is the first user signing up
         const userCount = await prisma.user.count();
-        const role = userCount === 0 ? 'SUPER_ADMIN' : 'USER';
+        const isSuperAdmin = userCount === 0;
+        const role = isSuperAdmin ? 'SUPER_ADMIN' : 'USER';
         
         // Find the default "Free" plan
         const freePlan = await prisma.plan.findFirst({
@@ -49,69 +50,89 @@ export async function signUp(prevState: any, formData: FormData) {
              throw new Error("Default 'Free' plan not found. Please seed the database.");
         }
 
-        const verificationToken = randomBytes(32).toString('hex');
-        const hashedToken = createHash('sha256').update(verificationToken).digest('hex');
-        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        if (isSuperAdmin) {
+            // Super Admin: Auto-verify and set to Active
+            await prisma.user.create({
+                data: {
+                    email,
+                    displayName: name,
+                    passwordHash,
+                    role,
+                    status: 'Active',
+                    emailVerified: true,
+                    planId: freePlan.id,
+                },
+            });
 
-        await prisma.verificationToken.create({
-          data: {
-            identifier: email,
-            token: hashedToken,
-            expires: tokenExpires,
-          },
-        });
+            console.log(`Super Admin ${email} signed up successfully and auto-verified.`);
+            
+            return { success: true, error: '', isSuperAdmin: true };
+        } else {
+            // Regular User: Requires email verification
+            const verificationToken = randomBytes(32).toString('hex');
+            const hashedToken = createHash('sha256').update(verificationToken).digest('hex');
+            const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-        await prisma.user.create({
-            data: {
-                email,
-                displayName: name,
-                passwordHash,
-                role,
-                status: 'Pending',
-                emailVerified: false,
-                planId: freePlan.id,
-            },
-        });
+            await prisma.verificationToken.create({
+              data: {
+                identifier: email,
+                token: hashedToken,
+                expires: tokenExpires,
+              },
+            });
 
-        // Send verification email
-        const { appName } = await getAdminSettings();
-        const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${verificationToken}`;
-        
-        await sendEmail({
-            to: email,
-            templateKey: 'emailVerification',
-            data: {
-                appName,
-                name,
-                verificationLink: verificationUrl,
-            }
-        });
-        
-        // Send signup confirmation email to user
-        await sendEmail({
-            to: email,
-            templateKey: 'userSignup',
-            data: {
-                appName,
-                name,
-            }
-        });
+            await prisma.user.create({
+                data: {
+                    email,
+                    displayName: name,
+                    passwordHash,
+                    role,
+                    status: 'Pending',
+                    emailVerified: false,
+                    planId: freePlan.id,
+                },
+            });
 
-        console.log(`User ${email} signed up successfully. Verification and confirmation emails sent.`);
-        
-        // Send notification to admin about new user signup
-        const adminSettings = await getAdminSettings();
-        await sendEmail({
-            to: 'admin',
-            templateKey: 'adminNewUser',
-            data: {
-                appName: adminSettings.appName,
-                userEmail: email,
-                userName: name,
-            }
-        });
-        
-        return { success: true, error: '' };
+            // Send verification email
+            const { appName } = await getAdminSettings();
+            const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${verificationToken}`;
+            
+            await sendEmail({
+                to: email,
+                templateKey: 'emailVerification',
+                data: {
+                    appName,
+                    name,
+                    verificationLink: verificationUrl,
+                }
+            });
+            
+            // Send signup confirmation email to user
+            await sendEmail({
+                to: email,
+                templateKey: 'userSignup',
+                data: {
+                    appName,
+                    name,
+                }
+            });
+
+            console.log(`User ${email} signed up successfully. Verification and confirmation emails sent.`);
+            
+            // Send notification to admin about new user signup
+            const adminSettings = await getAdminSettings();
+            await sendEmail({
+                to: 'admin',
+                templateKey: 'adminNewUser',
+                data: {
+                    appName: adminSettings.appName,
+                    userEmail: email,
+                    userName: name,
+                }
+            });
+            
+            return { success: true, error: '', isSuperAdmin: false };
+        }
 
     } catch (error: any) {
         return { error: `An unexpected error occurred: ${error.message}`, success: false };
@@ -284,9 +305,9 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
             },
         });
         
+        return { success: true, error: '' };
+        
     } catch(e) {
         return { error: 'An unexpected error occurred.', success: false };
     }
-
-    redirect('/login');
 }

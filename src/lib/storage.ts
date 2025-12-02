@@ -218,7 +218,56 @@ export const getMediaUrl = (key: string, useCDN = true): string => {
   return useCDN ? storageManager.getCdnUrl(key) : storageManager.getFileUrl(key);
 };
 
-// Initialize with environment variables if available
+/**
+ * Initialize storage with admin settings from database
+ * This should be called server-side to get current settings
+ */
+export const initializeStorageFromDB = async (): Promise<void> => {
+  try {
+    // Dynamic import to avoid circular dependency
+    const { getAdminSettings } = await import('@/server/actions/admin-actions');
+    const settings = await getAdminSettings();
+    
+    const storageConfig = {
+      wasabi: {
+        endpoint: settings.apiKeys.wasabiEndpoint || defaultConfig.wasabi.endpoint,
+        region: settings.apiKeys.wasabiRegion || defaultConfig.wasabi.region,
+        accessKeyId: settings.apiKeys.wasabiAccessKey || '',
+        secretAccessKey: settings.apiKeys.wasabiSecretKey || '',
+        bucket: settings.apiKeys.wasabiBucket || defaultConfig.wasabi.bucket,
+      },
+      bunny: {
+        cdnUrl: settings.apiKeys.bunnyCdnUrl || defaultConfig.bunny.cdnUrl,
+        apiKey: settings.apiKeys.bunnyApiKey || '',
+        storageZone: settings.apiKeys.bunnyStorageZone || defaultConfig.bunny.storageZone,
+      },
+    };
+
+    await storageManager.initialize(storageConfig);
+  } catch (error) {
+    console.warn('Failed to initialize storage from database, falling back to env vars:', error);
+    
+    // Fallback to environment variables
+    const wasabiConfig = {
+      wasabi: {
+        endpoint: process.env.WASABI_ENDPOINT || defaultConfig.wasabi.endpoint,
+        region: process.env.WASABI_REGION || defaultConfig.wasabi.region,
+        accessKeyId: process.env.WASABI_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.WASABI_SECRET_ACCESS_KEY || '',
+        bucket: process.env.WASABI_BUCKET || defaultConfig.wasabi.bucket,
+      },
+      bunny: {
+        cdnUrl: process.env.BUNNY_CDN_URL || defaultConfig.bunny.cdnUrl,
+        apiKey: process.env.BUNNY_API_KEY || '',
+        storageZone: process.env.BUNNY_STORAGE_ZONE || defaultConfig.bunny.storageZone,
+      },
+    };
+
+    await storageManager.initialize(wasabiConfig);
+  }
+};
+
+// Initialize with environment variables if available (fallback)
 if (typeof window === 'undefined') { // Server-side only
   const wasabiConfig = {
     wasabi: {
