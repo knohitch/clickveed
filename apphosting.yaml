@@ -1,0 +1,64 @@
+
+# Settings to manage and configure a Firebase App Hosting backend.
+# https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  # Increase this value if you'd like to automatically spin up
+  # more instances in response to increased traffic.
+  maxInstances: 1
+# Secrets are environment variables that are not checked into source control.
+# They can be created using the Firebase CLI.
+# e.g. firebase apphosting:secrets:set MY_SECRET --project my-project-id
+# https://firebase.google.com/docs/app-hosting/configure#secrets
+secretEnvironmentVariables:
+  - key: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: NEXT_PUBLIC_FIREBASE_API_KEY
+  - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    secret: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+  - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    secret: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+  - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    secret: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+  - key: NEXT_PUBLIC_FIREBASE_APP_ID
+    secret: NEXT_PUBLIC_FIREBASE_APP_ID
+  - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+    secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  - key: DATABASE_URL
+    secret: DATABASE_URL
+  - key: CRON_SECRET
+    secret: CRON_SECRET
+  - key: WASABI_ENDPOINT
+    secret: WASABI_ENDPOINT
+  - key: WASABI_REGION
+    secret: WASABI_REGION
+  - key: WASABI_ACCESS_KEY
+    secret: WASABI_ACCESS_KEY
+  - key: WASABI_SECRET_KEY
+    secret: WASABI_SECRET_KEY
+  - key: WASABI_BUCKET
+    secret: WASABI_BUCKET
+  - key: BUNNY_CDN_URL
+    secret: BUNNY_CDN_URL
+  - key: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+  - key: OPENAI_API_KEY
+    secret: OPENAI_API_KEY
+  - key: PEXELS_API_KEY
+    secret: PEXELS_API_KEY
+  - key: PIXABAY_API_KEY
+    secret: PIXABAY_API_KEY
+  - key: UNSPLASH_API_KEY
+    secret: UNSPLASH_API_KEY
+  - key: AUTH_SECRET
+    secret: AUTH_SECRET
+  - key: STRIPE_SECRET_KEY
+    secret: STRIPE_SECRET_KEY
+  - key: STRIPE_WEBHOOK_SECRET
+    secret: STRIPE_WEBHOOK_SECRET
+  - key: GOOGLE_CLIENT_ID
+    secret: GOOGLE_CLIENT_ID
+  - key: GOOGLE_CLIENT_SECRET
+    secret: GOOGLE_CLIENT_SECRET
+

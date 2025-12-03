@@ -1,0 +1,310 @@
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl"]
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+// ==================================
+//         Core User Models
+// ==================================
+
+model User {
+  id                    String          @id @default(cuid())
+  displayName           String?         // Renamed from 'name'
+  email                 String?         @unique
+  emailVerified         Boolean?        // Changed from DateTime? to Boolean?
+  avatarUrl             String?         // Renamed from 'image'
+  passwordHash          String?
+  passwordResetToken    String?         // Added
+  passwordResetExpires  DateTime?       // Added
+  role                  String          @default("USER") // USER, ADMIN, SUPER_ADMIN
+  status                String          @default("Active") // Active, Pending
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  onboardingComplete    Boolean         @default(false)
+  onboardingData        Json?
+  stripeCustomerId      String?         @unique
+  stripeSubscriptionId  String?         @unique
+  stripeSubscriptionStatus String?
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  accounts              Account[]
+  sessions              Session[]
+  projects              Project[]
+  mediaAssets           MediaAsset[]
+  agents                Agent[]
+  socialConnections     SocialConnection[]
+  supportTickets        SupportTicket[]
+  brandKit              BrandKit?
+  usage                 UserUsage?
+  voiceClones           VoiceClone[]    // Added
+  planId                String?
+  plan                  Plan?           @relation(fields: [planId], references: [id])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==================================
+//         Application Models
+// ==================================
+
+model Plan {
+  id                   String        @id
+  name                 String
+  description          String
+  priceMonthly         Float
+  priceQuarterly       Float
+  priceYearly          Float
+  videoExports         Int?          // Added
+  aiCredits            Int?          // Added
+  storageGB            Int?          // Added
+  stripeProductId      String?       @unique
+  stripePriceIdMonthly String?       @unique
+  stripePriceIdQuarterly String?     @unique
+  stripePriceIdYearly  String?       @unique
+  features             PlanFeature[]
+  promotions           PromotionOnPlan[]
+  applicablePromotions  ApplicablePromotionPlan[] // Added
+  users                User[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model PlanFeature {
+  id     String @id @default(cuid())
+  text   String
+  plan   Plan   @relation(fields: [planId], references: [id])
+  planId String
+}
+
+model Promotion {
+  id                 String            @id @default(cuid())
+  name               String
+  discountPercentage Int
+  isActive           Boolean           @default(true)
+  plans              PromotionOnPlan[]
+  applicablePlans    ApplicablePromotionPlan[] // Added
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model PromotionOnPlan {
+  plan        Plan      @relation(fields: [planId], references: [id])
+  planId      String
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  promotionId String
+  assignedAt  DateTime  @default(now())
+  assignedBy  String    @default("Admin")
+
+  @@id([planId, promotionId])
+}
+
+model ApplicablePromotionPlan {
+  plan        Plan      @relation(fields: [planId], references: [id])
+  planId      String
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  promotionId String
+  createdAt   DateTime  @default(now())
+
+  @@id([planId, promotionId])
+}
+
+model Project {
+  id            Int      @id @default(autoincrement())
+  title         String
+  status        String   @default("In Progress") // In Progress, Completed, Archived
+  thumbnailUrl  String?
+  thumbnailHint String?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  videos        Video[]
+}
+
+model Video {
+  id          String      @id @default(cuid())
+  name        String
+  url         String
+  size        Float
+  projectId   Int
+  project     Project     @relation(fields: [projectId], references: [id])
+  transcript  Transcript?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Transcript {
+  id          String   @id @default(cuid())
+  content     String
+  jsonContent Json?
+  videoId     String   @unique
+  video       Video    @relation(fields: [videoId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
+model MediaAsset {
+  id        Int      @id @default(autoincrement())
+  name      String
+  type      String // IMAGE, VIDEO, AUDIO
+  url       String
+  size      Float // in MB
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Agent {
+  id           Int      @id @default(autoincrement())
+  name         String
+  platform     String // n8n, Make.com
+  trigger      String
+  workflowJson Json
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SocialConnection {
+  id           Int       @id @default(autoincrement())
+  userId       String
+  platform     String // youtube, facebook, etc.
+  name         String
+  accessToken  String    @db.Text
+  refreshToken String?   @db.Text
+  expiresAt    DateTime?
+  user         User      @relation(fields: [userId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, platform])
+}
+
+// Voice Clone model for storing voice cloning results
+model VoiceClone {
+  id          String   @id @default(cuid())
+  voiceId     String   @unique // The ID returned by the voice cloning provider
+  name        String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  provider    String   // elevenlabs, respeecher, etc.
+  status      String   @default("processing") // processing, completed, failed
+  sampleUrls  String[] // URLs to the original audio samples used
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ==================================
+//         Admin Models
+// ==================================
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model ApiKey {
+  name  String @id
+  value String
+}
+
+model EmailSettings {
+  id               Int    @id @default(1)
+  smtpHost         String
+  smtpPort         String
+  smtpUser         String
+  smtpPass         String
+  fromAdminEmail   String
+  fromSupportEmail String
+  fromName         String
+}
+
+model EmailTemplate {
+  key     String @id
+  subject String
+  body    String @db.Text
+}
+
+model SupportTicket {
+  id           String   @id @default(cuid())
+  userId       String?
+  userName     String
+  userEmail    String
+  userAvatar   String?
+  subject      String
+  preview      String
+  status       String   @default("Open") // Open, Pending, Resolved
+  conversation Json     @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User?    @relation(fields: [userId], references: [id])
+}
+
+model BrandKit {
+  id             Int      @id @default(autoincrement())
+  userId         String   @unique
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  headlineFont   String?
+  bodyFont       String?
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model UserUsage {
+  id            Int    @id @default(autoincrement())
+  userId        String @unique
+  projects      Int    @default(0)
+  mediaAssets   Int    @default(0)
+  aiCreditsUsed Int    @default(0)
+  storageUsedGB Float  @default(0)
+  user          User   @relation(fields: [userId], references: [id])
+}
