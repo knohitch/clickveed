@@ -119,7 +119,7 @@ function getDefaultSettings() {
         isSupportOnline: true,
         plans: [],
         promotions: [],
-        apiKeys: {},
+        apiKeys: {} as Record<string, string>,
         emailSettings: defaultEmailSettings,
         emailTemplates: defaultEmailTemplates,
         storageSettings: {
