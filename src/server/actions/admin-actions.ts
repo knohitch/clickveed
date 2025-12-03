@@ -23,68 +23,113 @@ const defaultEmailTemplates: EmailTemplates = {
 
 /**
  * Retrieves all admin settings from the production database.
+ * Returns default values if database is not available (e.g., during build time).
  */
 export async function getAdminSettings() {
-    const settings = await prisma.setting.findMany();
-    const apiKeys = await prisma.apiKey.findMany();
-    const emailSettingsData = await prisma.emailSettings.findFirst();
-    const emailTemplatesData = await prisma.emailTemplate.findMany();
-    const plans = await prisma.plan.findMany({ include: { features: true } });
-    const promotions = await prisma.promotion.findMany({ include: { applicablePlans: true } });
-    
-    const appName = settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator';
-    
+    try {
+        // Check if DATABASE_URL is available (skip database queries during build time)
+        if (!process.env.DATABASE_URL) {
+            console.warn('DATABASE_URL not found, using default settings for build time');
+            return getDefaultSettings();
+        }
+
+        const settings = await prisma.setting.findMany();
+        const apiKeys = await prisma.apiKey.findMany();
+        const emailSettingsData = await prisma.emailSettings.findFirst();
+        const emailTemplatesData = await prisma.emailTemplate.findMany();
+        const plans = await prisma.plan.findMany({ include: { features: true } });
+        const promotions = await prisma.promotion.findMany({ include: { applicablePlans: true } });
+
+        const appName = settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator';
+
+        const defaultEmailSettings: EmailSettings = {
+            id: 1,
+            smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+            fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
+            fromName: appName || 'AI Video Creator'
+        };
+
+        const emailSettings = {
+            ...defaultEmailSettings,
+            ...emailSettingsData
+        };
+
+        // Combine default templates with database templates
+        const emailTemplatesFromDb = emailTemplatesData.reduce((acc, tpl) => {
+            acc[tpl.key as keyof EmailTemplates] = { subject: tpl.subject, body: tpl.body };
+            return acc;
+        }, {} as Partial<EmailTemplates>);
+
+        const emailTemplates = { ...defaultEmailTemplates, ...emailTemplatesFromDb };
+
+        // Parse storage settings from database
+        const storageSettings = {
+            wasabiEndpoint: settings.find(s => s.key === 'storageSettings')?.value ?
+                JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiEndpoint || 's3.us-west-1.wasabisys.com' : 's3.us-west-1.wasabisys.com',
+            wasabiRegion: settings.find(s => s.key === 'storageSettings')?.value ?
+                JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiRegion || 'us-west-1' : 'us-west-1',
+            wasabiBucket: settings.find(s => s.key === 'storageSettings')?.value ?
+                JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiBucket || 'clickvid-media' : 'clickvid-media',
+            bunnyCdnUrl: settings.find(s => s.key === 'storageSettings')?.value ?
+                JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').bunnyCdnUrl || 'https://clickvid.b-cdn.net' : 'https://clickvid.b-cdn.net',
+            wasabiAccessKey: settings.find(s => s.key === 'storageSettings')?.value ?
+                JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiAccessKey || '' : '',
+            wasabiSecretKey: settings.find(s => s.key === 'storageSettings')?.value ?
+                JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiSecretKey || '' : '',
+        };
+
+        return {
+            appName: settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator',
+            logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
+            faviconUrl: settings.find(s => s.key === 'faviconUrl')?.value === 'null' ? null : settings.find(s => s.key === 'faviconUrl')?.value as string | null,
+            allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true',
+            isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true',
+            plans,
+            promotions: promotions.map(p => ({ ...p, applicablePlanIds: p.applicablePlans.map(ap => ap.planId) })),
+            apiKeys: apiKeys.reduce((acc, key) => {
+              acc[key.name] = key.value;
+              return acc;
+            }, {} as Record<string, string>),
+            emailSettings,
+            emailTemplates,
+            storageSettings,
+        };
+    } catch (error) {
+        console.warn('Failed to fetch admin settings from database, using defaults:', error);
+        return getDefaultSettings();
+    }
+}
+
+/**
+ * Returns default admin settings when database is not available.
+ */
+function getDefaultSettings() {
     const defaultEmailSettings: EmailSettings = {
         id: 1,
         smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
         fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
-        fromName: appName || 'AI Video Creator'
-    };
-  
-    const emailSettings = {
-        ...defaultEmailSettings,
-        ...emailSettingsData
-    };
-    
-    // Combine default templates with database templates
-    const emailTemplatesFromDb = emailTemplatesData.reduce((acc, tpl) => {
-        acc[tpl.key as keyof EmailTemplates] = { subject: tpl.subject, body: tpl.body };
-        return acc;
-    }, {} as Partial<EmailTemplates>);
-    
-    const emailTemplates = { ...defaultEmailTemplates, ...emailTemplatesFromDb };
-    
-    // Parse storage settings from database
-    const storageSettings = {
-        wasabiEndpoint: settings.find(s => s.key === 'storageSettings')?.value ?
-            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiEndpoint || 's3.us-west-1.wasabisys.com' : 's3.us-west-1.wasabisys.com',
-        wasabiRegion: settings.find(s => s.key === 'storageSettings')?.value ?
-            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiRegion || 'us-west-1' : 'us-west-1',
-        wasabiBucket: settings.find(s => s.key === 'storageSettings')?.value ?
-            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiBucket || 'clickvid-media' : 'clickvid-media',
-        bunnyCdnUrl: settings.find(s => s.key === 'storageSettings')?.value ?
-            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').bunnyCdnUrl || 'https://clickvid.b-cdn.net' : 'https://clickvid.b-cdn.net',
-        wasabiAccessKey: settings.find(s => s.key === 'storageSettings')?.value ?
-            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiAccessKey || '' : '',
-        wasabiSecretKey: settings.find(s => s.key === 'storageSettings')?.value ?
-            JSON.parse(settings.find(s => s.key === 'storageSettings')?.value || '{}').wasabiSecretKey || '' : '',
+        fromName: 'AI Video Creator'
     };
 
     return {
-        appName: settings.find(s => s.key === 'appName')?.value as string || 'AI Video Creator',
-        logoUrl: settings.find(s => s.key === 'logoUrl')?.value === 'null' ? null : settings.find(s => s.key === 'logoUrl')?.value as string | null,
-        faviconUrl: settings.find(s => s.key === 'faviconUrl')?.value === 'null' ? null : settings.find(s => s.key === 'faviconUrl')?.value as string | null,
-        allowAdminSignup: settings.find(s => s.key === 'allowAdminSignup')?.value === 'true',
-        isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true',
-        plans,
-        promotions: promotions.map(p => ({ ...p, applicablePlanIds: p.applicablePlans.map(ap => ap.planId) })),
-        apiKeys: apiKeys.reduce((acc, key) => {
-          acc[key.name] = key.value;
-          return acc;
-        }, {} as Record<string, string>),
-        emailSettings,
-        emailTemplates,
-        storageSettings,
+        appName: 'AI Video Creator',
+        logoUrl: null,
+        faviconUrl: null,
+        allowAdminSignup: false,
+        isSupportOnline: true,
+        plans: [],
+        promotions: [],
+        apiKeys: {},
+        emailSettings: defaultEmailSettings,
+        emailTemplates: defaultEmailTemplates,
+        storageSettings: {
+            wasabiEndpoint: 's3.us-west-1.wasabisys.com',
+            wasabiRegion: 'us-west-1',
+            wasabiBucket: 'clickvid-media',
+            bunnyCdnUrl: 'https://clickvid.b-cdn.net',
+            wasabiAccessKey: '',
+            wasabiSecretKey: '',
+        },
     };
 }
 
