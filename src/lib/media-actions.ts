@@ -141,20 +141,3 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
         };
     }
 }
-
-/**
- * Get file type category from filename
- */
-export function getFileTypeFromName(filename: string): 'IMAGE' | 'VIDEO' | 'AUDIO' {
-    const extension = filename.split('.').pop()?.toLowerCase() || '';
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
-        return 'IMAGE';
-    }
-    
-    if (['mp4', 'webm', 'avi', 'mov', 'flv', 'wmv', 'mkv'].includes(extension)) {
-        return 'VIDEO';
-    }
-    
-    return 'AUDIO';
-}
