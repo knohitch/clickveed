@@ -205,12 +205,103 @@ export async function upsertBrandKit(data: BrandKit) {
 }
 
 /**
+ * Approves a pending user, changing their status from 'Pending' to 'Active'.
+ */
+export async function approveUser(userId: string) {
+    const session = await auth();
+    if (!session?.user?.role || !['SUPER_ADMIN', 'ADMIN'].includes(session.user.role)) {
+        throw new Error('Unauthorized: Only admins can approve users');
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId }
+    });
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    if (user.status !== 'Pending') {
+        throw new Error('User is not in pending status');
+    }
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { status: 'Active' }
+    });
+
+    revalidatePath('/chin/dashboard/users');
+    revalidatePath('/kanri/dashboard/users');
+
+    return { success: true, message: 'User approved successfully' };
+}
+
+/**
+ * Deletes a user from the system.
+ */
+export async function deleteUser(userId: string) {
+    const session = await auth();
+    if (!session?.user?.role || !['SUPER_ADMIN', 'ADMIN'].includes(session.user.role)) {
+        throw new Error('Unauthorized: Only admins can delete users');
+    }
+
+    // Prevent deleting super admins
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true, email: true }
+    });
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    if (user.role === 'SUPER_ADMIN') {
+        throw new Error('Cannot delete super admin users');
+    }
+
+    // Delete the user (cascade will handle related records)
+    await prisma.user.delete({
+        where: { id: userId }
+    });
+
+    revalidatePath('/chin/dashboard/users');
+    revalidatePath('/kanri/dashboard/users');
+
+    return { success: true, message: 'User deleted successfully' };
+}
+
+/**
+ * Updates a user's role and status.
+ */
+export async function updateUser(userId: string, updates: { role?: UserRole; status?: UserStatus }) {
+    const session = await auth();
+    if (!session?.user?.role || !['SUPER_ADMIN', 'ADMIN'].includes(session.user.role)) {
+        throw new Error('Unauthorized: Only admins can update users');
+    }
+
+    // Prevent non-super-admins from changing roles to super admin
+    if (updates.role === 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+        throw new Error('Only super admins can assign super admin role');
+    }
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: updates
+    });
+
+    revalidatePath('/chin/dashboard/users');
+    revalidatePath('/kanri/dashboard/users');
+
+    return { success: true, message: 'User updated successfully' };
+}
+
+/**
  * Fixes users with missing displayName values.
  * This function updates users who have a null or empty displayName field.
  */
 export async function fixUsersWithMissingDisplayName() {
     console.log('Starting to fix users with missing display names...');
-    
+
     // Find users with null or empty displayName
     const usersToFix = await prisma.user.findMany({
         where: {
@@ -232,12 +323,12 @@ export async function fixUsersWithMissingDisplayName() {
     const updates = usersToFix.map(async (user) => {
         // Extract name from email (part before @) if displayName is missing
         let displayName = user.email ? user.email.split('@')[0] : 'User';
-        
+
         // Capitalize first letter
         displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
-        
+
         console.log(`Updating user ${user.id} with display name: ${displayName}`);
-        
+
         return prisma.user.update({
             where: { id: user.id },
             data: { displayName }
@@ -245,12 +336,12 @@ export async function fixUsersWithMissingDisplayName() {
     });
 
     await Promise.all(updates);
-    
+
     const result = {
         message: `Fixed ${usersToFix.length} users with missing display names.`,
         count: usersToFix.length
     };
-    
+
     console.log('Finished fixing user display names:', result);
     return result;
 }

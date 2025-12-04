@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { Stripe } from 'stripe';
-import prisma from '@/lib/prisma';
+import prisma from '@/server/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { auth } from '@/auth';
 

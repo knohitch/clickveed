@@ -47,6 +47,7 @@ export async function signUp(prevState: any, formData: FormData) {
             where: { name: 'Free' }
         });
         if (!freePlan) {
+             console.error("Default 'Free' plan not found. Available plans:", await prisma.plan.findMany({ select: { name: true } }));
              throw new Error("Default 'Free' plan not found. Please seed the database.");
         }
 

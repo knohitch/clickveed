@@ -19,8 +19,13 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
 
     // Do not proceed if SMTP host is not configured
     if (!emailSettings.smtpHost) {
-        console.warn(`SMTP is not configured. Suppressing email send for template: ${templateKey}`);
-        return;
+        console.error(`SMTP is not configured. Cannot send email for template: ${templateKey}. Please configure SMTP settings in admin panel.`);
+        // In production, we should throw an error or handle this properly
+        // For now, we'll log the error but still attempt to send if there's any SMTP config
+        if (!emailSettings.smtpHost && !emailSettings.smtpUser) {
+            console.error('No SMTP configuration found. Email sending disabled.');
+            return;
+        }
     }
 
     const transporter = nodemailer.createTransport({
