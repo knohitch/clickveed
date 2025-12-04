@@ -62,11 +62,19 @@ export function checkFeatureAccess(planName: string | null, featureId: string): 
     };
   }
   
-  // Free plan features
+  // Free plan features - expanded to allow basic video creation
   const freePlanFeatures = [
     'ai-assistant',
     'creative-assistant',
     'social-integrations',
+    'video-suite',
+    'video-pipeline',
+    'script-generator',
+    'stock-media',
+    'ai-image-generator',
+    'background-remover',
+    'media-library',
+    'profile-settings',
   ];
   
   // Starter plan features

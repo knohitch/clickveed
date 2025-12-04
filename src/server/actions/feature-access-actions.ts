@@ -98,8 +98,16 @@ export async function checkFeatureAccessWithPlan(
       'ai-assistant',
       'creative-assistant',
       'social-integrations',
+      'video-suite',
+      'video-pipeline',
+      'script-generator',
+      'stock-media',
+      'ai-image-generator',
+      'background-remover',
+      'media-library',
+      'profile-settings',
     ];
-    
+
     const canAccess = freeFeatures.includes(featureId);
     return {
       canAccess,
