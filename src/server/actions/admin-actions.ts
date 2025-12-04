@@ -3,6 +3,7 @@
 
 import type { Plan, Promotion, ApiKeys, EmailSettings, EmailTemplates } from '@/contexts/admin-settings-context';
 import prisma from '@/server/prisma';
+import { sendEmail } from '@/server/services/email-service';
 
 // Define default email templates
 const defaultEmailTemplates: EmailTemplates = {
@@ -309,46 +310,44 @@ export async function testDbConnection() {
 export async function sendTestEmail(testEmail: string) {
     try {
         const { emailSettings, appName } = await getAdminSettings();
-        
+
         if (!emailSettings.smtpHost) {
             return { success: false, message: 'SMTP host is not configured. Please configure SMTP settings first.' };
         }
 
-        const nodemailer = require('nodemailer');
-        
-        const transporter = nodemailer.createTransporter({
-            host: emailSettings.smtpHost,
-            port: Number(emailSettings.smtpPort),
-            secure: Number(emailSettings.smtpPort) === 465,
-            auth: {
-                user: emailSettings.smtpUser,
-                pass: emailSettings.smtpPass,
-            },
-        });
+        if (!emailSettings.smtpUser || !emailSettings.smtpPass) {
+            return { success: false, message: 'SMTP username and password are required. Please configure SMTP authentication settings.' };
+        }
 
-        const senderName = emailSettings.fromName || appName;
-        
-        await transporter.sendMail({
-            from: `"${senderName}" <${emailSettings.fromAdminEmail}>`,
+        if (!emailSettings.fromAdminEmail) {
+            return { success: false, message: 'From email address is not configured. Please set the "From Email Address" in SMTP settings.' };
+        }
+
+        // Use the sendEmail service function for consistency
+        await sendEmail({
             to: testEmail,
-            subject: 'SMTP Configuration Test',
-            html: `
-                <h2>SMTP Test Successful!</h2>
-                <p>If you're reading this email, your SMTP configuration is working correctly.</p>
-                <p><strong>Configuration Details:</strong></p>
-                <ul>
-                    <li>SMTP Host: ${emailSettings.smtpHost}</li>
-                    <li>SMTP Port: ${emailSettings.smtpPort}</li>
-                    <li>From Email: ${emailSettings.fromAdminEmail}</li>
-                    <li>Sender Name: ${senderName}</li>
-                </ul>
-                <p>Your email notifications will now be delivered successfully.</p>
-            `,
+            templateKey: 'userSignup', // Using existing template for testing
+            data: {
+                name: 'SMTP Test User',
+                appName: appName || 'Your App',
+            }
         });
 
-        return { success: true, message: `Test email sent successfully to ${testEmail}` };
+        return { success: true, message: `Test email sent successfully to ${testEmail}. Check your inbox for a welcome message.` };
     } catch (error: any) {
         console.error('SMTP Test Error:', error);
-        return { success: false, message: `Failed to send test email: ${error.message}` };
+
+        // Provide more specific error messages
+        if (error.code === 'EAUTH') {
+            return { success: false, message: 'SMTP authentication failed. Please check your username and password.' };
+        } else if (error.code === 'ENOTFOUND') {
+            return { success: false, message: 'SMTP host not found. Please check your SMTP host setting.' };
+        } else if (error.code === 'ECONNREFUSED') {
+            return { success: false, message: 'Connection refused. Please check your SMTP host and port settings.' };
+        } else if (error.code === 'ETIMEDOUT') {
+            return { success: false, message: 'Connection timeout. Please check your SMTP settings and network connection.' };
+        }
+
+        return { success: false, message: `Failed to send test email: ${error.message || 'Unknown error'}` };
     }
 }

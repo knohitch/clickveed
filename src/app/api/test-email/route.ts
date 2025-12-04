@@ -4,11 +4,11 @@ import { auth } from '@/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication - only super admin can test emails
+    // Check authentication - admins and super admins can test emails
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== 'SUPER_ADMIN') {
+    if (!session?.user?.id || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
       return NextResponse.json(
-        { error: 'Unauthorized. Super admin access required.' },
+        { error: 'Unauthorized. Admin access required.' },
         { status: 401 }
       );
     }
