@@ -33,7 +33,12 @@ export type GenerateVoiceOverOutput = z.infer<typeof GenerateVoiceOverOutputSche
 export async function generateVoiceOver(
   input: GenerateVoiceOverInput
 ): Promise<GenerateVoiceOverOutput> {
-  return generateVoiceOverFlow(input);
+  try {
+    return await generateVoiceOverFlow(input);
+  } catch (error) {
+    console.error('Voice over generation failed:', error);
+    throw new Error(`Voice over generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 async function toWav(

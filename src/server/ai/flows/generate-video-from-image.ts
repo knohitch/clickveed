@@ -13,7 +13,7 @@ import {z} from 'genkit';
 import wav from 'wav';
 import { getAvailableVideoGenerator, getAvailableTTSProvider, getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
-import prisma from '@/lib/prisma';
+import prisma from '@/server/prisma';
 import { auth } from '@/auth';
 
 
@@ -36,7 +36,12 @@ const GenerateVideoFromImageOutputSchema = z.object({
 export type GenerateVideoFromImageOutput = z.infer<typeof GenerateVideoFromImageOutputSchema>;
 
 export async function generateVideoFromImage(input: GenerateVideoFromImageInput): Promise<GenerateVideoFromImageOutput> {
-  return generateVideoFromImageFlow(input);
+  try {
+    return await generateVideoFromImageFlow(input);
+  } catch (error) {
+    console.error('Video from image generation failed:', error);
+    throw new Error(`Video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 const generateVideoScriptPrompt = ai.definePrompt({

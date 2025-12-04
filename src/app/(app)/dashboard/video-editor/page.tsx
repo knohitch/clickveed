@@ -156,7 +156,18 @@ export default function VideoEditorPage() {
                 <CardContent>
                     <div className="aspect-video bg-black rounded-lg relative flex items-center justify-center">
                         {selectedScene ? (
-                             <Image src={selectedScene.src} data-ai-hint="placeholder" layout="fill" objectFit="contain" alt="Scene preview" />
+                            selectedScene.type === 'video' ? (
+                                <video
+                                    ref={videoRef}
+                                    src={selectedScene.src}
+                                    className="w-full h-full object-contain rounded-lg"
+                                    onPlay={() => setIsPlaying(true)}
+                                    onPause={() => setIsPlaying(false)}
+                                    onEnded={() => setIsPlaying(false)}
+                                />
+                            ) : (
+                                <Image src={selectedScene.src} data-ai-hint="placeholder" fill objectFit="contain" alt="Scene preview" />
+                            )
                         ) : (
                             <p className="text-muted-foreground">Select a scene to preview</p>
                         )}
@@ -189,7 +200,7 @@ export default function VideoEditorPage() {
                                     style={{ width: `${scene.duration * 2}rem` }}
                                 >
                                     <div className="relative h-full w-full bg-muted rounded-md overflow-hidden">
-                                        <Image src={scene.src} data-ai-hint="placeholder" layout="fill" objectFit="cover" alt={`Scene ${scene.id}`} />
+                                        <Image src={scene.src} data-ai-hint="placeholder" fill objectFit="cover" alt={`Scene ${scene.id}`} />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-1 flex flex-col justify-end">
                                             <p className="text-white text-xs truncate">{scene.caption.text || `Scene ${scene.id}`}</p>
                                         </div>

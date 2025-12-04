@@ -24,7 +24,23 @@ const GenerateVideoScriptOutputSchema = z.object({
 export type GenerateVideoScriptOutput = z.infer<typeof GenerateVideoScriptOutputSchema>;
 
 export async function generateVideoScript(input: GenerateVideoScriptInput): Promise<GenerateVideoScriptOutput> {
-  return generateVideoScriptFlow(input);
+  try {
+    return await generateVideoScriptFlow(input);
+  } catch (error) {
+    console.error('Script generation failed:', error);
+    // Provide fallback script if AI generation fails
+    return {
+      script: `[SCENE: Professional video scene]
+
+VOICEOVER: ${input.topic}. ${input.style || 'Learn more'} about this exciting topic that will help you achieve your goals.
+
+[SCENE: Call to action]
+
+VOICEOVER: Take action today and transform your approach.`,
+      title: `${input.topic} - ${input.style || 'Guide'}`,
+      durationEstimate: input.length || '2 minutes'
+    };
+  }
 }
 
 const generateVideoScriptPrompt = ai.definePrompt({

@@ -169,38 +169,43 @@ const GeneratePipelineVideoOutputSchema = z.object({
 export type GeneratePipelineVideoOutput = z.infer<typeof GeneratePipelineVideoOutputSchema>;
 
 export async function generatePipelineVideo(input: GeneratePipelineVideoInput): Promise<GeneratePipelineVideoOutput> {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-        throw new Error("User must be authenticated to generate media.");
-    }
-
-    // Extract scene descriptions from the script to create a visual prompt
-    const sceneDescriptions = input.script.match(/\[SCENE:.*?\]/g) || [];
-    const visualPrompt = sceneDescriptions.length > 0 
-        ? sceneDescriptions.join(' ').replace(/\[SCENE:/g, '').replace(/\]/g, '')
-        : input.script.substring(0, 200); // Fallback to first 200 characters
-
-    // For now, we'll use a placeholder image URL since we don't have actual images in the pipeline
-    // In a real implementation, this would be replaced with actual generated or provided images
-    const placeholderImageUrl = "https://placehold.co/1920x1080/000000/FFFFFF/png?text=Generated+Video+Scene";
-    
-    // Import the video generation function
-    const { generateVideoFromImage } = await import('./generate-video-from-image');
-    
     try {
-        // Generate video using the real video generation API
-        const result = await generateVideoFromImage({
-            photoUrl: placeholderImageUrl,
-            musicPrompt: "Energetic background music",
-            videoDescription: visualPrompt
-        });
-        
-        return {
-            videoUrl: result.videoUrl,
-        };
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            throw new Error("User must be authenticated to generate media.");
+        }
+
+        // Extract scene descriptions from the script to create a visual prompt
+        const sceneDescriptions = input.script.match(/\[SCENE:.*?\]/g) || [];
+        const visualPrompt = sceneDescriptions.length > 0
+            ? sceneDescriptions.join(' ').replace(/\[SCENE:/g, '').replace(/\]/g, '')
+            : input.script.substring(0, 200); // Fallback to first 200 characters
+
+        // For now, we'll use a placeholder image URL since we don't have actual images in the pipeline
+        // In a real implementation, this would be replaced with actual generated or provided images
+        const placeholderImageUrl = "https://placehold.co/1920x1080/000000/FFFFFF/png?text=Generated+Video+Scene";
+
+        // Import the video generation function
+        const { generateVideoFromImage } = await import('./generate-video-from-image');
+
+        try {
+            // Generate video using the real video generation API
+            const result = await generateVideoFromImage({
+                photoUrl: placeholderImageUrl,
+                musicPrompt: "Energetic background music",
+                videoDescription: visualPrompt
+            });
+
+            return {
+                videoUrl: result.videoUrl,
+            };
+        } catch (error) {
+            console.error("Video generation failed:", error);
+            throw new Error(`Failed to generate video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     } catch (error) {
-        console.error("Video generation failed:", error);
-        throw new Error(`Failed to generate video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('Pipeline video generation failed:', error);
+        throw new Error(`Pipeline video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }

@@ -72,17 +72,40 @@ const FetchStockVideosOutputSchema = z.object({
 export type FetchStockVideosOutput = z.infer<typeof FetchStockVideosOutputSchema>;
 
 export async function fetchStockVideos(input: FetchStockVideosInput): Promise<FetchStockVideosOutput> {
-  // For consistency with current implementation while fixing the API issue
-  // We're using a standardized fallback approach
-  return {
-    videos: [
-      {
-        id: `video-${Date.now()}`,
-        url: 'https://example.com/video-' + input.searchTerm.replace(/\s+/g, '-') + '.mp4',
-        thumbnail: 'https://example.com/thumb-' + input.searchTerm.replace(/\s+/g, '-') + '.jpg',
-        description: 'Professional footage of ' + input.searchTerm,
-        photographer: 'Stock Media Library'
-      }
-    ]
-  };
+  try {
+    // Use the Pexels video search tool
+    const { searchPexelsVideosTool } = await import('../tools/pexels-video-tool');
+
+    const videos = await searchPexelsVideosTool({
+      query: input.searchTerm,
+      perPage: 5, // Limit to 5 results for better UX
+    });
+
+    // Transform the Pexels response to our expected format
+    const transformedVideos: StockVideoResult[] = videos.map(video => ({
+      id: video.id.toString(),
+      url: video.videoUrl,
+      thumbnail: video.thumbnail,
+      description: `Professional footage of ${input.searchTerm}`,
+      photographer: video.photographer,
+    }));
+
+    return {
+      videos: transformedVideos
+    };
+  } catch (error) {
+    console.error('Failed to fetch stock videos:', error);
+    // Fallback to placeholder data if API fails
+    return {
+      videos: [
+        {
+          id: `fallback-${Date.now()}`,
+          url: 'https://placehold.co/1920x1080/000000/FFFFFF.mp4',
+          thumbnail: 'https://placehold.co/400x300/000000/FFFFFF.png',
+          description: `Placeholder for ${input.searchTerm}`,
+          photographer: 'Fallback Media'
+        }
+      ]
+    };
+  }
 }
