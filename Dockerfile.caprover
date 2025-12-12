@@ -1,0 +1,89 @@
+# Use Node.js 18 slim (Debian-based) for better OpenSSL compatibility
+FROM node:18-slim AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+WORKDIR /app
+
+# Install system dependencies for Prisma and other tools
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    wget \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install dependencies including devDependencies for build
+RUN npm ci --omit=dev
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Install system dependencies for Prisma
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build the application with increased memory limit
+ENV NODE_OPTIONS="--max-old-space-size=6144"
+RUN npm run build
+
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+# Uncomment the following line in case you want to disable telemetry during runtime.
+# ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Install system dependencies for Prisma and PostgreSQL client
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy public directory if it exists, otherwise create an empty one
+RUN mkdir -p ./public
+RUN cp -r /app/public/* ./public/ 2>/dev/null || true
+
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy Prisma files
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copy startup script and fallback seed
+COPY --from=builder /app/startup.sh ./startup.sh
+COPY --from=builder /app/seed-fallback.sql ./seed-fallback.sql
+RUN chmod +x ./startup.sh
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Use the startup script as the entrypoint
+CMD ["./startup.sh"]

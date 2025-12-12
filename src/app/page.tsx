@@ -16,10 +16,18 @@ export default function LandingPage() {
     }
 
     if (status === 'authenticated') {
-        // Post-login redirects are now handled server-side in the AuthLayout
-        // This component just handles the initial unauthenticated case.
-        return;
-    } 
+      // Redirect authenticated users based on role and onboarding status
+      if (session?.user?.role === 'SUPER_ADMIN') {
+        router.replace('/chin/dashboard');
+      } else if (session?.user?.role === 'ADMIN') {
+        router.replace('/kanri/dashboard');
+      } else if (session?.user?.onboardingComplete) {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/dashboard/onboarding');
+      }
+      return;
+    }
     
     if (status === 'unauthenticated') {
       router.replace('/login');
