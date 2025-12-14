@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && NODE_OPTIONS=\"--max-old-space-size=8192\" next build",
     "start": "next start",
     "genkit:dev": "genkit start -- tsx src/ai/dev-index.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev-index.ts",
