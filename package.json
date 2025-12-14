@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && NODE_OPTIONS=\"--max-old-space-size=8192\" next build",
+    "build": "prisma generate && cross-env NODE_OPTIONS=\"--max-old-space-size=8192\" next build",
     "start": "next start",
     "genkit:dev": "genkit start -- tsx src/ai/dev-index.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev-index.ts",
@@ -100,6 +100,7 @@
     "@types/react-dom": "^18",
     "@types/wav": "^1.0.3",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "dotenv": "^16.5.0",
     "genkit-cli": "1.9.0",
     "postcss": "^8",
