@@ -54,7 +54,8 @@ export async function generateAutomationWorkflowAction(prevState: any, formData:
             ]
         });
 
-        const content = response.result?.content?.[0]?.text;
+        const responseAny = response as any;
+        const content = responseAny.result?.content?.[0]?.text || responseAny.text?.();
 
         if (!content) {
             return { message: 'Failed to generate workflow: No content returned', workflow: null, errors: {} };
@@ -258,11 +259,15 @@ export async function generatePersonaAvatarAction(prevState: any, formData: Form
 }
 
 export async function generateScriptAction(prevState: any, formData: FormData) {
+    const topic = formData.get('prompt') as string;
+    const style = (formData.get('videoType') as string) || 'default';
+    const tone = (formData.get('tone') as string) || 'professional';
+    const length = (formData.get('duration') as string) || '2 minutes';
     const input = {
-        topic: formData.get('prompt') as string,
-        style: (formData.get('videoType') as string) || undefined,
-        tone: (formData.get('tone') as string) || undefined,
-        length: (formData.get('duration') as string) || undefined,
+        topic,
+        style,
+        tone,
+        length,
     };
 
     if (!input.topic) {
@@ -325,13 +330,15 @@ export async function supportChatAction(prevState: any, formData: FormData) {
 
 export async function researchVideoTopicAction(prevState: any, formData: FormData) {
     const topic = formData.get('topic') as string;
+    const platform = (formData.get('platform') as string) || 'YouTube';
+    const audience = (formData.get('audience') as string) || undefined;
 
     if (!topic) {
         return { message: 'Topic is required', ideas: [], errors: { topic: ['Topic is required'] } };
     }
 
     try {
-        const result = await researchVideoTopic({ topic });
+        const result = await researchVideoTopic({ topic, platform, audience });
         return {
             message: 'success',
             ideas: result.titleIdeas,
