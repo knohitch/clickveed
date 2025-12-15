@@ -15,8 +15,8 @@ import { createVoiceCloneAction } from '@/lib/actions';
 
 const initialState = {
   message: '',
-  result: undefined,
-  errors: {},
+  result: null as any,
+  errors: {} as { voiceName?: string[]; fileUrls?: string[] },
 };
 
 export function VoiceCloningStudio() {
