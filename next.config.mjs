@@ -7,6 +7,12 @@ const nextConfig = {
             // Exclude bcrypt from client-side bundle
             config.externals.push('bcryptjs');
         }
+        // Suppress critical dependency warnings for @opentelemetry instrumentation
+        config.ignoreWarnings = [
+            { module: /@opentelemetry\/instrumentation/ },
+            { module: /require-in-the-middle/ },
+            { module: /handlebars/ },
+        ];
         return config;
     },
     // Production optimizations

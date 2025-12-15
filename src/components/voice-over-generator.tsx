@@ -15,7 +15,13 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
 
-const initialState = {
+type VoiceOverActionState = {
+  message: string;
+  audio: string | null;
+  errors: Record<string, any>;
+};
+
+const initialState: VoiceOverActionState = {
   message: '',
   audio: null,
   errors: {},
@@ -72,7 +78,7 @@ function VoiceSelector({ name, defaultValue, onValueChange }: { name: string, de
 }
 
 export function VoiceOverGenerator() {
-  const [state, formAction] = useFormState(generateVoiceOverAction, initialState);
+  const [state, formAction] = useFormState<VoiceOverActionState, FormData>(generateVoiceOverAction, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const [audio, setAudio] = useState<string | null>(null);
