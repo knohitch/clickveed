@@ -109,39 +109,8 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
              if (session.mode === 'subscription' && session.metadata?.userId) {
                 const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
                 const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-                
-                // Get user and plan details for email notification
-                const user = await prisma.user.findUnique({ 
-                    where: { id: session.metadata.userId },
-                    include: { plan: true }
-                });
-                
-                if (user && user.plan) {
-                    // Send email to user about subscription activation
-                    const adminSettings = await getAdminSettings();
-                    await sendEmail({
-                        to: user.email!,
-                        templateKey: 'subscriptionActivated',
-                        data: {
-                            appName: adminSettings.appName,
-                            userName: user.displayName || 'User',
-                            planName: user.plan.name,
-                        }
-                    });
-                    
-                    // Send email to admin about new subscription
-                    await sendEmail({
-                        to: 'admin',
-                        templateKey: 'adminNewUser',
-                        data: {
-                            appName: adminSettings.appName,
-                            userEmail: user.email!,
-                            userName: user.displayName || 'User',
-                            planName: user.plan.name,
-                        }
-                    });
-                }
-                
+
+                // First, update the user with the new plan
                 await upsertUser({
                     id: session.metadata.userId,
                     email: session.customer_details?.email!,
@@ -152,6 +121,43 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                     stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
                     planId: session.metadata.planId,
                 });
+
+                // Now get the updated user with NEW plan details for email notification
+                const updatedUser = await prisma.user.findUnique({
+                    where: { id: session.metadata.userId },
+                    include: { plan: true }
+                });
+
+                if (updatedUser && updatedUser.plan) {
+                    // Send email to user about subscription activation with NEW plan name
+                    const adminSettings = await getAdminSettings();
+                    try {
+                        await sendEmail({
+                            to: updatedUser.email!,
+                            templateKey: 'subscriptionActivated',
+                            data: {
+                                appName: adminSettings.appName,
+                                userName: updatedUser.displayName || 'User',
+                                planName: updatedUser.plan.name,
+                            }
+                        });
+
+                        // Send email to admin about new subscription
+                        await sendEmail({
+                            to: 'admin',
+                            templateKey: 'adminNewUser',
+                            data: {
+                                appName: adminSettings.appName,
+                                userEmail: updatedUser.email!,
+                                userName: updatedUser.displayName || 'User',
+                                planName: updatedUser.plan.name,
+                            }
+                        });
+                    } catch (emailError) {
+                        // Log but don't fail the webhook if email fails
+                        console.error('Failed to send subscription emails:', emailError);
+                    }
+                }
             }
             break;
         }

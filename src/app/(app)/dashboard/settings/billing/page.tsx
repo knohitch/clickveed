@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { AlertTriangle, CreditCard, User, ShieldQuestion, CheckCircle, Loader2, MessageSquare, HelpCircle } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAdminSettings } from "@/contexts/admin-settings-context";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
@@ -65,16 +65,38 @@ const PaymentProviderDialog = ({ plan, cycle, onSelectProvider, isRedirecting, a
 }
 
 export default function BillingPage() {
-    const { currentUser, subscriptionPlan, userPlanDetails } = useAuth();
+    const { currentUser, subscriptionPlan, userPlanDetails, refreshUser, refreshing } = useAuth();
     const { plans, promotions, apiKeys } = useAdminSettings();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
-    
+
     const [isRedirecting, setIsRedirecting] = useState(false);
-    
+
     const [billingCycles, setBillingCycles] = useState<Record<string, 'monthly' | 'quarterly' | 'yearly'>>({});
     const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<Plan | null>(null);
+    const [hasHandledPaymentSuccess, setHasHandledPaymentSuccess] = useState(false);
+
+    // Handle payment success - refresh user data to get new plan
+    useEffect(() => {
+        const paymentSuccess = searchParams.get('payment_success');
+        if (paymentSuccess === 'true' && !hasHandledPaymentSuccess) {
+            setHasHandledPaymentSuccess(true);
+            // Small delay to allow webhook to process
+            const refreshTimeout = setTimeout(async () => {
+                await refreshUser();
+                toast({
+                    title: "Payment Successful!",
+                    description: "Your subscription has been activated. Thank you for your purchase!",
+                });
+                // Clean up the URL
+                router.replace('/dashboard/settings/billing');
+            }, 2000);
+
+            return () => clearTimeout(refreshTimeout);
+        }
+    }, [searchParams, refreshUser, toast, router, hasHandledPaymentSuccess]);
 
     const availableProviders = useMemo((): Provider[] => {
         const providers: Provider[] = [];

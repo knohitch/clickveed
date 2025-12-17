@@ -98,6 +98,7 @@ model Plan {
   priceMonthly         Float
   priceQuarterly       Float
   priceYearly          Float
+  featureTier          String        @default("free") // free, starter, professional, enterprise - determines feature access
   videoExports         Int?          // Added
   aiCredits            Int?          // Added
   storageGB            Int?          // Added

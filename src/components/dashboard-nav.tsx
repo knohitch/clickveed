@@ -129,15 +129,19 @@ export function DashboardNav() {
     }
 
     // Filter menu sections based on user's plan
+    // Use featureTier if available (from Plan model), otherwise fall back to plan name
+    const planName = subscriptionPlan?.name || null;
+    const featureTier = (subscriptionPlan as any)?.featureTier || null;
+
     const filteredMenuSections = menuSections.filter(section => {
         if (!section.featureId) return true; // Always show sections without featureId
-        const featureAccess = checkFeatureAccess(subscriptionPlan?.name || null, section.featureId);
+        const featureAccess = checkFeatureAccess(planName, section.featureId, featureTier);
         return featureAccess.canAccess;
     }).map(section => ({
         ...section,
         items: section.items.filter(item => {
             if (!item.featureId) return true; // Always show items without featureId
-            const featureAccess = checkFeatureAccess(subscriptionPlan?.name || null, item.featureId);
+            const featureAccess = checkFeatureAccess(planName, item.featureId, featureTier);
             return featureAccess.canAccess;
         })
     })).filter(section => section.items.length > 0); // Only show sections that have accessible items
