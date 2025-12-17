@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { UserWithRole } from "@/server/actions/user-actions";
-import { getUsers, createPendingAdminUser } from "@/server/actions/user-actions";
+import { getUsers, createPendingAdminUser, approveUser, deleteUser } from "@/server/actions/user-actions";
 import { useSession } from "next-auth/react";
 
 const NewUserForm = ({ onUserAdded, closeDialog }: { onUserAdded: (newUser: UserWithRole) => void, closeDialog: () => void }) => {
@@ -125,16 +125,25 @@ export default function AdminUsersPage() {
         return '?';
     }
 
-    const handleApprove = (userId: string) => {
-        setUsers(users.map(u => u.id === userId ? {...u, status: 'Active'} : u));
-        const approvedUser = users.find(u => u.id === userId);
-        toast({
-            title: "User Approved",
-            description: `${approvedUser?.name || 'User'} has been approved and can now log in.`
-        });
+    const handleApprove = async (userId: string) => {
+        try {
+            await approveUser(userId);
+            setUsers(users.map(u => u.id === userId ? {...u, status: 'Active'} : u));
+            const approvedUser = users.find(u => u.id === userId);
+            toast({
+                title: "User Approved",
+                description: `${approvedUser?.name || 'User'} has been approved and can now log in.`
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: error.message || 'Failed to approve user.'
+            });
+        }
     }
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!userToDelete || userToDelete.id === session?.user?.id) {
             toast({
                 variant: 'destructive',
@@ -145,11 +154,20 @@ export default function AdminUsersPage() {
             return;
         }
 
-        setUsers(users.filter(u => u.id !== userToDelete.id));
-        toast({
-            title: "User Deleted",
-            description: `${userToDelete.name || 'The user'} has been removed from the system.`
-        });
+        try {
+            await deleteUser(userToDelete.id!);
+            setUsers(users.filter(u => u.id !== userToDelete.id));
+            toast({
+                title: "User Deleted",
+                description: `${userToDelete.name || 'The user'} has been removed from the system.`
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: error.message || 'Failed to delete user.'
+            });
+        }
         setUserToDelete(null);
     }
 

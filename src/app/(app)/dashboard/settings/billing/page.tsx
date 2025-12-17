@@ -113,6 +113,12 @@ export default function BillingPage() {
     }
 
     const handleChoosePlan = (plan: Plan) => {
+        // Don't allow purchasing free plans
+        if (plan.priceMonthly === 0) {
+            toast({ variant: 'destructive', title: 'Invalid Selection', description: 'Free plan does not require payment.' });
+            return;
+        }
+
         if (availableProviders.length === 0) {
             toast({ variant: 'destructive', title: 'Payments Not Configured', description: 'No payment providers are available. Please contact support.' });
             return;
@@ -226,13 +232,16 @@ export default function BillingPage() {
                                     ))}
                             </CardContent>
                             <CardFooter>
-                                <Button 
-                                    className="w-full" 
-                                    disabled={subscriptionPlan?.id === plan.id || isRedirecting}
+                                <Button
+                                    className="w-full"
+                                    disabled={subscriptionPlan?.id === plan.id || isRedirecting || plan.priceMonthly === 0}
                                     onClick={() => handleChoosePlan(plan)}
+                                    variant={plan.priceMonthly === 0 ? "secondary" : "default"}
                                 >
                                     {isRedirecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {subscriptionPlan?.id === plan.id ? 'Current Plan' : isRedirecting ? 'Processing...' : 'Choose Plan'}
+                                    {subscriptionPlan?.id === plan.id ? 'Current Plan' :
+                                     plan.priceMonthly === 0 ? 'Free Plan' :
+                                     isRedirecting ? 'Processing...' : 'Choose Plan'}
                                 </Button>
                             </CardFooter>
                         </Card>

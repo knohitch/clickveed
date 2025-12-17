@@ -17,15 +17,23 @@ interface SendEmailParams {
 export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
     const { emailSettings, emailTemplates, appName } = await getAdminSettings();
 
-    // Do not proceed if SMTP host is not configured
+    // Validate SMTP configuration before attempting to send
     if (!emailSettings.smtpHost) {
-        console.error(`SMTP is not configured. Cannot send email for template: ${templateKey}. Please configure SMTP settings in admin panel.`);
-        // In production, we should throw an error or handle this properly
-        // For now, we'll log the error but still attempt to send if there's any SMTP config
-        if (!emailSettings.smtpHost && !emailSettings.smtpUser) {
-            console.error('No SMTP configuration found. Email sending disabled.');
-            return;
-        }
+        const error = new Error('SMTP host is not configured. Please configure SMTP settings in admin panel.');
+        console.error(`SMTP is not configured. Cannot send email for template: ${templateKey}.`);
+        throw error;
+    }
+
+    if (!emailSettings.smtpUser || !emailSettings.smtpPass) {
+        const error = new Error('SMTP authentication credentials are not configured. Please configure SMTP username and password.');
+        console.error('SMTP credentials missing.');
+        throw error;
+    }
+
+    if (!emailSettings.fromAdminEmail) {
+        const error = new Error('From email address is not configured. Please set the sender email address.');
+        console.error('From email address missing.');
+        throw error;
     }
 
     const transporter = nodemailer.createTransport({
@@ -40,13 +48,14 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
 
     const template = emailTemplates[templateKey];
     if (!template) {
-        console.error(`Email template not found for key: ${templateKey}`);
-        return;
+        const error = new Error(`Email template not found for key: ${templateKey}`);
+        console.error(error.message);
+        throw error;
     }
-    
+
     // Determine the sender name: use fromName if set, otherwise default to appName
     const senderName = emailSettings.fromName || appName;
-    
+
     // Add appName to data if not already present
     const finalData = { appName, ...data };
 
@@ -73,7 +82,7 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
         console.log(`Email sent successfully to ${mailOptions.to} with template ${templateKey}`);
     } catch (error) {
         console.error(`Failed to send email with template ${templateKey}:`, error);
-        // Depending on requirements, you might want to throw the error
-        // or handle it silently. For now, we log it.
+        // Re-throw the error so callers can handle it appropriately
+        throw error;
     }
 }

@@ -97,42 +97,48 @@ export async function signUp(prevState: any, formData: FormData) {
             // Send verification email
             const { appName } = await getAdminSettings();
             const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${verificationToken}`;
-            
-            await sendEmail({
-                to: email,
-                templateKey: 'emailVerification',
-                data: {
-                    appName,
-                    name,
-                    verificationLink: verificationUrl,
-                }
-            });
-            
-            // Send signup confirmation email to user
-            await sendEmail({
-                to: email,
-                templateKey: 'userSignup',
-                data: {
-                    appName,
-                    name,
-                }
-            });
 
-            console.log(`User ${email} signed up successfully. Verification and confirmation emails sent.`);
-            
-            // Send notification to admin about new user signup
-            const adminSettings = await getAdminSettings();
-            await sendEmail({
-                to: 'admin',
-                templateKey: 'adminNewUser',
-                data: {
-                    appName: adminSettings.appName,
-                    userEmail: email,
-                    userName: name,
-                }
-            });
-            
-            return { success: true, error: '', isSuperAdmin: false };
+            let emailError = '';
+            try {
+                await sendEmail({
+                    to: email,
+                    templateKey: 'emailVerification',
+                    data: {
+                        appName,
+                        name,
+                        verificationLink: verificationUrl,
+                    }
+                });
+
+                // Send signup confirmation email to user
+                await sendEmail({
+                    to: email,
+                    templateKey: 'userSignup',
+                    data: {
+                        appName,
+                        name,
+                    }
+                });
+
+                console.log(`User ${email} signed up successfully. Verification and confirmation emails sent.`);
+
+                // Send notification to admin about new user signup
+                const adminSettings = await getAdminSettings();
+                await sendEmail({
+                    to: 'admin',
+                    templateKey: 'adminNewUser',
+                    data: {
+                        appName: adminSettings.appName,
+                        userEmail: email,
+                        userName: name,
+                    }
+                });
+            } catch (error: any) {
+                console.error('Failed to send signup emails:', error.message);
+                emailError = 'Account created but verification email could not be sent. Please contact support or check SMTP settings.';
+            }
+
+            return { success: true, error: emailError, isSuperAdmin: false };
         }
 
     } catch (error: any) {
@@ -236,7 +242,7 @@ export async function requestPasswordResetAction(prevState: any, formData: FormD
     if (!email) {
         return { error: 'Email is required.', success: false };
     }
-    
+
     try {
         const user = await prisma.user.findUnique({ where: { email } });
         if (user) {
@@ -248,22 +254,28 @@ export async function requestPasswordResetAction(prevState: any, formData: FormD
                 where: { email },
                 data: { passwordResetToken, passwordResetExpires },
             });
-            
+
             const { appName } = await getAdminSettings();
             const resetLink = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
-            
-            await sendEmail({
-                to: email,
-                templateKey: 'passwordReset',
-                data: {
-                    appName,
-                    name: user.displayName || 'User',
-                    resetLink: resetLink,
-                }
-            });
+
+            try {
+                await sendEmail({
+                    to: email,
+                    templateKey: 'passwordReset',
+                    data: {
+                        appName,
+                        name: user.displayName || 'User',
+                        resetLink: resetLink,
+                    }
+                });
+            } catch (emailError: any) {
+                console.error('Failed to send password reset email:', emailError.message);
+                // Return error since user needs the email to reset password
+                return { error: 'Password reset email could not be sent. Please contact support or try again later.', success: false };
+            }
         }
-        
-        // Always return success to prevent user enumeration
+
+        // Always return success to prevent user enumeration (if user doesn't exist)
         return { success: true, error: '' };
 
     } catch (e) {

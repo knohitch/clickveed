@@ -74,22 +74,30 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/dashboard') ||
       request.nextUrl.pathname.startsWith('/chin') ||
       request.nextUrl.pathname.startsWith('/kanri')) {
-    
+
     try {
       const session = await auth();
-      
+
       if (!session?.user) {
         // Redirect unauthenticated users to login
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('callbackUrl', request.url);
         return NextResponse.redirect(loginUrl);
       }
-      
+
+      // Check if user account is pending verification (but allow access to verify-pending page)
+      if (session.user.status === 'Pending' &&
+          !request.nextUrl.pathname.startsWith('/dashboard/verify-pending') &&
+          !request.nextUrl.pathname.startsWith('/dashboard/settings')) {
+        // Redirect pending users to verification pending page
+        return NextResponse.redirect(new URL('/dashboard/verify-pending', request.url));
+      }
+
       // Check role-based access
       if (request.nextUrl.pathname.startsWith('/chin') && session.user.role !== 'SUPER_ADMIN') {
         return NextResponse.redirect(new URL('/unauthorized', request.url));
       }
-      
+
       if (request.nextUrl.pathname.startsWith('/kanri') && session.user.role !== 'ADMIN') {
         return NextResponse.redirect(new URL('/unauthorized', request.url));
       }
