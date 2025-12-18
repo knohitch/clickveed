@@ -17,11 +17,14 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
+      email?: string | null;
+      name?: string | null;
+      image?: string | null;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
       status: string;
       emailVerified: boolean;
-    } & DefaultSession['user'];
+    };
   }
 
   interface User {
@@ -31,7 +34,7 @@ declare module 'next-auth' {
       image?: string | null;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
-      emailVerified?: Date | boolean | null;
+      emailVerified?: boolean | null;
       status?: string;
       passwordHash?: string;
   }
@@ -115,7 +118,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.status = token.status as string;
       }
       if (token.emailVerified !== undefined) {
-        session.user.emailVerified = token.emailVerified as boolean;
+        (session.user as any).emailVerified = token.emailVerified as boolean;
       }
       console.log('Session callback - user role:', session.user.role, 'status:', session.user.status);
       return session;

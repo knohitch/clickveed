@@ -62,8 +62,8 @@ export async function createCheckoutSession(
         customer: stripeCustomerId,
         line_items: [{ price: stripePriceId, quantity: 1 }],
         mode: 'subscription',
-        success_url: `${getURL()}/dashboard/settings?payment_success=true`,
-        cancel_url: `${getURL()}/dashboard/settings`,
+        success_url: `${getURL()}/dashboard/settings/billing?payment_success=true`,
+        cancel_url: `${getURL()}/dashboard/settings/billing`,
         metadata: { userId, planId, priceId: stripePriceId },
     });
 
