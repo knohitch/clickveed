@@ -260,6 +260,7 @@ model EmailSettings {
   id               Int    @id @default(1)
   smtpHost         String
   smtpPort         String
+  smtpSecure       String @default("auto") // auto, none, tls, ssl
   smtpUser         String
   smtpPass         String
   fromAdminEmail   String

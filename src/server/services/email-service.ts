@@ -36,10 +36,42 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
         throw error;
     }
 
+    // Determine secure/TLS settings based on smtpSecure option
+    const port = Number(emailSettings.smtpPort);
+    const smtpSecure = (emailSettings as any).smtpSecure || 'auto';
+
+    let secure: boolean;
+    let requireTLS: boolean | undefined;
+    let ignoreTLS: boolean | undefined;
+
+    switch (smtpSecure) {
+        case 'ssl':
+            // SSL/TLS on connection (typically port 465)
+            secure = true;
+            break;
+        case 'tls':
+            // STARTTLS upgrade (typically port 587)
+            secure = false;
+            requireTLS = true;
+            break;
+        case 'none':
+            // No encryption
+            secure = false;
+            ignoreTLS = true;
+            break;
+        case 'auto':
+        default:
+            // Auto-detect based on port
+            secure = port === 465;
+            break;
+    }
+
     const transporter = nodemailer.createTransport({
         host: emailSettings.smtpHost,
-        port: Number(emailSettings.smtpPort),
-        secure: Number(emailSettings.smtpPort) === 465, // true for 465, false for other ports
+        port: port,
+        secure: secure,
+        requireTLS: requireTLS,
+        ignoreTLS: ignoreTLS,
         auth: {
             user: emailSettings.smtpUser,
             pass: emailSettings.smtpPass,

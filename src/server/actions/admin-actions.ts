@@ -45,7 +45,7 @@ export async function getAdminSettings() {
 
         const defaultEmailSettings: EmailSettings = {
             id: 1,
-            smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+            smtpHost: '', smtpPort: '587', smtpSecure: 'auto', smtpUser: '', smtpPass: '',
             fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
             fromName: appName || 'AI Video Creator'
         };
@@ -107,7 +107,7 @@ export async function getAdminSettings() {
 function getDefaultSettings() {
     const defaultEmailSettings: EmailSettings = {
         id: 1,
-        smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+        smtpHost: '', smtpPort: '587', smtpSecure: 'auto', smtpUser: '', smtpPass: '',
         fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
         fromName: 'AI Video Creator'
     };

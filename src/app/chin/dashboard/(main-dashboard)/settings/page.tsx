@@ -13,6 +13,7 @@ import React, { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import type { ApiKeys, EmailSettings } from "@/contexts/admin-settings-context";
 import { sendTestEmail } from "@/server/actions/admin-actions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AdminSettingsPage() {
     const { 
@@ -242,7 +243,7 @@ export default function AdminSettingsPage() {
                     <CardDescription>Configure how the application sends emails for notifications, password resets, etc.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                             <Label htmlFor="smtpHost">SMTP Host</Label>
                             <Input id="smtpHost" name="smtpHost" placeholder="smtp.example.com" value={localSettings.emailSettings.smtpHost} onChange={(e) => handleNestedChange('emailSettings', e)} />
@@ -250,6 +251,27 @@ export default function AdminSettingsPage() {
                         <div className="space-y-2">
                             <Label htmlFor="smtpPort">SMTP Port</Label>
                             <Input id="smtpPort" name="smtpPort" type="number" placeholder="587" value={localSettings.emailSettings.smtpPort} onChange={(e) => handleNestedChange('emailSettings', e)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="smtpSecure">Connection Security</Label>
+                            <Select
+                                value={localSettings.emailSettings.smtpSecure || 'auto'}
+                                onValueChange={(value) => setLocalSettings(prev => ({
+                                    ...prev,
+                                    emailSettings: { ...prev.emailSettings, smtpSecure: value }
+                                }))}
+                            >
+                                <SelectTrigger id="smtpSecure">
+                                    <SelectValue placeholder="Select security type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="auto">Auto (based on port)</SelectItem>
+                                    <SelectItem value="tls">STARTTLS (port 587)</SelectItem>
+                                    <SelectItem value="ssl">SSL/TLS (port 465)</SelectItem>
+                                    <SelectItem value="none">None (not recommended)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">Choose TLS for port 587, SSL for port 465</p>
                         </div>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

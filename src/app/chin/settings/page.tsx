@@ -26,6 +26,7 @@ export default function ChinSettingsPage() {
         emailSettings: {
             smtpHost: 'smtp.example.com',
             smtpPort: '587',
+            smtpSecure: 'auto',
             smtpUser: 'user@example.com',
             smtpPass: '••••••••',
             fromAdminEmail: 'noreply@example.com',
@@ -63,6 +64,7 @@ export default function ChinSettingsPage() {
             ...prev.emailSettings,
             smtpHost: adminSettings.emailSettings?.smtpHost || prev.emailSettings.smtpHost,
             smtpPort: adminSettings.emailSettings?.smtpPort || prev.emailSettings.smtpPort,
+            smtpSecure: (adminSettings.emailSettings as any)?.smtpSecure || prev.emailSettings.smtpSecure,
             smtpUser: adminSettings.emailSettings?.smtpUser || prev.emailSettings.smtpUser,
             smtpPass: adminSettings.emailSettings?.smtpPass || prev.emailSettings.smtpPass,
             fromName: adminSettings.emailSettings?.fromName || prev.emailSettings.fromName,
@@ -246,6 +248,7 @@ export default function ChinSettingsPage() {
         id: 1,
         smtpHost: settings.emailSettings.smtpHost,
         smtpPort: settings.emailSettings.smtpPort,
+        smtpSecure: settings.emailSettings.smtpSecure || 'auto',
         smtpUser: settings.emailSettings.smtpUser,
         smtpPass: settings.emailSettings.smtpPass,
         fromAdminEmail: settings.emailSettings.fromAdminEmail,
