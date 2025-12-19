@@ -3,7 +3,6 @@ import { Nunito, Poppins } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import ClientLayout from '@/components/client-layout';
-import { getAdminSettings } from '@/server/actions/admin-actions';
 
 const nunito = Nunito({
   subsets: ['latin'],
@@ -18,27 +17,10 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  // Only generate dynamic metadata if DATABASE_URL is available (runtime)
-  if (process.env.DATABASE_URL) {
-    try {
-      const { appName } = await getAdminSettings();
-      return {
-        title: appName,
-        description: 'The All-in-One AI Video Creation Suite',
-      };
-    } catch (error) {
-      // Fallback on database errors during build time
-      console.warn('Failed to fetch dynamic metadata:', error);
-    }
-  }
-
-  // Fallback static metadata for build time
-  return {
-    title: 'ClickVid',
-    description: 'The All-in-One AI Video Creation Suite',
-  };
-}
+export const metadata: Metadata = {
+  title: 'ClickVid',
+  description: 'The All-in-One AI Video Creation Suite',
+};
 
 export default function RootLayout({
   children,
