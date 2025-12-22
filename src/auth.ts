@@ -17,9 +17,14 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
+      email?: string | null;
+      name?: string | null;
+      image?: string | null;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
-    } & DefaultSession['user'];
+      status: string;
+      emailVerified: boolean;
+    };
   }
 
   interface User {
@@ -29,7 +34,7 @@ declare module 'next-auth' {
       image?: string | null;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
-      emailVerified?: Date | null;
+      emailVerified?: boolean | null;
       status?: string;
       passwordHash?: string;
   }
@@ -37,9 +42,11 @@ declare module 'next-auth' {
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id: string
+    id: string;
     role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
     onboardingComplete: boolean;
+    status: string;
+    emailVerified: boolean;
   }
 }
 
@@ -72,6 +79,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = user.role;
         token.onboardingComplete = user.onboardingComplete;
+        token.status = user.status || 'Pending';
+        token.emailVerified = typeof user.emailVerified === 'boolean' ? user.emailVerified : !!user.emailVerified;
       }
 
       // If the session is updated (e.g., name change, onboarding completion),
@@ -83,8 +92,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (session.onboardingComplete !== undefined) {
           token.onboardingComplete = session.onboardingComplete;
         }
+        if (session.status !== undefined) {
+          token.status = session.status;
+        }
+        if (session.emailVerified !== undefined) {
+          token.emailVerified = session.emailVerified;
+        }
       }
-      
+
       return token;
     },
 
@@ -99,7 +114,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.onboardingComplete !== undefined) {
         session.user.onboardingComplete = token.onboardingComplete as boolean;
       }
-      console.log('Session callback - user role:', session.user.role);
+      if (token.status !== undefined) {
+        session.user.status = token.status as string;
+      }
+      if (token.emailVerified !== undefined) {
+        (session.user as any).emailVerified = token.emailVerified as boolean;
+      }
+      console.log('Session callback - user role:', session.user.role, 'status:', session.user.status);
       return session;
     },
   },
@@ -144,7 +165,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.displayName || '',
             role: user.role,
             onboardingComplete: user.onboardingComplete || false,
-            status: user.status
+            status: user.status,
+            emailVerified: user.emailVerified || false
           };
         } catch (error) {
           console.error('Authorization error:', error);

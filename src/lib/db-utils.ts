@@ -88,6 +88,7 @@ export async function findUserForAuth(
   role: string;
   onboardingComplete: boolean | null;
   status: string | null;
+  emailVerified: boolean | null;
 } | null> {
   return withTimeout(
     withRetry(
@@ -100,7 +101,8 @@ export async function findUserForAuth(
           passwordHash: true,
           role: true,
           onboardingComplete: true,
-          status: true
+          status: true,
+          emailVerified: true
         }
       }),
       1, // Reduce retries for auth operations

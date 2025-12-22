@@ -14,6 +14,7 @@ export interface EmailSettings {
   id: number;
   smtpHost: string;
   smtpPort: string;
+  smtpSecure: string; // auto, none, tls, ssl
   smtpUser: string;
   smtpPass: string;
   fromAdminEmail: string;
@@ -91,7 +92,7 @@ export function useAdminSettings() {
 
 const defaultEmailSettings: EmailSettings = {
     id: 1,
-    smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+    smtpHost: '', smtpPort: '587', smtpSecure: 'auto', smtpUser: '', smtpPass: '',
     fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com', fromName: ''
 };
 

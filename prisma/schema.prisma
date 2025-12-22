@@ -98,6 +98,7 @@ model Plan {
   priceMonthly         Float
   priceQuarterly       Float
   priceYearly          Float
+  featureTier          String        @default("free") // free, starter, professional, enterprise - determines feature access
   videoExports         Int?          // Added
   aiCredits            Int?          // Added
   storageGB            Int?          // Added
@@ -259,6 +260,7 @@ model EmailSettings {
   id               Int    @id @default(1)
   smtpHost         String
   smtpPort         String
+  smtpSecure       String @default("auto") // auto, none, tls, ssl
   smtpUser         String
   smtpPass         String
   fromAdminEmail   String

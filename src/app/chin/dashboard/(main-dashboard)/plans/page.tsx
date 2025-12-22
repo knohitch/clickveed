@@ -28,6 +28,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { plan: Plan; onEdit: (plan: Plan) => void; onDelete: (planId: string) => void, isPopular: boolean, isDeletable: boolean }) => {
     
@@ -114,17 +115,28 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { plan: Pl
     );
 };
 
+const featureTierOptions = [
+    { value: 'free', label: 'Free - Basic features only' },
+    { value: 'starter', label: 'Starter - Includes analytics & brand kit' },
+    { value: 'professional', label: 'Professional - Voice, video generation & AI agents' },
+    { value: 'enterprise', label: 'Enterprise - All features including voice cloning' },
+];
+
 const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSave: (plan: Plan) => void, onCancel: () => void }) => {
     const [name, setName] = React.useState(plan?.name || '');
     const [description, setDescription] = React.useState(plan?.description || '');
     const [priceMonthly, setPriceMonthly] = React.useState(plan?.priceMonthly ? String(plan.priceMonthly) : '0');
     const [priceQuarterly, setPriceQuarterly] = React.useState(plan?.priceQuarterly ? String(plan.priceQuarterly) : '0');
     const [priceYearly, setPriceYearly] = React.useState(plan?.priceYearly ? String(plan.priceYearly) : '0');
+    const [featureTier, setFeatureTier] = React.useState((plan as any)?.featureTier || 'free');
+    const [stripePriceIdMonthly, setStripePriceIdMonthly] = React.useState(plan?.stripePriceIdMonthly || '');
+    const [stripePriceIdQuarterly, setStripePriceIdQuarterly] = React.useState(plan?.stripePriceIdQuarterly || '');
+    const [stripePriceIdYearly, setStripePriceIdYearly] = React.useState(plan?.stripePriceIdYearly || '');
     const [features, setFeatures] = React.useState(plan?.features?.map(f => f.text).join('\n') || '');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         const planId = plan?.id || `plan_${Date.now()}`;
         const newFeaturesList = features.split('\n').filter(f => f.trim() !== '');
 
@@ -136,7 +148,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                 planId: planId,
             };
         });
-        
+
         const finalPlan: Plan = {
             id: planId,
             name,
@@ -144,6 +156,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             priceMonthly: Number(priceMonthly),
             priceQuarterly: Number(priceQuarterly),
             priceYearly: Number(priceYearly),
+            featureTier: featureTier,
             features: finalFeatures,
             createdAt: plan?.createdAt || new Date(),
             updatedAt: new Date(),
@@ -151,15 +164,15 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             aiCredits: plan?.aiCredits ?? null,
             storageGB: plan?.storageGB ?? null,
             stripeProductId: plan?.stripeProductId ?? null,
-            stripePriceIdMonthly: plan?.stripePriceIdMonthly ?? null,
-            stripePriceIdQuarterly: plan?.stripePriceIdQuarterly ?? null,
-            stripePriceIdYearly: plan?.stripePriceIdYearly ?? null,
-        };
+            stripePriceIdMonthly: stripePriceIdMonthly || null,
+            stripePriceIdQuarterly: stripePriceIdQuarterly || null,
+            stripePriceIdYearly: stripePriceIdYearly || null,
+        } as Plan;
         onSave(finalPlan);
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
             <div className="space-y-2">
                 <Label htmlFor="planName">Plan Name</Label>
                 <Input id="planName" value={name} onChange={e => setName(e.target.value)} required />
@@ -167,6 +180,22 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Input id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="A short description of this plan." required />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="featureTier">Feature Access Tier</Label>
+                <Select value={featureTier} onValueChange={setFeatureTier}>
+                    <SelectTrigger id="featureTier">
+                        <SelectValue placeholder="Select feature tier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {featureTierOptions.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Determines which features users on this plan can access.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -182,6 +211,26 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                     <Input id="priceYearly" type="number" step="0.01" min="0" value={priceYearly} onChange={e => setPriceYearly(e.target.value)} required />
                 </div>
             </div>
+            <Separator />
+            <div className="space-y-2">
+                <Label className="text-sm font-semibold">Stripe Price IDs</Label>
+                <p className="text-xs text-muted-foreground mb-2">Required for payments. Get these from your Stripe Dashboard → Products → Price IDs.</p>
+                <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1">
+                        <Label htmlFor="stripePriceIdMonthly" className="text-xs">Monthly Price ID</Label>
+                        <Input id="stripePriceIdMonthly" value={stripePriceIdMonthly} onChange={e => setStripePriceIdMonthly(e.target.value)} placeholder="price_..." />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="stripePriceIdQuarterly" className="text-xs">Quarterly Price ID</Label>
+                        <Input id="stripePriceIdQuarterly" value={stripePriceIdQuarterly} onChange={e => setStripePriceIdQuarterly(e.target.value)} placeholder="price_..." />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="stripePriceIdYearly" className="text-xs">Yearly Price ID</Label>
+                        <Input id="stripePriceIdYearly" value={stripePriceIdYearly} onChange={e => setStripePriceIdYearly(e.target.value)} placeholder="price_..." />
+                    </div>
+                </div>
+            </div>
+            <Separator />
              <div className="space-y-2">
                 <Label htmlFor="features">Features (one per line)</Label>
                 <Textarea id="features" value={features} onChange={e => setFeatures(e.target.value)} rows={6} placeholder="Enter each feature on a new line." required />

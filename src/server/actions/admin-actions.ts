@@ -45,7 +45,7 @@ export async function getAdminSettings() {
 
         const defaultEmailSettings: EmailSettings = {
             id: 1,
-            smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+            smtpHost: '', smtpPort: '587', smtpSecure: 'auto', smtpUser: '', smtpPass: '',
             fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
             fromName: appName || 'AI Video Creator'
         };
@@ -107,7 +107,7 @@ export async function getAdminSettings() {
 function getDefaultSettings() {
     const defaultEmailSettings: EmailSettings = {
         id: 1,
-        smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+        smtpHost: '', smtpPort: '587', smtpSecure: 'auto', smtpUser: '', smtpPass: '',
         fromAdminEmail: 'noreply@example.com', fromSupportEmail: 'support@example.com',
         fromName: 'AI Video Creator'
     };
@@ -156,7 +156,7 @@ export async function updatePlans(plans: Plan[]) {
     const existingPlans = await prisma.plan.findMany();
     const existingPlanIds = existingPlans.map(p => p.id);
     const newPlanIds = plans.map(p => p.id);
-    
+
     // Delete plans that are no longer in the new list
     const plansToDelete = existingPlanIds.filter(id => !newPlanIds.includes(id));
     if (plansToDelete.length > 0) {
@@ -164,17 +164,26 @@ export async function updatePlans(plans: Plan[]) {
             where: { id: { in: plansToDelete } }
         });
     }
-    
+
     // Upsert the remaining plans
     for (const plan of plans) {
+        // Include all plan fields including featureTier and Stripe Price IDs
         const planData = {
             name: plan.name,
             description: plan.description,
             priceMonthly: plan.priceMonthly,
             priceQuarterly: plan.priceQuarterly,
             priceYearly: plan.priceYearly,
+            featureTier: (plan as any).featureTier || 'free',
+            stripePriceIdMonthly: plan.stripePriceIdMonthly || null,
+            stripePriceIdQuarterly: plan.stripePriceIdQuarterly || null,
+            stripePriceIdYearly: plan.stripePriceIdYearly || null,
+            stripeProductId: plan.stripeProductId || null,
+            videoExports: plan.videoExports ?? null,
+            aiCredits: plan.aiCredits ?? null,
+            storageGB: plan.storageGB ?? null,
         };
-        
+
         await prisma.plan.upsert({
             where: { id: plan.id },
             update: {

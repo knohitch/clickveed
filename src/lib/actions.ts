@@ -17,6 +17,38 @@ import { findViralClips as findViralClipsFlow } from '@/server/ai/flows/find-vir
 import { generatePipelineScript, generatePipelineVoiceOver, generatePipelineVideo } from '@/server/ai/flows/video-pipeline';
 import type { Message } from '@/lib/types';
 import { z } from 'zod';
+import { auth } from '@/auth';
+import prisma from '@/server/prisma';
+import { checkFeatureAccess, getMinimumPlanForFeature } from '@/lib/feature-access';
+
+/**
+ * Helper function to verify feature access for the current user
+ * Throws an error if the user doesn't have access to the feature
+ */
+async function verifyFeatureAccess(featureId: string): Promise<void> {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new Error('Authentication required');
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { plan: true }
+    });
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const planName = user.plan?.name || null;
+    const featureTier = user.plan?.featureTier || null;
+    const access = checkFeatureAccess(planName, featureId, featureTier);
+
+    if (!access.canAccess) {
+        const requiredPlan = getMinimumPlanForFeature(featureId);
+        throw new Error(`${access.featureName} requires a ${requiredPlan} plan or higher. Please upgrade your subscription.`);
+    }
+}
 
 export const findViralClips = findViralClipsFlow;
 
@@ -42,6 +74,8 @@ export async function generateAutomationWorkflowAction(prevState: any, formData:
     const { prompt, platform } = validatedFields.data;
 
     try {
+        // Check feature access for AI agents
+        await verifyFeatureAccess('ai-agents');
         const systemPrompt = `You are an expert automation engineer specializing in ${platform}.
     Create a JSON representation of a workflow that accomplishes the following task: "${prompt}".
     Return ONLY validity JSON code for the workflow. Do not include any markdown formatting, explanations, or code blocks.
@@ -104,6 +138,9 @@ export async function removeImageBackgroundAction(prevState: any, formData: Form
     }
 
     try {
+        // Check feature access for background remover
+        await verifyFeatureAccess('background-remover');
+
         const result = await removeImageBackground({
             imageUrl: validatedFields.data.imageUrl
         });
@@ -210,6 +247,9 @@ export async function generateVideoAction(prevState: any, formData: FormData) {
     }
 
     try {
+        // Check feature access for image-to-video
+        await verifyFeatureAccess('image-to-video');
+
         const result = await generateVideoFromImage(input);
         return {
             message: 'success',
@@ -241,6 +281,9 @@ export async function generatePersonaAvatarAction(prevState: any, formData: Form
     }
 
     try {
+        // Check feature access for persona studio
+        await verifyFeatureAccess('persona-studio');
+
         const result = await generatePersonaAvatar(input);
         return {
             message: 'success',
@@ -275,6 +318,9 @@ export async function generateScriptAction(prevState: any, formData: FormData) {
     }
 
     try {
+        // Check feature access for script generator
+        await verifyFeatureAccess('script-generator');
+
         const result = await generateVideoScript(input);
         return {
             message: 'success',
@@ -338,6 +384,9 @@ export async function researchVideoTopicAction(prevState: any, formData: FormDat
     }
 
     try {
+        // Check feature access for topic researcher
+        await verifyFeatureAccess('topic-researcher');
+
         const result = await researchVideoTopic({ topic, platform, audience });
         return {
             message: 'success',
@@ -361,6 +410,9 @@ export async function createVoiceCloneAction(prevState: any, formData: FormData)
     if (!fileUrls.length) return { message: 'Audio samples required', result: null, errors: { fileUrls: ['Required'] } };
 
     try {
+        // Check feature access for voice cloning (Enterprise only)
+        await verifyFeatureAccess('voice-cloning');
+
         const result = await createVoiceClone({ voiceName, fileUrls });
         return {
             message: 'success',
@@ -398,6 +450,9 @@ export async function generateVoiceOverAction(prevState: any, formData: FormData
     } catch (e) { }
 
     try {
+        // Check feature access for voice over
+        await verifyFeatureAccess('voice-over');
+
         const result = await generateVoiceOver({ script, speakers });
         return {
             message: 'success',
@@ -442,6 +497,9 @@ export async function analyzeThumbnailsAction(prevState: any, formData: FormData
     }
 
     try {
+        // Check feature access for thumbnail tester
+        await verifyFeatureAccess('thumbnail-tester');
+
         // Helper to convert File to Data URI
         const fileToDataUri = async (file: File) => {
             const arrayBuffer = await file.arrayBuffer();
@@ -478,6 +536,9 @@ export async function generateStockMediaAction(prevState: any, formData: FormDat
     if (!prompt) return { message: 'Prompt required', images: [], errors: { prompt: ['Required'] } };
 
     try {
+        // Check feature access for stock media
+        await verifyFeatureAccess('stock-media');
+
         const result = await generateStockMedia({ prompt });
         return {
             message: 'success',
@@ -504,6 +565,9 @@ export async function generatePipelineScriptAction(prevState: any, formData: For
     if (!input.prompt) return { message: 'Prompt required', script: null, errors: {} };
 
     try {
+        // Check feature access for video pipeline
+        await verifyFeatureAccess('video-pipeline');
+
         const result = await generatePipelineScript(input);
         return {
             message: 'success',
@@ -526,6 +590,9 @@ export async function generatePipelineVoiceOverAction(prevState: any, formData: 
     if (!script) return { message: 'Script required', audio: null, errors: {} };
 
     try {
+        // Check feature access for voice over
+        await verifyFeatureAccess('voice-over');
+
         const result = await generatePipelineVoiceOver({ script, voice });
         return {
             message: 'success',
@@ -547,6 +614,9 @@ export async function generatePipelineVideoAction(prevState: any, formData: Form
     if (!script) return { message: 'Script required', video: null, errors: {} };
 
     try {
+        // Check feature access for video pipeline
+        await verifyFeatureAccess('video-pipeline');
+
         const result = await generatePipelineVideo({ script });
         return {
             message: 'success',

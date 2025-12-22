@@ -206,6 +206,7 @@ export async function upsertBrandKit(data: BrandKit) {
 
 /**
  * Approves a pending user, changing their status from 'Pending' to 'Active'.
+ * Also sets emailVerified to true and sends a notification email.
  */
 export async function approveUser(userId: string) {
     const session = await auth();
@@ -225,10 +226,34 @@ export async function approveUser(userId: string) {
         throw new Error('User is not in pending status');
     }
 
+    // Update user status to Active and set emailVerified to true
     await prisma.user.update({
         where: { id: userId },
-        data: { status: 'Active' }
+        data: {
+            status: 'Active',
+            emailVerified: true
+        }
     });
+
+    // Send approval notification email to user
+    try {
+        const { sendEmail } = await import('@/server/services/email-service');
+        const { getAdminSettings } = await import('@/server/actions/admin-actions');
+        const { appName } = await getAdminSettings();
+
+        await sendEmail({
+            to: user.email!,
+            templateKey: 'emailVerification', // Using existing template, ideally create a dedicated 'accountApproved' template
+            data: {
+                appName,
+                name: user.displayName || 'User',
+                verificationLink: `${process.env.NEXTAUTH_URL}/login`, // Direct to login since they're approved
+            }
+        });
+    } catch (emailError) {
+        // Log but don't fail the approval if email fails
+        console.error('Failed to send approval notification email:', emailError);
+    }
 
     revalidatePath('/chin/dashboard/users');
     revalidatePath('/kanri/dashboard/users');
