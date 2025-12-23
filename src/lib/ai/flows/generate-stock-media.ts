@@ -9,7 +9,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
-import prisma from '@/lib/prisma';
+import prisma from '@lib/prisma';
 import { auth } from '@/auth';
 
 const GenerateStockMediaInputSchema = z.object({

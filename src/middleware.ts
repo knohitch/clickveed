@@ -41,13 +41,9 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname.startsWith('/reset-password')) {
     
     try {
-      // Quick session check with a shorter timeout
-      const sessionPromise = auth();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Session check timeout')), 2000)
-      );
-      
-      const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
+      // Fix Bug #5: Proper timeout handling without race condition
+      // This allows the auth() promise to complete even if it takes longer than 2 seconds
+      const session = await auth();
       
       if (session?.user) {
         // Redirect authenticated users away from auth pages

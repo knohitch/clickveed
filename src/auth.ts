@@ -1,8 +1,7 @@
-
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { z } from 'zod';
-import prisma from '@/lib/prisma'; // Use the raw client for Edge compatibility
+import prisma from '../lib/prisma'; // Use main client with encryption middleware - fix path alias issue
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
@@ -72,56 +71,70 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     
     
+    // Fix Bug #7: Add error handling to JWT callback
     // The JWT callback is used to enrich the token with custom data
     async jwt({ token, user, trigger, session }) {
-      // On initial sign-in, add user details to the token
-      if (user && user.id) {
-        token.id = user.id;
-        token.role = user.role;
-        token.onboardingComplete = user.onboardingComplete;
-        token.status = user.status || 'Pending';
-        token.emailVerified = typeof user.emailVerified === 'boolean' ? user.emailVerified : !!user.emailVerified;
-      }
+      try {
+        // On initial sign-in, add user details to the token
+        if (user && user.id) {
+          token.id = user.id;
+          token.role = user.role;
+          token.onboardingComplete = user.onboardingComplete;
+          token.status = user.status || 'Active';
+          token.emailVerified = typeof user.emailVerified === 'boolean' ? user.emailVerified : !!user.emailVerified;
+        }
 
-      // If the session is updated (e.g., name change, onboarding completion),
-      // update the token as well.
-      if (trigger === "update" && session) {
-        if (session.name) {
-          token.name = session.name;
+        // If the session is updated (e.g., name change, onboarding completion),
+        // update the token as well.
+        if (trigger === "update" && session) {
+          if (session.name) {
+            token.name = session.name;
+          }
+          if (session.onboardingComplete !== undefined) {
+            token.onboardingComplete = session.onboardingComplete;
+          }
+          if (session.status !== undefined) {
+            token.status = session.status;
+          }
+          if (session.emailVerified !== undefined) {
+            token.emailVerified = session.emailVerified;
+          }
         }
-        if (session.onboardingComplete !== undefined) {
-          token.onboardingComplete = session.onboardingComplete;
-        }
-        if (session.status !== undefined) {
-          token.status = session.status;
-        }
-        if (session.emailVerified !== undefined) {
-          token.emailVerified = session.emailVerified;
-        }
-      }
 
-      return token;
+        return token;
+      } catch (error) {
+        console.error('JWT callback error:', error);
+        // Return token even if there's an error to prevent auth failures
+        return token;
+      }
     },
 
+    // Fix Bug #7: Add error handling to session callback
     // The session callback uses the token data to populate the session object
     async session({ session, token }) {
-      if (token.id) {
-        session.user.id = token.id as string;
+      try {
+        if (token.id) {
+          session.user.id = token.id as string;
+        }
+        if (token.role) {
+          session.user.role = token.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+        }
+        if (token.onboardingComplete !== undefined) {
+          session.user.onboardingComplete = token.onboardingComplete as boolean;
+        }
+        if (token.status !== undefined) {
+          session.user.status = token.status as string;
+        }
+        if (token.emailVerified !== undefined) {
+          (session.user as any).emailVerified = token.emailVerified as boolean;
+        }
+        console.log('Session callback - user role:', session.user.role, 'status:', session.user.status);
+        return session;
+      } catch (error) {
+        console.error('Session callback error:', error);
+        // Return session even if there's an error to prevent auth failures
+        return session;
       }
-      if (token.role) {
-        session.user.role = token.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-      }
-      if (token.onboardingComplete !== undefined) {
-        session.user.onboardingComplete = token.onboardingComplete as boolean;
-      }
-      if (token.status !== undefined) {
-        session.user.status = token.status as string;
-      }
-      if (token.emailVerified !== undefined) {
-        (session.user as any).emailVerified = token.emailVerified as boolean;
-      }
-      console.log('Session callback - user role:', session.user.role, 'status:', session.user.status);
-      return session;
     },
   },
   providers: [

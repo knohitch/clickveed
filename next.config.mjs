@@ -26,18 +26,15 @@ const nextConfig = {
     images: {
         domains: ['cdn.sanity.io', 'res.cloudinary.com', 'images.unsplash.com']
     },
-    // Configure TypeScript for production
-    typescript: {
-        // !! WARN !!
-        // Dangerously allow production builds to successfully complete even if
-        // your project has type errors.
-        // !! WARN !!
-        ignoreBuildErrors: process.env.NODE_ENV === 'development'
-    },
-    // Configure ESLint for production
-    eslint: {
-        ignoreDuringBuilds: true
-    },
+  // Fix Bug #8: Enable strict build checks for production
+  typescript: {
+    // Only ignore build errors in development, not production
+    ignoreBuildErrors: process.env.NODE_ENV !== 'production'
+  },
+  // Fix Bug #8: Enable ESLint for production builds
+  eslint: {
+    ignoreDuringBuilds: process.env.NODE_ENV !== 'production'
+  },
     // Configure Next.js for production
     productionBrowserSourceMaps: false,
     // Disable automatic static optimization for better control

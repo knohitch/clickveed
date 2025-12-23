@@ -1,26 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToStorage } from '@/server/actions/storage-actions';
 import { auth } from '@/auth';
+import { 
+  createUnauthorizedError, 
+  createValidationError, 
+  createInternalError,
+  createSuccessResponse 
+} from '@/lib/error-response';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
+    // Fix Bug #9: Add proper authentication check
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json(createUnauthorizedError(), { status: 401 });
     }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
+    // Fix Bug #9: Add input validation
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json(createValidationError('No file provided'), { status: 400 });
     }
 
     // Validate file type
@@ -39,19 +40,13 @@ export async function POST(request: NextRequest) {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'File type not allowed' },
-        { status: 400 }
-      );
+      return NextResponse.json(createValidationError('File type not allowed'), { status: 400 });
     }
 
     // Validate file size (50MB limit)
     const maxSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: 'File size too large. Maximum 50MB allowed.' },
-        { status: 400 }
-      );
+      return NextResponse.json(createValidationError('File size too large. Maximum 50MB allowed.'), { status: 400 });
     }
 
     // Get optional metadata
@@ -74,23 +69,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Upload failed' },
-        { status: 500 }
-      );
+      return NextResponse.json(createInternalError(result.error || 'Upload failed'), { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result.data,
-      message: 'File uploaded successfully'
-    });
+    // Fix Bug #10: Use standardized success response
+    return NextResponse.json(createSuccessResponse(result.data, 'File uploaded successfully'), { status: 200 });
 
   } catch (error) {
     console.error('Upload API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json(createInternalError('Internal server error'), { status: 500 });
   }
 }

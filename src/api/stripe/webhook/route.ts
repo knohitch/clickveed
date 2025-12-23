@@ -4,7 +4,7 @@
 import { Stripe } from 'stripe';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from '@lib/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { upsertUser } from '@/server/actions/user-actions';
 

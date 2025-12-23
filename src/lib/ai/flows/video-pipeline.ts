@@ -11,7 +11,7 @@ import {z} from 'genkit';
 import wav from 'wav';
 import { getAvailableTTSProvider, getAvailableTextGenerator, getAvailableVideoGenerator, generateWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
-import prisma from '@/lib/prisma';
+import prisma from '@lib/prisma';
 import { auth } from '@/auth';
 
 // STEP 1: SCRIPT GENERATION =================================================

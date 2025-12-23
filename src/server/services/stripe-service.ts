@@ -1,8 +1,7 @@
-
 'use server';
 
 import { Stripe } from 'stripe';
-import prisma from '@/server/prisma';
+import prisma from '@lib/prisma';
 import { upsertUser } from '@/server/actions/user-actions';
 import { sendEmail } from './email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
@@ -13,6 +12,25 @@ const getURL = () => {
     return url;
 };
 
+// Fix Bug #6: Stripe singleton pattern
+// Create a single Stripe instance that is reused across all function calls
+let stripeInstance: Stripe | null = null;
+
+async function getStripeInstance(): Promise<Stripe> {
+    if (!stripeInstance) {
+        const { apiKeys } = await getAdminSettings();
+        const stripeSecretKey = apiKeys.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+        
+        if (!stripeSecretKey) {
+            throw new Error('Stripe secret key not configured in admin settings or environment variables');
+        }
+        
+        stripeInstance = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+    }
+    
+    return stripeInstance;
+}
+
 /**
  * Creates a Stripe Checkout session for a subscription.
  */
@@ -22,7 +40,8 @@ export async function createCheckoutSession(
     billingCycle: 'monthly' | 'quarterly' | 'yearly', 
     stripeSecretKey: string
 ) {
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+    // Fix Bug #6: Use singleton Stripe instance
+    const stripe = await getStripeInstance();
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found.');
@@ -74,12 +93,13 @@ export async function createCheckoutSession(
  * Creates a Stripe Customer Portal session.
  */
 export async function createCustomerPortalSession(userId: string, stripeSecretKey: string) {
+    // Fix Bug #6: Use singleton Stripe instance
+    const stripe = await getStripeInstance();
+
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.stripeCustomerId) {
         throw new Error('Stripe customer not found for this user.');
     }
-    
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
     
     const portalSession = await stripe.billingPortal.sessions.create({
         customer: user.stripeCustomerId,
@@ -94,20 +114,13 @@ export async function createCustomerPortalSession(userId: string, stripeSecretKe
  * Handles incoming Stripe webhook events.
  */
 export async function handleStripeWebhookEvent(event: Stripe.Event) {
-    // Get Stripe configuration from admin settings (preserves existing deployments)
-    const { apiKeys } = await getAdminSettings();
-    const stripeSecretKey = apiKeys.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
-    
-    if (!stripeSecretKey) {
-        console.error("Stripe secret key not configured in admin settings or environment variables");
-        throw new Error("Stripe not properly configured");
-    }
+    // Fix Bug #6: Use singleton Stripe instance
+    const stripe = await getStripeInstance();
 
     switch (event.type) {
         case 'checkout.session.completed': {
             const session = event.data.object as Stripe.Checkout.Session;
              if (session.mode === 'subscription' && session.metadata?.userId) {
-                const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
                 const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
 
                 // First, update the user with the new plan

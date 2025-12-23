@@ -1,20 +1,6 @@
+import prisma from '@lib/prisma';
 
-import { PrismaClient } from '@prisma/client'
-
-// This is the raw Prisma client, without Accelerate.
-// It is intended ONLY for use in Edge environments like middleware, where the
-// standard client with extensions is not compatible.
-const prismaClientSingleton = () => {
-  return new PrismaClient()
-}
-
-declare global {
-  // eslint-disable-next-line no-var
-  var prismaRaw: undefined | ReturnType<typeof prismaClientSingleton>
-}
-
-const prismaRaw = globalThis.prismaRaw ?? prismaClientSingleton()
-
-export default prismaRaw
-
-if (process.env.NODE_ENV !== 'production') globalThis.prismaRaw = prismaRaw
+// Fix Bug #3: Consolidate to single Prisma client
+// Import main prisma instance which has encryption middleware
+// This ensures consistent behavior and proper encryption across the app
+export default prisma;

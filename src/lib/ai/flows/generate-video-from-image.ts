@@ -12,7 +12,7 @@ import { z } from 'genkit';
 import wav from 'wav';
 import { getAvailableVideoGenerator, getAvailableTTSProvider, getAvailableTextGenerator } from '../api-service-manager';
 import { uploadToWasabi } from '@/lib/services/wasabi-service';
-import prisma from '@/lib/prisma';
+import prisma from '@lib/prisma';
 import { auth } from '@/auth';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import * as pikaClient from '@/lib/pika-client';

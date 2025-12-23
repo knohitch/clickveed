@@ -8,7 +8,7 @@ import {z} from 'genkit';
 import wav from 'wav';
 import { getAvailableTTSProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
-import prisma from '@/lib/prisma';
+import prisma from '@lib/prisma';
 import { auth } from '@/auth';
 
 const SpeakerSchema = z.object({
