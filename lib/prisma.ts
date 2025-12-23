@@ -17,8 +17,9 @@ prisma.$use(async (params, next) => {
     if (!ENCRYPTION_KEY_HEX) {
       throw new Error('ENCRYPTION_KEY environment variable is required. Please add it to your CapRover/Coolify environment variables (32-byte hex string).');
     }
-    if (ENCRYPTION_KEY_HEX.length !== 64) {
-      throw new Error('ENCRYPTION_KEY must be a 32-byte hex string (64 characters). Please generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    // Fix: 32 bytes = 128 hex characters (each byte = 2 hex chars)
+    if (ENCRYPTION_KEY_HEX.length !== 128) {
+      throw new Error('ENCRYPTION_KEY must be a 32-byte hex string (128 hex characters). Please generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
     }
     ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_HEX, 'hex');
   }
