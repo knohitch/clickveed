@@ -3,26 +3,38 @@ import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// Middleware for encrypting sensitive fields (e.g., accessToken in SocialConnection)
 // Fix Bug #2: Validate ENCRYPTION_KEY exists before using it
+// Only validate when actually using the key (lazy validation) to avoid build-time errors
 const ENCRYPTION_KEY_HEX = process.env.ENCRYPTION_KEY;
-if (!ENCRYPTION_KEY_HEX) {
-  throw new Error('ENCRYPTION_KEY environment variable is required. Please add it to your CapRover/Coolify environment variables (32-byte hex string).');
-}
-if (ENCRYPTION_KEY_HEX.length !== 64) {
-  throw new Error('ENCRYPTION_KEY must be a 32-byte hex string (64 characters). Please generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
-}
-const ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_HEX, 'hex'); // 32-byte key from env
+let ENCRYPTION_KEY: Buffer | undefined = undefined;
 
 prisma.$use(async (params, next) => {
+  // Only check for encryption key when we actually need to use it
+  const needsEncryption = 
+    (params.model === 'SocialConnection' && params.action === 'create' && params.args.data.accessToken) ||
+    (params.model === 'SocialConnection' && params.action === 'update' && params.args.data.accessToken);  
+  if (needsEncryption) {
+    if (!ENCRYPTION_KEY_HEX) {
+      throw new Error('ENCRYPTION_KEY environment variable is required. Please add it to your CapRover/Coolify environment variables (32-byte hex string).');
+    }
+    if (ENCRYPTION_KEY_HEX.length !== 64) {
+      throw new Error('ENCRYPTION_KEY must be a 32-byte hex string (64 characters). Please generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    }
+    ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_HEX, 'hex');
+  }
+
   // Encrypt accessToken on create
   if (params.model === 'SocialConnection' && params.action === 'create' && params.args.data.accessToken) {
-    params.args.data.accessToken = encrypt(params.args.data.accessToken, ENCRYPTION_KEY);
+    if (ENCRYPTION_KEY) {
+      params.args.data.accessToken = encrypt(params.args.data.accessToken, ENCRYPTION_KEY);
+    }
   }
 
   // Encrypt accessToken on update
   if (params.model === 'SocialConnection' && params.action === 'update' && params.args.data.accessToken) {
-    params.args.data.accessToken = encrypt(params.args.data.accessToken, ENCRYPTION_KEY);
+    if (ENCRYPTION_KEY) {
+      params.args.data.accessToken = encrypt(params.args.data.accessToken, ENCRYPTION_KEY);
+    }
   }
 
   // Fix Bug #4: Remove invalid WHERE clause encryption logic
@@ -33,7 +45,7 @@ prisma.$use(async (params, next) => {
 
   // Decrypt accessToken after findUnique
   if (params.model === 'SocialConnection' && params.action === 'findUnique' && result) {
-    if (result.accessToken) {
+    if (result.accessToken && ENCRYPTION_KEY) {
       result.accessToken = decrypt(result.accessToken, ENCRYPTION_KEY);
     }
   }
@@ -42,7 +54,7 @@ prisma.$use(async (params, next) => {
   if (params.model === 'SocialConnection' && params.action === 'findMany') {
     if (Array.isArray(result)) {
       result.forEach(item => {
-        if (item.accessToken) {
+        if (item.accessToken && ENCRYPTION_KEY) {
           item.accessToken = decrypt(item.accessToken, ENCRYPTION_KEY);
         }
       });
