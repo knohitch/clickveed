@@ -1,11 +1,11 @@
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { z } from 'zod';
-import prisma from '../lib/prisma'; // Use main client with encryption middleware - fix path alias issue
+import prisma from '../lib/prisma';
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
-import { compare } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import type { Adapter } from '@auth/core/adapters';
 import { findUserForAuth } from '@/lib/db-utils';
