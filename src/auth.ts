@@ -1,5 +1,4 @@
 import NextAuth from 'next-auth';
-import { PrismaAdapter } from '@auth/prisma-adapter';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import authConfig from './auth.config';
@@ -7,9 +6,7 @@ import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
 import { compare, hash } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
-import type { Adapter } from '@auth/core/adapters';
 import { findUserForAuth } from '@/lib/db-utils';
-
 
 // Define custom types directly in the auth config for co-location and clarity.
 declare module 'next-auth' {
@@ -49,8 +46,11 @@ declare module "next-auth/jwt" {
   }
 }
 
+// Fix Bug #13: Remove PrismaAdapter to fix Edge Runtime incompatibility
+// Next.js middleware runs in Edge Runtime
+// Prisma doesn't support Edge Runtime
+// Since we're using JWT strategy with credentials, we don't need PrismaAdapter
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma) as any,
   session: { strategy: 'jwt' },
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   trustHost: process.env.AUTH_TRUST_HOST === 'true',
