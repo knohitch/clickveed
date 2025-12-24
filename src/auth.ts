@@ -1,12 +1,14 @@
 import NextAuth from 'next-auth';
 import { z } from 'zod';
-import prisma from '../lib/prisma';
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
 import { compare, hash } from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
-import { findUserForAuth } from '@/lib/db-utils';
+
+// Fix Bug #13: Lazy import Prisma to avoid loading in Edge Runtime
+// Only import Prisma when actually needed (in authorize() function)
+// This allows middleware to use auth() without loading Prisma
 
 // Define custom types directly in the auth config for co-location and clarity.
 declare module 'next-auth' {
@@ -154,6 +156,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
+          // Fix Bug #13: Lazy import Prisma only in authorize() (Node.js runtime)
+          // This prevents Prisma from being loaded in Edge Runtime
+          const { findUserForAuth } = await import('@/lib/db-utils');
+          const prismaModule = await import('../lib/prisma');
+          const prisma = prismaModule.default;
+          
           // Use optimized database utility with timeout and retry logic
           const user = await findUserForAuth(prisma, credentials.email as string);
 
