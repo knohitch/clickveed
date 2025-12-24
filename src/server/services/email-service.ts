@@ -66,12 +66,17 @@ export async function sendEmail({ to, templateKey, data }: SendEmailParams) {
             break;
     }
 
+    // Fix Bug #14: Add TLS options to handle self-signed certificates (Alibaba SMTP)
     const transporter = nodemailer.createTransport({
         host: emailSettings.smtpHost,
         port: port,
         secure: secure,
         requireTLS: requireTLS,
         ignoreTLS: ignoreTLS,
+        // Allow self-signed certificates (needed for Alibaba SMTP)
+        tls: {
+            rejectUnauthorized: false,
+        },
         auth: {
             user: emailSettings.smtpUser,
             pass: emailSettings.smtpPass,
