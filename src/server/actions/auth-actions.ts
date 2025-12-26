@@ -10,6 +10,7 @@ import { redirect } from 'next/navigation';
 import { randomBytes, createHash } from 'crypto';
 import { sendEmail } from '@/server/services/email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
+import { getBaseUrl } from '@/lib/utils';
 
 const signUpSchema = z.object({
   name: z.string().min(1, { message: 'Name is required' }),
@@ -96,7 +97,8 @@ export async function signUp(prevState: any, formData: FormData) {
 
             // Send verification email
             const { appName } = await getAdminSettings();
-            const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${verificationToken}`;
+            const baseUrl = getBaseUrl();
+            const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
 
             let emailError = '';
             try {
@@ -256,7 +258,8 @@ export async function requestPasswordResetAction(prevState: any, formData: FormD
             });
 
             const { appName } = await getAdminSettings();
-            const resetLink = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
+            const baseUrl = getBaseUrl();
+            const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
             try {
                 await sendEmail({

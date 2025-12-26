@@ -30,6 +30,7 @@ export interface EmailTemplate {
 export interface EmailTemplates {
     userSignup: EmailTemplate;
     emailVerification: EmailTemplate;
+    accountApproved: EmailTemplate;
     passwordReset: EmailTemplate;
     subscriptionActivated: EmailTemplate;
     subscriptionRenewal: EmailTemplate;
@@ -99,6 +100,7 @@ const defaultEmailSettings: EmailSettings = {
 const defaultEmailTemplates: EmailTemplates = {
     userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
     emailVerification: { subject: 'Verify Your Email Address', body: 'Hello {{name}}, please verify your email address by clicking the link below: {{verificationLink}}' },
+    accountApproved: { subject: 'Your Account Has Been Approved', body: 'Hello {{name}},\n\nGreat news! Your account has been approved by an administrator. You can now log in and access all features.\n\nClick here to log in: {{loginLink}}\n\nWelcome to {{appName}}!' },
     passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
     subscriptionActivated: { subject: 'Subscription Activated', body: 'Thanks for subscribing to {{planName}}.' },
     subscriptionRenewal: { subject: 'Subscription Renewal', body: 'Your plan {{planName}} will renew on {{renewalDate}}.' },

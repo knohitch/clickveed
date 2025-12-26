@@ -5,6 +5,7 @@ import prisma from '@/server/prisma';
 import { auth } from '@/auth';
 import type { User, Plan, UserUsage } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { getBaseUrl } from '@/lib/utils';
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'USER';
 export type UserStatus = 'Active' | 'Pending';
@@ -240,14 +241,15 @@ export async function approveUser(userId: string) {
         const { sendEmail } = await import('@/server/services/email-service');
         const { getAdminSettings } = await import('@/server/actions/admin-actions');
         const { appName } = await getAdminSettings();
+        const baseUrl = getBaseUrl();
 
         await sendEmail({
             to: user.email!,
-            templateKey: 'emailVerification', // Using existing template, ideally create a dedicated 'accountApproved' template
+            templateKey: 'accountApproved',
             data: {
                 appName,
                 name: user.displayName || 'User',
-                verificationLink: `${process.env.NEXTAUTH_URL}/login`, // Direct to login since they're approved
+                loginLink: `${baseUrl}/login`,
             }
         });
     } catch (emailError) {

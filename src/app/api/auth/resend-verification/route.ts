@@ -3,6 +3,7 @@ import prisma from '@/server/prisma';
 import { randomBytes, createHash } from 'crypto';
 import { sendEmail } from '@/server/services/email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
+import { getBaseUrl } from '@/lib/utils';
 
 export async function POST(request: Request) {
     try {
@@ -43,7 +44,8 @@ export async function POST(request: Request) {
 
         // Send verification email
         const { appName } = await getAdminSettings();
-        const verificationUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${verificationToken}`;
+        const baseUrl = getBaseUrl(request);
+        const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
 
         try {
             await sendEmail({

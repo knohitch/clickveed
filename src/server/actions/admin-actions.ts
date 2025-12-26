@@ -265,6 +265,11 @@ export async function updatePromotions(promotions: Promotion[]) {
  * Updates API keys in the production database.
  */
 export async function updateApiKeys(keys: ApiKeys) {
+    const stripeKeysChanged =
+        keys.stripeSecretKey !== undefined ||
+        keys.stripePublishableKey !== undefined ||
+        keys.stripeWebhookSecret !== undefined;
+
     for (const [name, value] of Object.entries(keys)) {
          if (value) { // Only upsert if value is not empty
             await prisma.apiKey.upsert({
@@ -273,6 +278,12 @@ export async function updateApiKeys(keys: ApiKeys) {
                 create: { name, value }
             });
         }
+    }
+
+    // Invalidate Stripe cache when Stripe keys are updated
+    if (stripeKeysChanged) {
+        const { invalidateStripeCache } = await import('@/server/services/stripe-service');
+        invalidateStripeCache();
     }
 }
 

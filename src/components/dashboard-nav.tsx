@@ -121,11 +121,7 @@ export function DashboardNav() {
     });
 
     const toggleSection = (name: string) => {
-        setOpenSections(prev => {
-            const newState = {...prev, [name]: !prev[name]};
-            console.log(`Toggling section ${name} to ${newState[name]}`);
-            return newState;
-        });
+        setOpenSections(prev => ({...prev, [name]: !prev[name]}));
     }
 
     // Filter menu sections based on user's plan
@@ -173,13 +169,17 @@ export function DashboardNav() {
                         ? pathname.startsWith(section.path) || pathname === '/dashboard/video-pipeline' || pathname === '/dashboard/video-editor'
                         : pathname.startsWith(section.path);
 
+                    // Determine if section should be open (either manually opened or active)
+                    const isOpen = openSections[section.name] !== undefined
+                        ? openSections[section.name]
+                        : isSectionActive;
+
                     return (
-                        <Collapsible key={section.name} open={openSections[section.name] || isSectionActive} onOpenChange={(open) => {
-            console.log(`Collapsible onOpenChange for ${section.name}: ${open}`);
-            if (open !== (openSections[section.name] || isSectionActive)) {
-                toggleSection(section.name);
-            }
-        }}>
+                        <Collapsible
+                            key={section.name}
+                            open={isOpen}
+                            onOpenChange={() => toggleSection(section.name)}
+                        >
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
                                     <SidebarMenuButton
@@ -189,7 +189,7 @@ export function DashboardNav() {
                                     >
                                         <section.icon className="w-5 h-5 text-sidebar-primary group-data-[active=true]:text-sidebar-primary-foreground" />
                                         <span className="text-base font-medium group-data-[collapsible=icon]:hidden">{section.name}</span>
-                                        <ChevronDown className={cn("ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden", (openSections[section.name] || isSectionActive) && "rotate-180")} />
+                                        <ChevronDown className={cn("ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden", isOpen && "rotate-180")} />
                                     </SidebarMenuButton>
                                 </CollapsibleTrigger>
                             </SidebarMenuItem>

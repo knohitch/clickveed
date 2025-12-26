@@ -5,12 +5,7 @@ import { Stripe } from 'stripe';
 import prisma from '@/server/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { auth } from '@/auth';
-
-const getURL = () => {
-    const url = process.env.NEXTAUTH_URL;
-    if (!url) throw new Error("NEXTAUTH_URL environment variable is not set.");
-    return url;
-};
+import { getBaseUrl } from '@/lib/utils';
 
 export async function POST(req: Request) {
     try {
@@ -80,14 +75,16 @@ export async function POST(req: Request) {
         }
 
 
+        const baseUrl = getBaseUrl(req);
+
         const checkoutSession = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             billing_address_collection: 'required',
             customer: stripeCustomerId,
             line_items: [{ price: stripePriceId, quantity: 1 }],
             mode: 'subscription',
-            success_url: `${getURL()}/dashboard/settings?payment_success=true`,
-            cancel_url: `${getURL()}/dashboard/settings`,
+            success_url: `${baseUrl}/dashboard/settings/billing?payment_success=true`,
+            cancel_url: `${baseUrl}/dashboard/settings/billing`,
             metadata: {
                 userId: userId,
                 planId: planId,

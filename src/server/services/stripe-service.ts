@@ -5,30 +5,46 @@ import prisma from '@lib/prisma';
 import { upsertUser } from '@/server/actions/user-actions';
 import { sendEmail } from './email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
+import { getBaseUrl } from '@/lib/utils';
 
-const getURL = () => {
-    const url = process.env.NEXTAUTH_URL;
-    if (!url) throw new Error("NEXTAUTH_URL environment variable is not set.");
-    return url;
-};
-
-// Fix Bug #6: Stripe singleton pattern
+// Fix Bug #4: Stripe singleton pattern with cache invalidation
 // Create a single Stripe instance that is reused across all function calls
+// Cache is invalidated when the secret key changes
 let stripeInstance: Stripe | null = null;
+let cachedStripeKey: string | null = null;
 
 async function getStripeInstance(): Promise<Stripe> {
+    const { apiKeys } = await getAdminSettings();
+    const stripeSecretKey = apiKeys.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
+        throw new Error('Stripe secret key not configured in admin settings or environment variables');
+    }
+
+    // Invalidate cache if the key has changed
+    if (cachedStripeKey !== stripeSecretKey) {
+        console.log('Stripe key changed, invalidating cached instance');
+        stripeInstance = null;
+        cachedStripeKey = stripeSecretKey;
+    }
+
+    // Create new instance if needed
     if (!stripeInstance) {
-        const { apiKeys } = await getAdminSettings();
-        const stripeSecretKey = apiKeys.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
-        
-        if (!stripeSecretKey) {
-            throw new Error('Stripe secret key not configured in admin settings or environment variables');
-        }
-        
+        console.log('Creating new Stripe instance');
         stripeInstance = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
     }
-    
+
     return stripeInstance;
+}
+
+/**
+ * Manually invalidate the Stripe instance cache.
+ * Call this after updating Stripe API keys in admin settings.
+ */
+export function invalidateStripeCache() {
+    console.log('Manually invalidating Stripe cache');
+    stripeInstance = null;
+    cachedStripeKey = null;
 }
 
 /**
@@ -75,14 +91,15 @@ export async function createCheckoutSession(
         throw new Error(`Stripe Price ID for ${billingCycle} cycle not found for this plan.`);
     }
 
+    const baseUrl = getBaseUrl();
     const checkoutSession = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         billing_address_collection: 'required',
         customer: stripeCustomerId,
         line_items: [{ price: stripePriceId, quantity: 1 }],
         mode: 'subscription',
-        success_url: `${getURL()}/dashboard/settings/billing?payment_success=true`,
-        cancel_url: `${getURL()}/dashboard/settings/billing`,
+        success_url: `${baseUrl}/dashboard/settings/billing?payment_success=true`,
+        cancel_url: `${baseUrl}/dashboard/settings/billing`,
         metadata: { userId, planId, priceId: stripePriceId },
     });
 
@@ -101,9 +118,10 @@ export async function createCustomerPortalSession(userId: string, stripeSecretKe
         throw new Error('Stripe customer not found for this user.');
     }
     
+    const baseUrl = getBaseUrl();
     const portalSession = await stripe.billingPortal.sessions.create({
         customer: user.stripeCustomerId,
-        return_url: `${getURL()}/dashboard/settings`,
+        return_url: `${baseUrl}/dashboard/settings/billing`,
     });
 
     return { url: portalSession.url };
