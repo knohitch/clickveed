@@ -14,16 +14,16 @@ export default function ProfilePage() {
     const { currentUser, updateUserDisplayName } = useAuth();
     const { toast } = useToast();
     
-    const [fullName, setFullName] = useState(currentUser?.name || '');
+    const [fullName, setFullName] = useState(currentUser?.displayName || '');
     const [isSaving, setIsSaving] = useState(false);
     
     useEffect(() => {
-        setFullName(currentUser?.name || '');
+        setFullName(currentUser?.displayName || '');
     }, [currentUser]);
 
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (fullName === currentUser?.name) return;
+        if (fullName === currentUser?.displayName) return;
         setIsSaving(true);
         try {
             await updateUserDisplayName(fullName);
@@ -59,7 +59,7 @@ export default function ProfilePage() {
                     </div>
                 </CardContent>
                  <CardFooter>
-                    <Button type="submit" disabled={isSaving || fullName === currentUser?.name}>
+                    <Button type="submit" disabled={isSaving || fullName === currentUser?.displayName}>
                         {isSaving ? "Saving..." : "Save Changes"}
                     </Button>
                 </CardFooter>
@@ -67,4 +67,3 @@ export default function ProfilePage() {
         </form>
     );
 }
-
