@@ -1,0 +1,68 @@
+diff --git a/node_modules/@prisma/client/scripts/default-index.js b/node_modules/@prisma/client/scripts/default-index.js
+index 4725516086e34c38206584210a4714d693259976..14041ff911c47087617b07548f438a3d5af15a6b 100644
+--- a/node_modules/@prisma/client/scripts/default-index.js
++++ b/node_modules/@prisma/client/scripts/default-index.js
+@@ -193,7 +193,7 @@ function getPrismaClient(config) {
+   const document = getDocument(config.document)
+   const { dmmf, schema, mappings, options } = config.generator
+   const prismaPath = findSync(config.prismaPath)
+-  const enginePath = findSync(config.enginePath)
++  const enginePath = config.enginePath ? findSync(config.enginePath) : undefined
+   const relativeEnginePath = enginePath ? path.relative(config.outputPath, enginePath) : undefined
+   const relativePrismaPath = prismaPath ? path.relative(config.outputPath, prismaPath) : undefined
+   const engineVersion = config.engineVersion
+diff --git a/node_modules/@prisma/client/generator-build.js b/node_modules/@prisma/client/generator-build.js
+index 725450893325e6f5348325a63908f51a30640d2f..24483751a02796e95c1a7a2a89326fd386f68cce 100644
+--- a/node_modules/@prisma/client/generator-build.js
++++ b/node_modules/@prisma/client/generator-build.js
+@@ -1,5 +1,6 @@
+ 'use strict'
++Object.defineProperty(exports, '__esModule', { value: true })
+ function findSync(id) {
+-  return require.resolve(id)
++  try { return require.resolve(id) } catch (e) { return undefined }
+ }
+ exports.findSync = findSync
+ //# sourceMappingURL=generator-build.js.map
+diff --git a/node_modules/@prisma/client/index.js b/node_modules/@prisma/client/index.js
+index c73295988e076722d3b25916a244b768a85e8d64..e8717808298dc3abef15ff7138382d609bd86756 100644
+--- a/node_modules/@prisma/client/index.js
++++ b/node_modules/@prisma/client/index.js
+@@ -1,6 +1,9 @@
+ "use strict";
++const dotenv = require('dotenv')
++const path = require('path')
++dotenv.config({ path: path.resolve(process.cwd(), '.env') })
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Prisma = exports.PrismaClient = void 0;
+ const get_runtime_1 = require("./get-runtime");
+-Object.defineProperty(exports, "PrismaClient", { enumerable: true, get: function () { return get_runtime_1.PrismaClient; } });
++exports.PrismaClient = get_runtime_1.PrismaClient;
+ Object.defineProperty(exports, "Prisma", { enumerable: true, get: function () { return get_runtime_1.Prisma; } });
+diff --git a/node_modules/@prisma/client/package.json b/node_modules/@prisma/client/package.json
+index 548c77207c6f2df122909a34931a7b45f9cd7260..b5a7940176c125d487f54c9ecf801fd639a037b5 100644
+--- a/node_modules/@prisma/client/package.json
++++ b/node_modules/@prisma/client/package.json
+@@ -6,6 +6,9 @@
+   "main": "index.js",
+   "types": "index.d.ts",
+   "author": "Tim Suchanek <suchanek@prisma.io>",
++  "dependencies": {
++    "dotenv": "^16.4.5"
++  },
+   "license": "Apache-2.0",
+   "bugs": "https://github.com/prisma/prisma/issues",
+   "homepage": "https://www.prisma.io",
+diff --git a/node_modules/@prisma/client/runtime/library.js b/node_modules/@prisma/client/runtime/library.js
+index ce0d5071167385d9ec81604a1b02b542bdc568ac..435c258d415b3a4a169b122cdd47c1b5006b5d92 100644
+--- a/node_modules/@prisma/client/runtime/library.js
++++ b/node_modules/@prisma/client/runtime/library.js
+@@ -467,7 +467,7 @@
+ var _a;
+ 
+ // ../../packages/client/src/runtime/core/init/getEngineInstance.ts
+-var MAX_START_ATTEMPTS = process.env.PRISMA_CLIENT_NO_RETRY ? 1 : 10;
++var MAX_START_ATTEMPTS = process.env.PRISMA_CLIENT_NO_RETRY ? 1 : 2;
+ var fatalErrors = [
+   "P1000",
+   "P1001",

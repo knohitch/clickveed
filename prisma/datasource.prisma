@@ -1,0 +1,12 @@
+// This file is used to dynamically set the database provider
+// based on the DATABASE_PROVIDER environment variable.
+// It is included by the main schema.prisma file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER")
+  url      = env("DATABASE_URL")
+}
