@@ -180,6 +180,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
 
+          // SUPER_ADMIN bypasses email verification requirement
+          const isSuperAdmin = user.role === 'SUPER_ADMIN';
+          
           return {
             id: user.id,
             email: user.email,
@@ -187,7 +190,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: user.role,
             onboardingComplete: user.onboardingComplete || false,
             status: user.status,
-            emailVerified: user.emailVerified || false
+            // SUPER_ADMIN bypasses email verification
+            emailVerified: isSuperAdmin ? true : (user.emailVerified || false)
           };
         } catch (error) {
           console.error('Authorization error:', error);

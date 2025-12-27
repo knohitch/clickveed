@@ -223,16 +223,19 @@ export async function login(prevState: any, formData: FormData) {
         // Check if user exists and their email verification status
         const user = await prisma.user.findUnique({
             where: { email },
-            select: { emailVerified: true, status: true }
+            select: { emailVerified: true, status: true, role: true }
         });
 
         if (!user) {
             return { error: 'Invalid email or password', success: false };
         }
 
+        // SUPER_ADMIN bypasses email verification requirement
+        const isSuperAdmin = user.role === 'SUPER_ADMIN';
+        
         // Check if email is verified (only for regular users, not super admins who are auto-verified)
         // Users with emailVerified: false should not be able to log in
-        if (user.emailVerified === false) {
+        if (user.emailVerified === false && !isSuperAdmin) {
             return { 
                 error: 'Please verify your email address before logging in. Check your email for the verification link.',
                 success: false,
