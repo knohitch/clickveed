@@ -96,10 +96,6 @@ export default function BillingPage() {
                 
                 await refreshUser();
                 
-                // Check if plan has been updated
-                const { subscriptionPlan } = useAuth();
-                const currentPlanId = subscriptionPlan?.id;
-                
                 // If we still need to wait for webhook, retry
                 if (attempts < maxAttempts) {
                     // Small delay then check again
