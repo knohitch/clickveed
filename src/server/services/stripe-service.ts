@@ -67,8 +67,7 @@ export async function invalidateStripeCache() {
 export async function createCheckoutSession(
     userId: string, 
     planId: string, 
-    billingCycle: 'monthly' | 'quarterly' | 'yearly', 
-    stripeSecretKey: string
+    billingCycle: 'monthly' | 'quarterly' | 'yearly'
 ) {
     // Fix Bug #6: Use singleton Stripe instance
     const stripe = await getStripeInstance();
