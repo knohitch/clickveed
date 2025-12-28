@@ -123,7 +123,7 @@ export async function createCheckoutSession(
 /**
  * Creates a Stripe Customer Portal session.
  */
-export async function createCustomerPortalSession(userId: string, stripeSecretKey: string) {
+export async function createCustomerPortalSession(userId: string) {
     // Fix Bug #6: Use singleton Stripe instance
     const stripe = await getStripeInstance();
 

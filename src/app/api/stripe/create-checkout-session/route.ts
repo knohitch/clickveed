@@ -7,6 +7,32 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { auth } from '@/auth';
 import { getBaseUrl } from '@/lib/utils';
 
+// Cache for Stripe instance
+let stripeInstance: Stripe | null = null;
+let cachedStripeKey: string | null = null;
+
+async function getStripe(): Promise<Stripe> {
+    // Check environment variables first (most secure), then fall back to database
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || (await getAdminSettings()).apiKeys.stripeSecretKey;
+    
+    if (!stripeSecretKey) {
+        throw new Error('Stripe secret key not configured. Please add STRIPE_SECRET_KEY to environment variables.');
+    }
+    
+    // Invalidate cache if key changed
+    if (cachedStripeKey !== stripeSecretKey || !stripeInstance) {
+        console.log('[Stripe Checkout] Creating new Stripe instance');
+        stripeInstance = null;
+        cachedStripeKey = stripeSecretKey;
+    }
+    
+    if (!stripeInstance) {
+        stripeInstance = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20', typescript: true });
+    }
+    
+    return stripeInstance;
+}
+
 export async function POST(req: Request) {
     try {
         const session = await auth();
@@ -21,12 +47,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing planId or billingCycle' }, { status: 400 });
         }
 
-        const { apiKeys } = await getAdminSettings();
-        if (!apiKeys.stripeSecretKey || !apiKeys.stripePublishableKey) {
-            return NextResponse.json({ error: 'Stripe is not configured.' }, { status: 500 });
+        // Check if Stripe is configured via env var (preferred) or admin settings
+        const stripeConfigured = !!process.env.STRIPE_SECRET_KEY || !!((await getAdminSettings()).apiKeys.stripeSecretKey);
+        if (!stripeConfigured) {
+            return NextResponse.json({ error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to environment variables or admin settings.' }, { status: 500 });
         }
 
-        const stripe = new Stripe(apiKeys.stripeSecretKey, { apiVersion: '2024-06-20' });
+        const stripe = await getStripe();
 
         const user = await prisma.user.findUnique({
             where: { id: userId },
