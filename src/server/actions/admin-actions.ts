@@ -37,6 +37,20 @@ export async function getAdminSettings() {
 
         const settings = await prisma.setting.findMany();
         const apiKeys = await prisma.apiKey.findMany();
+        
+        // Environment variables take precedence over database for sensitive keys
+        const mergedApiKeys: Record<string, string> = { ...apiKeys.reduce((acc, key) => {
+          acc[key.name] = key.value;
+          return acc;
+        }, {} as Record<string, string>) };
+        
+        // Override with environment variables if they exist (more secure for production)
+        if (process.env.STRIPE_SECRET_KEY) mergedApiKeys.stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+        if (process.env.STRIPE_PUBLISHABLE_KEY) mergedApiKeys.stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+        if (process.env.STRIPE_WEBHOOK_SECRET) mergedApiKeys.stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        if (process.env.OPENAI_API_KEY) mergedApiKeys.openaiApiKey = process.env.OPENAI_API_KEY;
+        if (process.env.ELEVENLABS_API_KEY) mergedApiKeys.elevenlabsApiKey = process.env.ELEVENLABS_API_KEY;
+        
         const emailSettingsData = await prisma.emailSettings.findFirst();
         const emailTemplatesData = await prisma.emailTemplate.findMany();
         const plans = await prisma.plan.findMany({ include: { features: true } });
@@ -88,10 +102,7 @@ export async function getAdminSettings() {
             isSupportOnline: settings.find(s => s.key === 'isSupportOnline')?.value === 'true',
             plans,
             promotions: promotions.map(p => ({ ...p, applicablePlanIds: p.applicablePlans.map(ap => ap.planId) })),
-            apiKeys: apiKeys.reduce((acc, key) => {
-              acc[key.name] = key.value;
-              return acc;
-            }, {} as Record<string, string>),
+            apiKeys: mergedApiKeys,
             emailSettings,
             emailTemplates,
             storageSettings,
