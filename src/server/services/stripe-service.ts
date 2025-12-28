@@ -15,24 +15,37 @@ let stripeInstance: Stripe | null = null;
 let cachedStripeKey: string | null = null;
 
 async function getStripeInstance(): Promise<Stripe> {
+    // Always fetch fresh settings to get the latest environment variables
     const { apiKeys } = await getAdminSettings();
-    const stripeSecretKey = apiKeys.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+    
+    // Check environment variables first (more secure), then fall back to database
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || apiKeys.stripeSecretKey;
 
     if (!stripeSecretKey) {
-        throw new Error('Stripe secret key not configured in admin settings or environment variables');
+        console.error('[Stripe] Secret key missing. Env:', !!process.env.STRIPE_SECRET_KEY, 'DB:', !!apiKeys.stripeSecretKey);
+        throw new Error('Stripe secret key not configured. Please add STRIPE_SECRET_KEY to environment variables or admin settings.');
     }
 
-    // Invalidate cache if the key has changed
-    if (cachedStripeKey !== stripeSecretKey) {
-        console.log('Stripe key changed, invalidating cached instance');
+    // Always invalidate cache to pick up new environment variable values
+    // This ensures we always use the latest key from the environment
+    if (cachedStripeKey !== stripeSecretKey || !stripeInstance) {
+        console.log('[Stripe] Initializing new Stripe instance with key from:', process.env.STRIPE_SECRET_KEY ? 'environment' : 'database');
         stripeInstance = null;
         cachedStripeKey = stripeSecretKey;
     }
 
     // Create new instance if needed
     if (!stripeInstance) {
-        console.log('Creating new Stripe instance');
-        stripeInstance = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+        try {
+            stripeInstance = new Stripe(stripeSecretKey, { 
+                apiVersion: '2024-06-20',
+                typescript: true 
+            });
+            console.log('[Stripe] Instance created successfully');
+        } catch (error: any) {
+            console.error('[Stripe] Failed to create Stripe instance:', error.message);
+            throw error;
+        }
     }
 
     return stripeInstance;

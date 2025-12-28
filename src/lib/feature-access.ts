@@ -123,12 +123,12 @@ function normalizeTier(tier: string | null | undefined): FeatureTier {
 /**
  * Check feature access based on plan's featureTier or planName (fallback)
  *
- * @param planNameOrTier - Either the plan name (for backward compatibility) or the featureTier
+ * @param planName - The plan name (for backward compatibility)
  * @param featureId - The feature to check access for
- * @param featureTier - Optional explicit featureTier (takes priority over planNameOrTier)
+ * @param featureTier - Optional explicit featureTier from plan.featureTier (takes priority)
  */
 export function checkFeatureAccess(
-  planNameOrTier: string | null,
+  planName: string | null,
   featureId: string,
   featureTier?: string | null
 ): FeatureAccess {
@@ -147,23 +147,22 @@ export function checkFeatureAccess(
   }
 
   // Determine the effective tier:
-  // 1. If explicit featureTier is provided, use it
-  // 2. Otherwise, try to interpret planNameOrTier as a tier
-  // 3. Fall back to inferring tier from plan name (backward compatibility)
+  // 1. If explicit featureTier is provided (from plan.featureTier), use it
+  // 2. Otherwise, try to interpret planName as a tier
+  // 3. Fall back to 'free'
   let effectiveTier: FeatureTier;
 
   if (featureTier) {
     // Explicit tier provided (from plan.featureTier)
     effectiveTier = normalizeTier(featureTier);
-  } else {
-    // Try to interpret the planNameOrTier
-    const normalized = (planNameOrTier || 'free').toLowerCase();
+  } else if (planName) {
+    const normalized = planName.toLowerCase();
 
-    // Check if it's already a valid tier
+    // Check if plan name directly matches a tier
     if (['free', 'starter', 'professional', 'enterprise'].includes(normalized)) {
       effectiveTier = normalized as FeatureTier;
     } else {
-      // Fallback: try to infer tier from plan name for backward compatibility
+      // Try to infer tier from plan name for backward compatibility
       if (normalized.includes('enterprise') || normalized.includes('ultimate')) {
         effectiveTier = 'enterprise';
       } else if (normalized.includes('professional') || normalized.includes('pro')) {
@@ -174,6 +173,9 @@ export function checkFeatureAccess(
         effectiveTier = 'free';
       }
     }
+  } else {
+    // No plan info, default to free
+    effectiveTier = 'free';
   }
 
   const availableFeatures = getFeaturesForTier(effectiveTier);

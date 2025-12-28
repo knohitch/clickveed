@@ -16,11 +16,12 @@ interface FeatureLockProps {
 export function FeatureLock({ 
   featureId, 
   planName, 
+  featureTier, // Add featureTier prop
   title, 
   description, 
   className = '' 
-}: FeatureLockProps): React.ReactElement | null {
-  const featureAccess = checkFeatureAccess(planName, featureId);
+}: FeatureLockProps & { featureTier?: string | null }): React.ReactElement | null {
+  const featureAccess = checkFeatureAccess(planName, featureId, featureTier);
   const minimumPlan = getMinimumPlanForFeature(featureId);
 
   if (featureAccess.canAccess) {
@@ -61,12 +62,13 @@ export function FeatureLock({
 interface FeatureGuardProps {
   featureId: string;
   planName: string | null;
+  featureTier?: string | null;
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
-export function FeatureGuard({ featureId, planName, children, fallback }: FeatureGuardProps): React.ReactElement {
-  const featureAccess = checkFeatureAccess(planName, featureId);
+export function FeatureGuard({ featureId, planName, featureTier, children, fallback }: FeatureGuardProps): React.ReactElement {
+  const featureAccess = checkFeatureAccess(planName, featureId, featureTier);
 
   if (featureAccess.canAccess) {
     return <>{children}</>;
@@ -80,6 +82,7 @@ export function FeatureGuard({ featureId, planName, children, fallback }: Featur
     <FeatureLock 
       featureId={featureId} 
       planName={planName}
+      featureTier={featureTier}
       title="Feature Not Available"
       description="This feature is not included in your current plan."
     />
