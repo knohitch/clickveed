@@ -1,11 +1,9 @@
-
-
 'use server';
 
 import { NextResponse } from 'next/server';
-import { getAdminSettings } from '@/server/actions/admin-actions';
 import { auth } from '@/auth';
-import { createCustomerPortalSession as createStripeCustomerPortalSession, invalidateStripeCache } from '@/server/services/stripe-service';
+import { createCustomerPortalSession as createStripeCustomerPortalSession } from '@/server/services/stripe-service';
+import { isStripeConfigured } from '@/server/services/stripe-service';
 
 export async function POST(req: Request) {
     try {
@@ -14,14 +12,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
         
-        // Check if Stripe is configured via env var (preferred) or admin settings
-        const stripeConfigured = !!process.env.STRIPE_SECRET_KEY || !!((await getAdminSettings()).apiKeys.stripeSecretKey);
-        if (!stripeConfigured) {
-            return NextResponse.json({ error: 'Stripe is not configured.' }, { status: 500 });
+        // Check if Stripe is configured via environment variables ONLY
+        if (!isStripeConfigured()) {
+            return NextResponse.json({ 
+                error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to your environment variables.' 
+            }, { status: 500 });
         }
-
-        // Invalidate cache to ensure fresh Stripe instance
-        await invalidateStripeCache();
 
         const { url } = await createStripeCustomerPortalSession(session.user.id);
         

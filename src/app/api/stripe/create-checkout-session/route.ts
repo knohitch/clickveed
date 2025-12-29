@@ -1,36 +1,28 @@
-
-
 import { NextResponse } from 'next/server';
 import { Stripe } from 'stripe';
 import prisma from '@/server/prisma';
-import { getAdminSettings } from '@/server/actions/admin-actions';
 import { auth } from '@/auth';
 import { getBaseUrl } from '@/lib/utils';
+import { isStripeConfigured } from '@/server/services/stripe-service';
 
-// Cache for Stripe instance
-let stripeInstance: Stripe | null = null;
-let cachedStripeKey: string | null = null;
-
-async function getStripe(): Promise<Stripe> {
-    // Check environment variables first (most secure), then fall back to database
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || (await getAdminSettings()).apiKeys.stripeSecretKey;
+/**
+ * Creates a new Stripe instance using ONLY environment variables.
+ * No database calls, no caching - simple and safe.
+ */
+function createStripeInstance(): Stripe {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     
     if (!stripeSecretKey) {
-        throw new Error('Stripe secret key not configured. Please add STRIPE_SECRET_KEY to environment variables.');
+        throw new Error(
+            'Stripe secret key is not configured. ' +
+            'Please add STRIPE_SECRET_KEY to your environment variables.'
+        );
     }
     
-    // Invalidate cache if key changed
-    if (cachedStripeKey !== stripeSecretKey || !stripeInstance) {
-        console.log('[Stripe Checkout] Creating new Stripe instance');
-        stripeInstance = null;
-        cachedStripeKey = stripeSecretKey;
-    }
-    
-    if (!stripeInstance) {
-        stripeInstance = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20', typescript: true });
-    }
-    
-    return stripeInstance;
+    return new Stripe(stripeSecretKey, { 
+        apiVersion: '2024-06-20', 
+        typescript: true 
+    });
 }
 
 export async function POST(req: Request) {
@@ -47,13 +39,15 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing planId or billingCycle' }, { status: 400 });
         }
 
-        // Check if Stripe is configured via env var (preferred) or admin settings
-        const stripeConfigured = !!process.env.STRIPE_SECRET_KEY || !!((await getAdminSettings()).apiKeys.stripeSecretKey);
-        if (!stripeConfigured) {
-            return NextResponse.json({ error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to environment variables or admin settings.' }, { status: 500 });
+        // Check if Stripe is configured via environment variables ONLY
+        if (!isStripeConfigured()) {
+            return NextResponse.json({ 
+                error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to your environment variables.' 
+            }, { status: 500 });
         }
 
-        const stripe = await getStripe();
+        // Create Stripe instance from environment variable only
+        const stripe = createStripeInstance();
 
         const user = await prisma.user.findUnique({
             where: { id: userId },

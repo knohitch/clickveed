@@ -8,69 +8,45 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { getBaseUrl } from '@/lib/utils';
 import { createNotification } from './notification-service';
 
-// Fix Bug #4: Stripe singleton pattern with cache invalidation
-// Create a single Stripe instance that is reused across all function calls
-// Cache is invalidated when the secret key changes
-let stripeInstance: Stripe | null = null;
-let cachedStripeKey: string | null = null;
-
-async function getStripeInstance(): Promise<Stripe> {
-    // Always fetch fresh settings to get the latest environment variables
-    const { apiKeys } = await getAdminSettings();
+/**
+ * Creates a new Stripe instance using ONLY environment variables.
+ * No database calls, no caching - simple and safe.
+ */
+function createStripeInstance(): Stripe {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     
-    // Check environment variables first (more secure), then fall back to database
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || apiKeys.stripeSecretKey;
-
     if (!stripeSecretKey) {
-        console.error('[Stripe] Secret key missing. Env:', !!process.env.STRIPE_SECRET_KEY, 'DB:', !!apiKeys.stripeSecretKey);
-        throw new Error('Stripe secret key not configured. Please add STRIPE_SECRET_KEY to environment variables or admin settings.');
+        throw new Error(
+            'Stripe secret key is not configured. ' +
+            'Please add STRIPE_SECRET_KEY to your environment variables.'
+        );
     }
-
-    // Always invalidate cache to pick up new environment variable values
-    // This ensures we always use the latest key from the environment
-    if (cachedStripeKey !== stripeSecretKey || !stripeInstance) {
-        console.log('[Stripe] Initializing new Stripe instance with key from:', process.env.STRIPE_SECRET_KEY ? 'environment' : 'database');
-        stripeInstance = null;
-        cachedStripeKey = stripeSecretKey;
-    }
-
-    // Create new instance if needed
-    if (!stripeInstance) {
-        try {
-            stripeInstance = new Stripe(stripeSecretKey, { 
-                apiVersion: '2024-06-20',
-                typescript: true 
-            });
-            console.log('[Stripe] Instance created successfully');
-        } catch (error: any) {
-            console.error('[Stripe] Failed to create Stripe instance:', error.message);
-            throw error;
-        }
-    }
-
-    return stripeInstance;
+    
+    return new Stripe(stripeSecretKey, {
+        apiVersion: '2024-06-20',
+        typescript: true
+    });
 }
 
 /**
- * Manually invalidate the Stripe instance cache.
- * Call this after updating Stripe API keys in admin settings.
+ * Validates that Stripe is configured via environment variables.
+ * Returns true if STRIPE_SECRET_KEY is present.
  */
-export async function invalidateStripeCache() {
-    console.log('Manually invalidating Stripe cache');
-    stripeInstance = null;
-    cachedStripeKey = null;
+export function isStripeConfigured(): boolean {
+    return !!process.env.STRIPE_SECRET_KEY;
 }
 
 /**
  * Creates a Stripe Checkout session for a subscription.
+ * Uses ONLY environment variables for Stripe configuration.
  */
 export async function createCheckoutSession(
     userId: string, 
     planId: string, 
     billingCycle: 'monthly' | 'quarterly' | 'yearly'
 ) {
-    // Fix Bug #6: Use singleton Stripe instance
-    const stripe = await getStripeInstance();
+    // Create Stripe instance from environment variable only
+    const stripe = createStripeInstance();
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found.');
@@ -121,10 +97,11 @@ export async function createCheckoutSession(
 
 /**
  * Creates a Stripe Customer Portal session.
+ * Uses ONLY environment variables for Stripe configuration.
  */
 export async function createCustomerPortalSession(userId: string) {
-    // Fix Bug #6: Use singleton Stripe instance
-    const stripe = await getStripeInstance();
+    // Create Stripe instance from environment variable only
+    const stripe = createStripeInstance();
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.stripeCustomerId) {
@@ -140,13 +117,13 @@ export async function createCustomerPortalSession(userId: string) {
     return { url: portalSession.url };
 }
 
-
 /**
  * Handles incoming Stripe webhook events.
+ * Uses ONLY environment variables for Stripe configuration.
  */
 export async function handleStripeWebhookEvent(event: Stripe.Event) {
-    // Fix Bug #6: Use singleton Stripe instance
-    const stripe = await getStripeInstance();
+    // Create Stripe instance from environment variable only
+    const stripe = createStripeInstance();
 
     switch (event.type) {
         case 'checkout.session.completed': {
@@ -175,7 +152,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                 });
 
                 if (updatedUser && updatedUser.plan) {
-                    // Send email to user about subscription activation with NEW plan name
+                    // getAdminSettings is OK here - it's for email templates, not Stripe config
                     const adminSettings = await getAdminSettings();
                     try {
                         await sendEmail({
@@ -236,7 +213,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                 
                 // Check if this is a renewal (active status)
                 if (subscription.status === 'active') {
-                    // Send email to user about subscription renewal
+                    // getAdminSettings is OK here - it's for email templates, not Stripe config
                     const adminSettings = await getAdminSettings();
                     await sendEmail({
                         to: user.email!,
@@ -303,8 +280,10 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                     return;
                 }
                 
-                // Send email to user about subscription cancellation
+                // getAdminSettings is OK here - it's for email templates, not Stripe config
                 const adminSettings = await getAdminSettings();
+                
+                // Send email to user about subscription cancellation
                 await sendEmail({
                     to: user.email!,
                     templateKey: 'subscriptionCanceled',
