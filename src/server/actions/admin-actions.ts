@@ -314,11 +314,8 @@ export async function updateApiKeys(keys: ApiKeys) {
         }
     }
 
-    // Invalidate Stripe cache when Stripe keys are updated
-    if (stripeKeysChanged) {
-        const { invalidateStripeCache } = await import('@/server/services/stripe-service');
-        await invalidateStripeCache();
-    }
+    // Note: Stripe now uses environment variables only, so no cache invalidation needed
+    // The Stripe instance is created on-demand from environment variables
 }
 
 /**
