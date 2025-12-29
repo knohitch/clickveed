@@ -31,8 +31,9 @@ function createStripeInstance(): Stripe {
 /**
  * Validates that Stripe is configured via environment variables.
  * Returns true if STRIPE_SECRET_KEY is present.
+ * Must be async because it's exported from a 'use server' file.
  */
-export function isStripeConfigured(): boolean {
+export async function isStripeConfigured(): Promise<boolean> {
     return !!process.env.STRIPE_SECRET_KEY;
 }
 

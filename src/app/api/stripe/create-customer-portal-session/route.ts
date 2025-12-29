@@ -13,7 +13,8 @@ export async function POST(req: Request) {
         }
         
         // Check if Stripe is configured via environment variables ONLY
-        if (!isStripeConfigured()) {
+        const configured = await isStripeConfigured();
+        if (!configured) {
             return NextResponse.json({ 
                 error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to your environment variables.' 
             }, { status: 500 });

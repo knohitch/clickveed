@@ -40,7 +40,8 @@ export async function POST(req: Request) {
         }
 
         // Check if Stripe is configured via environment variables ONLY
-        if (!isStripeConfigured()) {
+        const configured = await isStripeConfigured();
+        if (!configured) {
             return NextResponse.json({ 
                 error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to your environment variables.' 
             }, { status: 500 });
@@ -64,6 +65,9 @@ export async function POST(req: Request) {
         if (!plan) {
             return NextResponse.json({ error: 'Plan not found.' }, { status: 404 });
         }
+
+        // TypeScript knows plan is not null here
+        const planData = plan;
 
         let stripeCustomerId = user.stripeCustomerId;
 
@@ -89,7 +93,7 @@ export async function POST(req: Request) {
             default: return NextResponse.json({ error: 'Invalid billing cycle' }, { status: 400 });
         }
 
-        const stripePriceId = plan[priceIdField];
+        const stripePriceId = planData[priceIdField];
 
         if (!stripePriceId) {
              return NextResponse.json({ error: `Stripe Price ID for ${billingCycle} cycle not found for this plan. Please re-save the plan in the admin panel.` }, { status: 500 });

@@ -17,7 +17,8 @@ export async function createCheckoutSession(planId: string, billingCycle: 'month
     if (!session?.user?.id) throw new Error("User not authenticated.");
 
     // Check if Stripe is configured via environment variables ONLY
-    if (!isStripeConfigured()) {
+    const configured = await isStripeConfigured();
+    if (!configured) {
         throw new Error(
             "Stripe is not configured. " +
             "Please add STRIPE_SECRET_KEY to your environment variables."
@@ -37,7 +38,8 @@ export async function createCustomerPortalSession() {
     if (!session?.user?.id) throw new Error("User not authenticated.");
     
     // Check if Stripe is configured via environment variables ONLY
-    if (!isStripeConfigured()) {
+    const configured = await isStripeConfigured();
+    if (!configured) {
         throw new Error(
             "Stripe is not configured. " +
             "Please add STRIPE_SECRET_KEY to your environment variables."
