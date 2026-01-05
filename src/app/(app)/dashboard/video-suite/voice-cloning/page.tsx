@@ -4,6 +4,7 @@ import { VoiceCloningStudio } from '@/components/voice-cloning-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
+import type { PlanFeature } from '@prisma/client';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 export default function VoiceClippingPage() {
@@ -15,14 +16,14 @@ export default function VoiceClippingPage() {
 }
 
 function VoiceClippingContent() {
-    const { subscriptionPlan, loading } = useAuth();
+    const { subscriptionPlan, planFeatures, loading } = useAuth();
 
     if (loading) {
         return <VoiceClippingLoading />;
     }
 
     return (
-        <FeatureGuard featureId="voice-cloning" planName={subscriptionPlan?.name || null}>
+        <FeatureGuard featureId="voice-cloning" planName={subscriptionPlan?.name || null} planFeatures={planFeatures}>
             <Card>
                 <CardHeader>
                     <CardTitle>AI Voice Cloning</CardTitle>

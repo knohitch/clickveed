@@ -4,6 +4,7 @@ import { MagicClipsGenerator } from '@/components/magic-clips-generator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
+import type { PlanFeature } from '@prisma/client';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 export default function MagicClipsPage() {
@@ -15,14 +16,14 @@ export default function MagicClipsPage() {
 }
 
 function MagicClipsContent() {
-    const { subscriptionPlan, loading } = useAuth();
+    const { subscriptionPlan, planFeatures, loading } = useAuth();
 
     if (loading) {
         return <MagicClipsLoading />;
     }
 
     return (
-        <FeatureGuard featureId="magic-clips" planName={subscriptionPlan?.name || null}>
+        <FeatureGuard featureId="magic-clips" planName={subscriptionPlan?.name || null} planFeatures={planFeatures}>
             <MagicClipsGenerator />
         </FeatureGuard>
     );

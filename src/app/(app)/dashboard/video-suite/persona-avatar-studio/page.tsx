@@ -4,6 +4,7 @@ import { PersonaAvatarStudio } from '@/components/persona-avatar-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
+import type { PlanFeature } from '@prisma/client';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 export default function PersonaAvatarStudioPage() {
@@ -15,19 +16,19 @@ export default function PersonaAvatarStudioPage() {
 }
 
 function PersonaAvatarStudioContent() {
-    const { subscriptionPlan, loading } = useAuth();
+    const { subscriptionPlan, planFeatures, loading } = useAuth();
 
     if (loading) {
         return <PersonaAvatarStudioLoading />;
     }
 
     return (
-        <FeatureGuard featureId="persona-studio" planName={subscriptionPlan?.name || null}>
+        <FeatureGuard featureId="persona-studio" planName={subscriptionPlan?.name || null} planFeatures={planFeatures}>
             <Card>
                 <CardHeader>
                     <CardTitle>AI Persona & Avatar Studio</CardTitle>
                     <CardDescription>
-                        Define the personality and generate the visual appearance of your AI influencer.
+                        Define personality and generate visual appearance of your AI influencer.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

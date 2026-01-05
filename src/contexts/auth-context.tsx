@@ -4,12 +4,13 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserById } from '@/server/actions/user-actions';
-import type { Plan } from '@prisma/client';
+import type { Plan, PlanFeature } from '@prisma/client';
 import { format } from 'date-fns';
 
 interface AuthContextType {
   currentUser: UserWithPlan | null;
   subscriptionPlan: Plan | null;
+  planFeatures: PlanFeature[];
   userPlanDetails: {
     hasActiveSubscription: boolean;
     status: string;
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: session, status, update: updateSession } = useSession();
   const [currentUser, setCurrentUser] = useState<UserWithPlan | null>(null);
   const [subscriptionPlan, setSubscriptionPlan] = useState<Plan | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<PlanFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -59,10 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentUser(userDetails);
       if (userDetails?.plan) {
         setSubscriptionPlan(userDetails.plan);
+        setPlanFeatures(userDetails.plan.features || []);
         console.log('[AuthContext] Set subscription plan:', userDetails.plan.name);
+        console.log('[AuthContext] Plan features count:', userDetails.plan.features?.length || 0);
       } else {
         console.log('[AuthContext] No plan found for user, setting to null');
         setSubscriptionPlan(null);
+        setPlanFeatures([]);
       }
       return userDetails;
     } catch (error) {
@@ -122,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     currentUser,
     subscriptionPlan,
+    planFeatures,
     userPlanDetails,
     loading,
     refreshing,

@@ -3,7 +3,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Lock, Star, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { checkFeatureAccess, getMinimumPlanForFeature } from '@/lib/feature-access';
+import { getMinimumPlanForFeature } from '@/lib/feature-access';
+import type { PlanFeature } from '@prisma/client';
+
+function getFeatureDisplayName(featureId: string): string {
+  const displayNames: Record<string, string> = {
+    'ai-assistant': 'AI Assistant',
+    'creative-assistant': 'Creative Assistant',
+    'topic-researcher': 'Topic Researcher',
+    'thumbnail-tester': 'Thumbnail Tester',
+    'video-suite': 'Video Suite',
+    'video-pipeline': 'Video Pipeline',
+    'video-editor': 'Video Editor',
+    'magic-clips': 'Magic Clips',
+    'script-generator': 'Script Generator',
+    'voice-over': 'Voice Over',
+    'image-to-video': 'Image to Video',
+    'voice-cloning': 'Voice Cloning',
+    'video-from-url': 'Video from URL',
+    'stock-media': 'Stock Media Library',
+    'persona-studio': 'Persona Avatar Studio',
+    'ai-image-generator': 'AI Image Generator',
+    'flux-pro': 'Flux Pro Editor',
+    'background-remover': 'Background Remover',
+    'ai-agents': 'AI Agent Builder',
+    'n8n-integrations': 'N8n/Make Integrations',
+    'social-analytics': 'Social Analytics',
+    'social-scheduler': 'Social Scheduler',
+    'social-integrations': 'Social Integrations',
+    'media-library': 'Media Library',
+    'profile-settings': 'Profile Settings',
+    'brand-kit': 'Brand Kit',
+  };
+  
+  return displayNames[featureId] || featureId;
+}
 
 interface FeatureLockProps {
   featureId: string;
@@ -13,15 +47,115 @@ interface FeatureLockProps {
   className?: string;
 }
 
+/**
+ * Match feature keywords for better detection
+ */
+function matchFeatureKeywords(featureText: string, featureId: string): boolean {
+  const keywordMap: Record<string, string[]> = {
+    'video-suite': ['video', 'editing', 'creation'],
+    'ai-assistant': ['ai', 'assistant', 'chat'],
+    'voice-cloning': ['voice', 'clone', 'cloning'],
+    'background-remover': ['background', 'remove', 'remover'],
+    'social-analytics': ['social', 'analytics', 'insights'],
+    'social-scheduler': ['social', 'schedule', 'scheduling'],
+    'magic-clips': ['magic', 'clips', 'highlights'],
+    'script-generator': ['script', 'generator', 'writing'],
+    'voice-over': ['voice', 'over', 'voiceover', 'narration'],
+    'image-to-video': ['image', 'video', 'conversion'],
+    'stock-media': ['stock', 'media', 'library'],
+    'ai-agents': ['agent', 'automation', 'workflow'],
+    'brand-kit': ['brand', 'kit', 'branding'],
+  };
+  
+  const keywords = keywordMap[featureId] || [];
+  return keywords.some(keyword => featureText.includes(keyword));
+}
+
+/**
+ * Check feature access based on plan features from database
+ */
+function checkFeatureAccessWithFeatures(
+  planFeatures: PlanFeature[],
+  featureId: string
+): { canAccess: boolean; requiresUpgrade: boolean; featureName: string } {
+  // Always allow basic features for all users
+  const alwaysAccessibleFeatures = [
+    'profile-settings',
+    'media-library',
+  ];
+  
+  if (alwaysAccessibleFeatures.includes(featureId)) {
+    return {
+      canAccess: true,
+      requiresUpgrade: false,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+  
+  // If no plan features, use default free features as fallback
+  if (!planFeatures || planFeatures.length === 0) {
+    const freeFeatures = [
+      'ai-assistant',
+      'creative-assistant',
+      'social-integrations',
+      'video-suite',
+      'video-pipeline',
+      'script-generator',
+      'stock-media',
+      'ai-image-generator',
+      'background-remover',
+      'media-library',
+      'profile-settings',
+    ];
+
+    const canAccess = freeFeatures.includes(featureId);
+    return {
+      canAccess,
+      requiresUpgrade: !canAccess,
+      featureName: getFeatureDisplayName(featureId),
+    };
+  }
+  
+  // Check if the user's plan includes this specific feature
+  const hasFeature = planFeatures.some(feature => {
+    // Match feature text to feature ID (flexible matching)
+    const featureText = feature.text.toLowerCase();
+    const searchId = featureId.toLowerCase().replace('-', ' ');
+    
+    // Direct text matching or keyword matching
+    return featureText.includes(searchId) || 
+           featureText.includes(getFeatureDisplayName(featureId).toLowerCase()) ||
+           matchFeatureKeywords(featureText, featureId);
+  });
+  
+  return {
+    canAccess: hasFeature,
+    requiresUpgrade: !hasFeature,
+    featureName: getFeatureDisplayName(featureId),
+  };
+}
+
 export function FeatureLock({ 
   featureId, 
   planName, 
-  featureTier, // Add featureTier prop
+  featureTier,
+  planFeatures,
   title, 
   description, 
   className = '' 
-}: FeatureLockProps & { featureTier?: string | null }): React.ReactElement | null {
-  const featureAccess = checkFeatureAccess(planName, featureId, featureTier);
+}: FeatureLockProps & { 
+  featureTier?: string | null;
+  planFeatures?: PlanFeature[];
+}): React.ReactElement | null {
+  
+  // Use plan features if available, otherwise fall back to tier-based check
+  const featureAccess = (planFeatures && planFeatures.length > 0)
+    ? checkFeatureAccessWithFeatures(planFeatures, featureId)
+    : (() => {
+        const { checkFeatureAccess } = require('@/lib/feature-access');
+        return checkFeatureAccess(planName, featureId, featureTier);
+      })();
+  
   const minimumPlan = getMinimumPlanForFeature(featureId);
 
   if (featureAccess.canAccess) {
@@ -63,12 +197,20 @@ interface FeatureGuardProps {
   featureId: string;
   planName: string | null;
   featureTier?: string | null;
+  planFeatures?: PlanFeature[];
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
-export function FeatureGuard({ featureId, planName, featureTier, children, fallback }: FeatureGuardProps): React.ReactElement {
-  const featureAccess = checkFeatureAccess(planName, featureId, featureTier);
+export function FeatureGuard({ featureId, planName, featureTier, planFeatures, children, fallback }: FeatureGuardProps): React.ReactElement {
+  
+  // Use plan features if available, otherwise fall back to tier-based check
+  const featureAccess = (planFeatures && planFeatures.length > 0)
+    ? checkFeatureAccessWithFeatures(planFeatures, featureId)
+    : (() => {
+        const { checkFeatureAccess } = require('@/lib/feature-access');
+        return checkFeatureAccess(planName, featureId, featureTier);
+      })();
 
   if (featureAccess.canAccess) {
     return <>{children}</>;
@@ -83,6 +225,7 @@ export function FeatureGuard({ featureId, planName, featureTier, children, fallb
       featureId={featureId} 
       planName={planName}
       featureTier={featureTier}
+      planFeatures={planFeatures}
       title="Feature Not Available"
       description="This feature is not included in your current plan."
     />
