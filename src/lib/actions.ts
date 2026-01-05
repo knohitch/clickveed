@@ -19,7 +19,7 @@ import type { Message } from '@/lib/types';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import prisma from '@/server/prisma';
-import { checkFeatureAccess, getMinimumPlanForFeature } from '@/lib/feature-access';
+import { checkUserFeatureAccess } from '@/server/actions/feature-access-actions';
 
 /**
  * Helper function to verify feature access for the current user
@@ -31,22 +31,11 @@ async function verifyFeatureAccess(featureId: string): Promise<void> {
         throw new Error('Authentication required');
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        include: { plan: true }
-    });
-
-    if (!user) {
-        throw new Error('User not found');
-    }
-
-    const planName = user.plan?.name || null;
-    const featureTier = user.plan?.featureTier || null;
-    const access = checkFeatureAccess(planName, featureId, featureTier);
+    // Use server-side feature access check that respects database-configured features
+    const access = await checkUserFeatureAccess(session.user.id, featureId);
 
     if (!access.canAccess) {
-        const requiredPlan = getMinimumPlanForFeature(featureId);
-        throw new Error(`${access.featureName} requires a ${requiredPlan} plan or higher. Please upgrade your subscription.`);
+        throw new Error(`${access.featureName} is not available on your current plan. Please upgrade to access this feature.`);
     }
 }
 
