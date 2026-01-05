@@ -3,7 +3,7 @@
 
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
-import type { User, Plan, UserUsage } from '@prisma/client';
+import type { User, Plan, UserUsage, PlanFeature } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { getBaseUrl } from '@/lib/utils';
 
@@ -46,7 +46,7 @@ export async function getUsers(): Promise<UserWithRole[]> {
 /**
  * Retrieves a single user by their ID.
  */
-export async function getUserById(id: string): Promise<User & { plan: Plan & { features: any[] } | null, usage: UserUsage | null } | null> {
+export async function getUserById(id: string): Promise<(User & { plan: Plan & { features: PlanFeature[] } | null }) & { usage: UserUsage | null } | null> {
     const user = await prisma.user.findUnique({
         where: { id },
         include: {
@@ -58,7 +58,7 @@ export async function getUserById(id: string): Promise<User & { plan: Plan & { f
             usage: true
         }
     });
-    return user;
+    return user as any;
 }
 
 /**
