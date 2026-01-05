@@ -136,9 +136,8 @@ export async function signUp(prevState: any, formData: FormData) {
 
             // Send verification email
             const { appName } = await getAdminSettings();
-            // Use NEXTAUTH_URL env var, or fall back based on environment
-            const baseUrl = process.env.NEXTAUTH_URL || 
-                (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+            // Use getBaseUrl utility for proper URL handling
+            const baseUrl = getBaseUrl();
             const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
             
             console.log('[signUp] Verification URL:', verificationUrl);
@@ -346,9 +345,8 @@ export async function requestPasswordResetAction(prevState: any, formData: FormD
             });
 
             const { appName } = await getAdminSettings();
-            // Use NEXTAUTH_URL env var, or fall back based on environment
-            const baseUrl = process.env.NEXTAUTH_URL || 
-                (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+            // Use getBaseUrl utility for proper URL handling
+            const baseUrl = getBaseUrl();
             const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
             try {

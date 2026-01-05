@@ -92,8 +92,8 @@ export async function checkFeatureAccessWithPlan(
     };
   }
   
-  // If no plan or Free plan, check if feature is allowed
-  if (!userPlan || userPlan.name.toLowerCase() === 'free') {
+  // If no plan, use default free features as fallback
+  if (!userPlan) {
     const freeFeatures = [
       'ai-assistant',
       'creative-assistant',

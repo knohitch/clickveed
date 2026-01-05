@@ -5,12 +5,7 @@ import { Stripe } from 'stripe';
 import prisma from '@lib/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { auth } from '@/auth';
-
-const getURL = () => {
-    const url = process.env.NEXTAUTH_URL;
-    if (!url) throw new Error("NEXTAUTH_URL environment variable is not set.");
-    return url;
-};
+import { getBaseUrl } from '@/lib/utils';
 
 export async function POST(req: Request) {
     try {
@@ -86,8 +81,8 @@ export async function POST(req: Request) {
             customer: stripeCustomerId,
             line_items: [{ price: stripePriceId, quantity: 1 }],
             mode: 'subscription',
-            success_url: `${getURL()}/dashboard/settings?payment_success=true`,
-            cancel_url: `${getURL()}/dashboard/settings`,
+            success_url: `${getBaseUrl()}/dashboard/settings?payment_success=true`,
+            cancel_url: `${getBaseUrl()}/dashboard/settings`,
             metadata: {
                 userId: userId,
                 planId: planId,

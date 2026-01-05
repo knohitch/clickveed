@@ -62,9 +62,8 @@ export async function POST(request: Request) {
 
         // Send verification email
         const { appName } = await getAdminSettings();
-        // Use NEXTAUTH_URL env var, or fall back based on environment
-        const baseUrl = process.env.NEXTAUTH_URL || 
-            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+        // Use getBaseUrl utility for proper URL handling
+        const baseUrl = getBaseUrl(request);
         const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
         
         console.log('[resend-verification] Verification URL generated:', verificationUrl.substring(0, 80) + '...');

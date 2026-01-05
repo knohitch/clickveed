@@ -46,11 +46,15 @@ export async function getUsers(): Promise<UserWithRole[]> {
 /**
  * Retrieves a single user by their ID.
  */
-export async function getUserById(id: string): Promise<User & { plan: Plan | null, usage: UserUsage | null } | null> {
+export async function getUserById(id: string): Promise<User & { plan: Plan & { features: any[] } | null, usage: UserUsage | null } | null> {
     const user = await prisma.user.findUnique({
         where: { id },
         include: {
-            plan: true,
+            plan: {
+                include: {
+                    features: true
+                }
+            },
             usage: true
         }
     });
@@ -241,9 +245,8 @@ export async function approveUser(userId: string) {
         const { sendEmail } = await import('@/server/services/email-service');
         const { getAdminSettings } = await import('@/server/actions/admin-actions');
         const { appName } = await getAdminSettings();
-        // Use NEXTAUTH_URL env var, or fall back based on environment
-        const baseUrl = process.env.NEXTAUTH_URL || 
-            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+        // Use getBaseUrl utility for proper URL handling
+        const baseUrl = getBaseUrl();
 
         await sendEmail({
             to: user.email!,

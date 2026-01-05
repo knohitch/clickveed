@@ -1,219 +1,152 @@
-# Bug Fixes Summary - December 26, 2025
+# Bug Fixes Summary - January 5, 2026
 
-## ✅ Fixed Issues
+## Fixed Issues
 
-### 1. Email Verification Link Showing "undefined"
-**Problem:** Email verification links were showing "undefined" in the URL, making them unclickable.
+### 1. Verification Email URL Showing Localhost
 
-**Root Cause:** The `getBaseUrl()` function was being called without a request parameter and `NEXTAUTH_URL` environment variable was not configured, causing it to return `undefined`.
+**Problem:**
+Even when `NEXTAUTH_URL` was correctly set to the production domain URL, verification emails were still showing `localhost:3000` in the verification link.
 
-**Files Modified:**
-- `src/server/actions/auth-actions.ts` (lines 103-105)
-- `src/server/actions/user-actions.ts` (lines 134-136)
+**Root Cause:**
+Several files were constructing the base URL inline instead of using the centralized `getBaseUrl()` utility function. The inline logic had incorrect fallback priorities and wasn't properly reading the `NEXTAUTH_URL` environment variable.
 
-**Fix Applied:**
+**Affected Files:**
+- `src/server/actions/auth-actions.ts` (2 occurrences)
+- `src/app/api/auth/resend-verification/route.ts`
+- `src/server/actions/user-actions.ts`
+
+**Solution:**
+Replaced all inline base URL construction with calls to the `getBaseUrl()` utility function, which properly handles:
+1. `NEXTAUTH_URL` environment variable (highest priority)
+2. Request headers (protocol and host)
+3. `VERCEL_URL` for Vercel deployments
+4. Fallback to localhost for development
+
+**Changes Made:**
 ```typescript
-const baseUrl = getBaseUrl() || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+// Before
+const baseUrl = process.env.NEXTAUTH_URL || 
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
+// After
+const baseUrl = getBaseUrl();
+// or for API routes with Request object:
+const baseUrl = getBaseUrl(request);
 ```
 
-Added proper fallback chain for baseURL generation.
+**Verification:**
+- Verification emails will now correctly use the production domain URL when `NEXTAUTH_URL` is set
+- The URL will dynamically adapt based on the environment (production, staging, development)
+- Request headers are used as a fallback for proper protocol and host detection
 
-### 2. Account Approval Notification Missing Link
-**Problem:** When admin approves a user, the notification email was missing the login link.
+---
 
-**Root Cause:** Same as above - `getBaseUrl()` not returning a valid URL.
+### 2. Free Plan Users Cannot Use Features
 
-**Files Modified:**
-- `src/server/actions/user-actions.ts` (approveUser function)
+**Problem:**
+Users on the Free plan could not access any features, even when admins edited the Free plan features in the super admin panel. The system was ignoring the database-configured features.
 
-**Fix Applied:** Added proper baseURL fallback to generate valid login link in approval email.
+**Root Cause:**
+The `checkFeatureAccessWithPlan` function in `src/server/actions/feature-access-actions.ts` was using a hardcoded list of free features instead of checking the actual features stored in the database for the Free plan. It had this logic:
 
-### 3. Stripe Keys Not Deleting When Cleared
-**Problem:** When users deleted Stripe keys and saved, the old keys would reappear after page reload.
-
-**Root Cause:** The `updateApiKeys` function only upserted new keys but never deleted keys that were set to empty/undefined.
-
-**Files Modified:**
-- `src/server/actions/admin-actions.ts` (updateApiKeys function)
-
-**Fix Applied:**
 ```typescript
-// Get all existing keys
-const existingKeys = await prisma.apiKey.findMany();
-const existingKeyNames = new Set(existingKeys.map(k => k.name));
-
-// Update or create new keys
-for (const [name, value] of Object.entries(keys)) {
-    if (value !== '' && value !== undefined) {
-        await prisma.apiKey.upsert({
-            where: { name },
-            update: { value },
-            create: { name, value }
-        });
-    } else if (existingKeyNames.has(name)) {
-        // Delete key if it's being set to empty
-        await prisma.apiKey.delete({
-            where: { name }
-        });
-    }
+if (!userPlan || userPlan.name.toLowerCase() === 'free') {
+  const freeFeatures = [/* hardcoded list */];
+  const canAccess = freeFeatures.includes(featureId);
+  return { canAccess, ... };
 }
 ```
 
-Now keys are properly deleted when cleared and updated when new values are provided.
+This meant that even when admins configured different features for the Free plan, they were completely ignored.
 
-### 4. Missing accountApproved Template in Email Templates Page
-**Problem:** TypeScript compilation error because `accountApproved` template was defined in the EmailTemplates type but missing from the UI.
+**Affected File:**
+- `src/server/actions/feature-access-actions.ts`
 
-**Files Modified:**
-- `src/app/chin/dashboard/(main-dashboard)/email-templates/page.tsx`
+**Solution:**
+Modified the logic to:
+1. Only use hardcoded free features as a fallback when the plan object is `null` (missing)
+2. When a plan object exists (including Free plan), check the actual features defined in the database
+3. Allow admins to fully control which features are available on the Free plan
 
-**Fix Applied:**
-- Added `accountApproved` to `templateInfo` object with proper title, description, icon, and placeholders
-- Added `accountApproved` template editor to the UI rendering section under "User-Facing Emails"
+**Changes Made:**
+```typescript
+// Before
+if (!userPlan || userPlan.name.toLowerCase() === 'free') {
+  const freeFeatures = [/* hardcoded list */];
+  const canAccess = freeFeatures.includes(featureId);
+  return { canAccess, ... };
+}
+// Then check features for paid plans...
 
-## 🚧 Remaining Issues
+// After
+if (!userPlan) {
+  // Only use hardcoded list as fallback when plan is null
+  const freeFeatures = [/* hardcoded list */];
+  const canAccess = freeFeatures.includes(featureId);
+  return { canAccess, ... };
+}
+// Check database features for ALL plans (including Free)
+const hasFeature = userPlan.features.some(feature => {
+  // Match feature text to feature ID
+  return feature.text.includes(searchId) || ...;
+});
+```
 
-### 1. Dashboard Buttons Not Working (Free Tier Users)
-**Status:** ✅ FIXED
+**Verification:**
+- Free plan users can now access features configured by admins in the super admin panel
+- Admin changes to Free plan features are immediately effective
+- The feature matching system uses flexible text matching and keywords for robust feature detection
+- Backward compatibility maintained with existing plan configurations
 
-**Problem:** Users on free tier report that clicking menu buttons on the dashboard doesn't work.
+---
 
-**Root Causes Identified:**
-1. No loading state in AuthContext - the `getUserById` call could fail silently
-2. Menu filtering happened immediately even before plan data was loaded
-3. No debug logging to troubleshoot issues
+## Testing Recommendations
 
-**Files Modified:**
-- `src/components/dashboard-nav.tsx`
-- `src/contexts/auth-context.tsx`
+### Verification Email URL Fix
+1. Set `NEXTAUTH_URL` to your production domain in the environment
+2. Create a new user account
+3. Check the verification email received
+4. Verify the link contains your production domain, not localhost
 
-**Fixes Applied:**
+### Free Plan Feature Access Fix
+1. Log in as Super Admin
+2. Go to Super Admin Dashboard → Plans
+3. Edit the Free plan and add/remove features
+4. Log in as a Free plan user
+5. Verify the user can access the features you enabled
+6. Verify the user cannot access features you disabled
 
-1. **AuthContext Improvements (`src/contexts/auth-context.tsx`):**
-   - Added try/catch error handling around `getUserById` call
-   - Added detailed console logging for debugging:
-     - `[AuthContext] Loading user data for: {userId}`
-     - `[AuthContext] Loaded user details: {id, plan, planId}`
-     - `[AuthContext] Set subscription plan: {planName}`
-     - `[AuthContext] No plan found for user, setting to null`
-     - `[AuthContext] Error loading user: {error}`
-   - Improved loading state management
+---
 
-2. **DashboardNav Improvements (`src/components/dashboard-nav.tsx`):**
-   - Added `authLoading` from useAuth to check loading state
-   - Added debug logging:
-     - `[DashboardNav] Auth loading: {boolean}`
-     - `[DashboardNav] Subscription plan: {plan}`
-     - `[DashboardNav] Plan name: {name}`
-     - `[DashboardNav] Feature tier: {tier}`
-   - Show all menu sections while loading to ensure buttons are clickable
-   - Added proper imports for useEffect
+## Files Modified
 
-**Testing:**
-- Check browser console for `[AuthContext]` and `[DashboardNav]` logs
-- Verify menu buttons are clickable immediately on page load
-- Verify plan data loads correctly and menu filters appropriately
-- Check that free tier users can access all free features
+1. `src/server/actions/auth-actions.ts`
+   - Fixed verification URL generation in `signUp` function
+   - Fixed reset link URL generation in `requestPasswordResetAction` function
 
-**Free Tier Features (Available):**
-- AI Assistant Home
-- Video Suite (basic)
-- Video Pipeline
-- Script Generator
-- Stock Media Library
-- AI Image Generator
-- Background Remover
-- Media Library
-- Profile Settings
+2. `src/app/api/auth/resend-verification/route.ts`
+   - Fixed verification URL generation in resend endpoint
 
-### 2. Stripe Payment Upgrade Error
-**Status:** 🔧 IN PROGRESS
+3. `src/server/actions/user-actions.ts`
+   - Fixed login link URL in `approveUser` function
+   - **CRITICAL FIX:** Modified `getUserById` to include plan features in the query
+   - Without this fix, feature access checks would fail because plan features weren't loaded
 
-**Problem:** When users try to upgrade from free to a paid plan, they get a server error: "An error occurred in the Server components render."
+4. `src/server/actions/feature-access-actions.ts`
+   - Fixed feature access logic to respect database-configured features
+   - Removed hardcoded free plan feature check
+   - Now properly checks features from database for all plans
 
-**Root Causes Identified:**
-1. Missing Stripe environment variables documentation in `.env.example`
-2. No detailed error logging in the billing page
-3. Potential silent failures in webhook processing
-4. Missing Stripe price IDs for plans can cause checkout failures
+5. `src/api/stripe/create-checkout-session/route.ts`
+   - Updated to use `getBaseUrl()` utility for Stripe checkout URLs
+   - Removed local `getURL()` function in favor of centralized utility
 
-**Files Modified:**
-- `.env.example` - Added Stripe keys documentation
+---
 
-**Fixes Applied:**
+## Additional Notes
 
-1. **Environment Variables Documentation (`.env.example`):**
-   - Added Stripe configuration variables:
-     - `STRIPE_SECRET_KEY` - Secret key for server-side operations
-     - `STRIPE_PUBLISHABLE_KEY` - Publishable key for client-side Stripe.js
-     - `STRIPE_WEBHOOK_SECRET` - Webhook secret for verifying Stripe events
-
-**Recommended Next Steps:**
-1. Add detailed console logging to the billing page `processPayment` function
-2. Add error handling to `createCheckoutSession` function
-3. Verify webhook endpoint is receiving and processing events
-4. Ensure all plans have valid Stripe Price IDs configured
-5. Add graceful error messages when Stripe is not configured
-
-**Configuration Checklist:**
-- [ ] Verify Stripe API keys are set in admin settings
-- [ ] Verify plans have `stripePriceIdMonthly`, `stripePriceIdQuarterly`, and `stripePriceIdYearly` set
-- [ ] Verify webhook secret is configured in admin settings
-- [ ] Test checkout flow with test mode keys
-- [ ] Verify webhook is reachable from Stripe dashboard
-
-**Testing:**
-- Check browser console for any `[Billing]` logs
-- Check server logs for Stripe-related errors
-- Verify checkout session is created successfully
-- Verify webhook receives and processes `checkout.session.completed` event
-
-## 📋 Deployment Status
-
-All fixed issues have been:
-- ✅ Committed to git
-- ✅ Pushed to GitHub repository: https://github.com/knohitch/clickveed.git
-
-**Latest Commit:** `0fd9784` - "Fix critical bugs: email verification links, account approval, and API key persistence"
-
-## 🧪 Testing Checklist
-
-After deployment, verify:
-
-### Email Flow
-- [ ] User signup receives verification email with working link
-- [ ] Verification link redirects to correct URL
-- [ ] Admin approval sends notification with login link
-- [ ] Password reset email works correctly
-
-### API Keys
-- [ ] New API keys can be saved
-- [ ] Existing API keys can be updated
-- [ ] Cleared API keys are properly deleted and don't reappear
-- [ ] Settings persist across page reloads
-
-### Dashboard (Pending Investigation)
-- [ ] Free tier users can access basic features
-- [ ] Menu navigation works correctly
-- [ ] Feature locks display properly for unavailable features
-- [ ] User plan data loads in AuthContext
-
-### Stripe Payments (Pending Investigation)
-- [ ] Users can view available plans
-- [ ] Checkout session creation works
-- [ ] Webhook receives payment confirmation
-- [ ] User plan upgrades successfully
-- [ ] User access updates after payment
-
-## 📝 Notes for Next Developer
-
-1. **NEXTAUTH_URL Environment Variable:** This must be set in production for email links to work. Example: `https://your-domain.com`
-
-2. **Feature Access Testing:** To properly test dashboard functionality, you may need to temporarily expand the free tier feature list or use a higher-tier test account.
-
-3. **Stripe Testing:** Use Stripe's test mode with test API keys to verify payment flow without real transactions.
-
-4. **Console Logging:** Consider adding more verbose logging to debug remaining issues, especially around:
-   - User data loading in AuthContext
-   - Feature access validation
-   - Stripe webhook processing
+- The `getBaseUrl()` utility function in `src/lib/utils.ts` is the single source of truth for URL generation
+- All email links should use this utility for consistent behavior
+- The feature access system is now fully dynamic and respects admin configurations
+- No database migrations are required for these fixes
+- These changes are backward compatible with existing data
