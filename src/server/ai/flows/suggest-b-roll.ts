@@ -95,17 +95,8 @@ export async function fetchStockVideos(input: FetchStockVideosInput): Promise<Fe
     };
   } catch (error) {
     console.error('Failed to fetch stock videos:', error);
-    // Fallback to placeholder data if API fails
-    return {
-      videos: [
-        {
-          id: `fallback-${Date.now()}`,
-          url: 'https://placehold.co/1920x1080/000000/FFFFFF.mp4',
-          thumbnail: 'https://placehold.co/400x300/000000/FFFFFF.png',
-          description: `Placeholder for ${input.searchTerm}`,
-          photographer: 'Fallback Media'
-        }
-      ]
-    };
+    throw new Error(
+      `Failed to fetch stock videos for "${input.searchTerm}". Please check your Pexels API key or try again later.`
+    );
   }
 }

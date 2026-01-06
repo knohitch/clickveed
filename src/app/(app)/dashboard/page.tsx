@@ -203,13 +203,13 @@ export default function DashboardPage() {
                         <div className="space-y-1">
                             <h4 className="font-bold text-lg">{subscriptionPlan?.name || 'Free'} Plan</h4>
                             <p className="text-sm text-muted-foreground">
-                                {userPlanDetails.hasActiveSubscription ? `Renews on ${userPlanDetails.renewsOn}` : 'Upgrade to unlock features.'}
+                                {userPlanDetails.hasPremiumFeatures ? `Renews on ${userPlanDetails.renewsOn}` : 'Upgrade to unlock premium features.'}
                             </p>
                         </div>
                          <Star className="h-8 w-8 text-yellow-500" />
                     </div>
                     <Button className="w-full" asChild>
-                        <Link href="/dashboard/settings">{userPlanDetails.hasActiveSubscription ? 'Manage Subscription' : 'Upgrade Plan'}</Link>
+                        <Link href="/dashboard/settings">{userPlanDetails.hasPremiumFeatures ? 'Manage Subscription' : 'Upgrade Plan'}</Link>
                     </Button>
                 </CardContent>
             </Card>

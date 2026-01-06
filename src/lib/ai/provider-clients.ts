@@ -31,6 +31,29 @@ interface TTSResponse {
   provider: string;
 }
 
+// Provider metadata for authentication type
+interface ProviderMetadata {
+  authType: 'apiKey' | 'oauth' | 'none';
+  requiresSetup: boolean;
+  setupInstructions?: string;
+}
+
+// Import database config service
+import { getProviderMetadata as getDbProviderMetadata } from '@/lib/database-config-service';
+
+// Helper function to check provider setup status (now uses database)
+async function checkProviderSetup(provider: string): Promise<void> {
+  const metadata = await getDbProviderMetadata(provider);
+  if (metadata?.requiresSetup) {
+    throw new Error(
+      `[${provider}] Provider requires setup before use.\n` +
+      `Authentication Type: ${metadata.authType}\n` +
+      `Setup Instructions: ${metadata.setupInstructions}\n` +
+      `This provider is intentionally disabled until proper credentials are configured.`
+    );
+  }
+}
+
 // OpenAI Client
 export class OpenAIClient {
   private client: OpenAI;
@@ -160,10 +183,14 @@ export class ElevenLabsClient {
         }
       );
       
-      // In a real implementation, we would save the audio and return a URL
-      // For now, we'll just return a placeholder
+      const audioBuffer = Buffer.from(response.data);
+      const audioDataUri = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
+      
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const { publicUrl } = await uploadToWasabi(audioDataUri, 'audio');
+      
       return {
-        audioUrl: 'placeholder-audio-url',
+        audioUrl: publicUrl,
         model,
         provider: 'elevenlabs'
       };
@@ -264,10 +291,16 @@ export class ReplicateClient {
   
   async generateImage(prompt: string, model: string = 'stability-ai/sdxl'): Promise<ImageGenerationResponse> {
     try {
-      const response = await axios.post(
+      const modelVersions: Record<string, string> = {
+        'stability-ai/sdxl': '39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
+      };
+
+      const version = modelVersions[model] || model;
+
+      const createResponse = await axios.post(
         `${this.baseUrl}/predictions`,
         {
-          version: 'model-version-id', // This would need to be the actual model version
+          version,
           input: { prompt },
         },
         {
@@ -277,11 +310,38 @@ export class ReplicateClient {
           },
         }
       );
+
+      const predictionId = createResponse.data.id;
       
-      // In a real implementation, we would poll for the result
-      // For now, we'll just return a placeholder
+      let result = createResponse.data;
+      while (result.status !== 'succeeded' && result.status !== 'failed' && result.status !== 'canceled') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const pollResponse = await axios.get(
+          `${this.baseUrl}/predictions/${predictionId}`,
+          {
+            headers: {
+              'Authorization': `Token ${this.apiKey}`,
+            },
+          }
+        );
+        result = pollResponse.data;
+      }
+
+      if (result.status !== 'succeeded' || !result.output?.[0]) {
+        throw new Error(`Replicate generation failed: ${result.status}`);
+      }
+
+      const imageUrl = result.output[0];
+      
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const imageResponse = await fetch(imageUrl);
+      const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      const imageDataUri = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+      const { publicUrl } = await uploadToWasabi(imageDataUri, 'images');
+      
       return {
-        imageUrl: 'placeholder-image-url',
+        imageUrl: publicUrl,
         model,
         provider: 'replicate'
       };
@@ -316,11 +376,21 @@ export class SeedanceClient {
           },
         }
       );
-      
-      // In a real implementation, we would extract the video URL from the response
-      // For now, we'll just return a placeholder
+
+      const videoUrl = response.data?.video_url || response.data?.videoUrl;
+
+      if (!videoUrl) {
+        throw new Error('No video URL returned from Seedance API');
+      }
+
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const videoResponse = await fetch(videoUrl);
+      const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+      const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'video');
+
       return {
-        videoUrl: 'placeholder-video-url',
+        videoUrl: publicUrl,
         model: 'seedance-video',
         provider: 'seedance'
       };
@@ -355,11 +425,21 @@ export class HeyGenClient {
           },
         }
       );
-      
-      // In a real implementation, we would extract the video URL from the response
-      // For now, we'll just return a placeholder
+
+      const videoUrl = response.data?.data?.video_url || response.data?.videoUrl;
+
+      if (!videoUrl) {
+        throw new Error('No video URL returned from HeyGen API');
+      }
+
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const videoResponse = await fetch(videoUrl);
+      const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+      const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'video');
+
       return {
-        videoUrl: 'placeholder-video-url',
+        videoUrl: publicUrl,
         model: 'heygen-video',
         provider: 'heygen'
       };
@@ -394,11 +474,21 @@ export class WanClient {
           },
         }
       );
-      
-      // In a real implementation, we would extract the video URL from the response
-      // For now, we'll just return a placeholder
+
+      const videoUrl = response.data?.data?.video_url || response.data?.videoUrl;
+
+      if (!videoUrl) {
+        throw new Error('No video URL returned from Wan API');
+      }
+
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const videoResponse = await fetch(videoUrl);
+      const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+      const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'video');
+
       return {
-        videoUrl: 'placeholder-video-url',
+        videoUrl: publicUrl,
         model: 'wan-video',
         provider: 'wan'
       };
@@ -443,7 +533,21 @@ export class HuggingFaceClient {
 }
 
 // Factory function to create clients based on provider
-export function createProviderClient(provider: string, apiKey: string): any {
+export async function createProviderClient(provider: string): Promise<any> {
+  // Check setup status before creating any client (now uses database)
+  const metadata = await checkProviderSetup(provider);
+  
+  // Fetch API key from database
+  const { getAdminSettings } = await import('@/server/actions/admin-actions');
+  const settings = await getAdminSettings();
+  const apiKey = settings?.apiKeys?.[provider] || '';
+
+  if (!apiKey && metadata.authType === 'apiKey') {
+    throw new Error(
+      `[${provider}] API key not configured. Please add the API key in admin settings.`
+    );
+  }
+  
   switch (provider) {
     case 'openai':
     case 'azureOpenai':
@@ -469,4 +573,9 @@ export function createProviderClient(provider: string, apiKey: string): any {
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
+}
+
+// Export helper to get provider metadata (now wraps database call)
+export async function getProviderMetadata(provider: string): Promise<ProviderMetadata> {
+  return getDbProviderMetadata(provider);
 }

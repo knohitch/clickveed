@@ -5,6 +5,7 @@ import prisma from '@/server/prisma';
 import { auth } from '@/auth';
 import { generateTimedTranscript as generateTimedTranscriptFlow } from '@/server/ai/flows/generate-timed-transcript';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
+import { requireFeatureAccess } from '@/server/actions/feature-access-service';
 
 /**
  * Creates a new video record in the database, uploads the video file to storage,
@@ -53,6 +54,7 @@ export async function createVideoWithTranscript(videoFile: File) {
     // 1. Upload video to Wasabi to get a public URL
     const videoDataUri = `data:${videoFile.type};base64,${Buffer.from(await videoFile.arrayBuffer()).toString('base64')}`;
     const { publicUrl: videoUrl, sizeMB } = await uploadToWasabi(videoDataUri, 'videos');
+    console.log(`[VideoActions] Video uploaded successfully: ${videoUrl}`);
     
     // 2. Create a default project for the user if one doesn't exist
     let project = await prisma.project.findFirst({

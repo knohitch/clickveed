@@ -182,9 +182,25 @@ export async function generatePipelineVideo(input: GeneratePipelineVideoInput): 
             ? sceneDescriptions.join(' ').replace(/\[SCENE:/g, '').replace(/\]/g, '')
             : input.script.substring(0, 200); // Fallback to first 200 characters
 
-        // For now, we'll use a placeholder image URL since we don't have actual images in the pipeline
-        // In a real implementation, this would be replaced with actual generated or provided images
-        const placeholderImageUrl = "https://placehold.co/1920x1080/000000/FFFFFF/png?text=Generated+Video+Scene";
+        // Generate an image from the visual prompt using the image generation service
+        const { getAvailableImageGenerator } = await import('@/lib/ai/api-service-manager');
+        const imageProvider = await getAvailableImageGenerator();
+        
+        const { ai: genkitAi } = await import('@/ai/genkit');
+        const imageResponse = await genkitAi.generate({
+            model: imageProvider.model,
+            prompt: visualPrompt.substring(0, 500), // Limit prompt length
+            config: {
+                responseModalities: ['IMAGE']
+            }
+        });
+        
+        if (!imageResponse.media) {
+            throw new Error('Image generation failed for video pipeline scene.');
+        }
+        
+        const placeholderImageUrl = imageResponse.media.url;
+
 
         // Import the video generation function
         const { generateVideoFromImage } = await import('./generate-video-from-image');

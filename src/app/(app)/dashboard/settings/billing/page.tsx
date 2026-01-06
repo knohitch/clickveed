@@ -172,12 +172,9 @@ export default function BillingPage() {
     }
 
     const handleChoosePlan = (plan: Plan) => {
-        // Don't allow purchasing free plans
-        if (plan.priceMonthly === 0) {
-            toast({ variant: 'destructive', title: 'Invalid Selection', description: 'Free plan does not require payment.' });
-            return;
-        }
-
+        // Remove plan check - allow free plan users to see payment UI
+        // Payment will still check features via verifyFeatureAccess()
+        
         if (availableProviders.length === 0) {
             toast({ variant: 'destructive', title: 'Payments Not Configured', description: 'No payment providers are available. Please contact support.' });
             return;
@@ -187,22 +184,6 @@ export default function BillingPage() {
         } else {
             setSelectedPlanForPayment(plan);
             setPaymentDialogOpen(true);
-        }
-    }
-
-    const handleManageBilling = async () => {
-         if (!apiKeys.stripeSecretKey || !currentUser) {
-            toast({ variant: 'destructive', title: "Configuration Error", description: "Payment processing is not configured or you are not logged in. Please contact support." });
-            return;
-        }
-        setIsRedirecting(true);
-        try {
-            const { url } = await createCustomerPortalSession();
-            router.push(url);
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: "Error", description: error.message });
-        } finally {
-            setIsRedirecting(false);
         }
     };
     
@@ -293,14 +274,13 @@ export default function BillingPage() {
                             <CardFooter>
                                 <Button
                                     className="w-full"
-                                    disabled={subscriptionPlan?.id === plan.id || isRedirecting || plan.priceMonthly === 0}
+                                    disabled={subscriptionPlan?.id === plan.id || isRedirecting}
                                     onClick={() => handleChoosePlan(plan)}
-                                    variant={plan.priceMonthly === 0 ? "secondary" : "default"}
+                                     variant="default"
                                 >
                                     {isRedirecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     {subscriptionPlan?.id === plan.id ? 'Current Plan' :
-                                     plan.priceMonthly === 0 ? 'Free Plan' :
-                                     isRedirecting ? 'Processing...' : 'Choose Plan'}
+                                      isRedirecting ? 'Processing...' : 'Choose Plan'}
                                 </Button>
                             </CardFooter>
                         </Card>

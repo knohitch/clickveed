@@ -111,8 +111,26 @@ export async function createPendingAdminUser(userData: { fullName: string; email
         }
     });
 
-    // TODO: Send an email invitation with a link to set the password.
-    console.log(`User invitation created for ${userData.email}. They need to set their password.`);
+    // Send email invitation with a link to set up password
+    const { sendEmail } = await import('@/server/services/email-service');
+    // Use NEXT_PUBLIC_SITE_URL for production URLs, fallback to localhost for development
+    const appUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    
+    try {
+      await sendEmail({
+        templateKey: 'user-invitation',
+        to: userData.email,
+        subject: 'You\'ve been invited to join the platform',
+        data: {
+          name: userData.fullName,
+          invitationLink: `${appUrl}/auth/reset-password?email=${encodeURIComponent(userData.email)}`
+        }
+      });
+      console.log(`User invitation email sent to ${userData.email}`);
+    } catch (error) {
+      console.error('Failed to send invitation email:', error);
+      // Continue even if email fails - user can still login and set password
+    }
 
     return {
         id: newUser.id,

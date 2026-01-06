@@ -3,32 +3,22 @@ import { createRateLimit } from '@/lib/rate-limit';
 
 // Rate limiting: 5 requests per minute for video generation
 const rateLimiter = createRateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   maxRequests: 5,
   message: 'Too many video generation requests. Please try again in a minute.'
 });
 
 export async function POST(request: Request) {
   try {
-    // Apply rate limiting
     const rateLimitResponse = rateLimiter(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
-    // Basic authentication check (you can enhance this with proper session validation)
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
     }
-
-    // For now, we'll accept any bearer token (in production, validate against session/JWT)
-    // const token = authHeader.substring(7);
-    // const session = await validateToken(token);
-    // if (!session) {
-    //   return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    // }
-
 
     const { url, topic } = await request.json();
 
@@ -36,50 +26,77 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    // Validate URL format
     try {
       new URL(url);
     } catch {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
     }
 
-    // For now, generate a mock script
-    // In a real implementation, you would:
-    // 1. Fetch the content from the URL
-    // 2. Extract key information
-    // 3. Use AI to generate a video script
-    
-    const mockScript = `Video Script Generated from: ${url}
+    try {
+      const urlResponse = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
 
-${topic ? `Focus: ${topic}` : ''}
+      if (!urlResponse.ok) {
+        return NextResponse.json({ error: 'Failed to fetch URL content' }, { status: 400 });
+      }
 
-Introduction:
-Welcome to this video where we explore the fascinating content from the article. Today we'll dive deep into the key insights and takeaways that will help you understand this topic better.
+      const html = await urlResponse.text();
+      
+      const textContent = html
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .substring(0, 10000);
 
-Main Points:
-1. The article highlights several important aspects that deserve our attention
-2. We'll examine the core concepts and how they relate to our daily lives
-3. The implications of these findings are significant for our audience
+      if (!textContent.trim()) {
+        return NextResponse.json({ error: 'No extractable content found at URL' }, { status: 400 });
+      }
 
-Key Takeaways:
-- Understanding the main message helps us make better decisions
-- The evidence presented supports the conclusions drawn
-- Practical applications can be implemented immediately
+      const { ai } = await import('@/ai/genkit');
 
-Conclusion:
-Thank you for joining us on this exploration. The insights from this article provide valuable perspectives that we can all learn from. Don't forget to like, subscribe, and share your thoughts in the comments below.
+      const prompt = `Generate a compelling video script (under 300 words) for content about:
+      
+      ${textContent}
+      
+      ${topic ? `Focus on this angle: ${topic}` : ''}
+      
+      Structure the script with:
+      - Hook/Intro (10-15 seconds)
+      - Main content with 2-3 key points
+      - Call-to-action
+      
+      Make it engaging and suitable for video format.`;
 
-Generated on: ${new Date().toLocaleDateString()}`;
+      const scriptResponse = await ai.generate({
+        prompt,
+        output: { schema: require('z').object({ script: require('z').string() }) }
+      });
 
-    return NextResponse.json({
-      success: true,
-      script: mockScript
-    });
+      const script = scriptResponse.output?.script;
 
+      if (!script) {
+        return NextResponse.json({ error: 'Failed to generate script' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        script,
+        wordCount: script.split(/\s+/).length
+      });
+
+    } catch (error) {
+      console.error('Error generating script from URL:', error);
+      return NextResponse.json(
+        { error: 'Failed to generate script' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Error generating script from URL:', error);
+    console.error('Unexpected error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate script' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

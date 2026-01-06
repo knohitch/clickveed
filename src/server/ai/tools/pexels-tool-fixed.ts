@@ -1,4 +1,3 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -6,7 +5,7 @@ import { z } from 'zod';
 import { createClient, type PhotosWithTotalResults } from 'pexels';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 
-// Constants from established patterns
+// Constants
 const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000; // 1 second
@@ -27,7 +26,6 @@ const pexelsOutputSchema = z.array(z.object({
 
 /**
  * Generic retry function with exponential backoff
- * Uses same pattern as elevenlabs-client.ts
  */
 async function fetchWithRetry<T>(
   fn: () => Promise<T>,
@@ -82,7 +80,6 @@ export const searchPexelsTool = ai.defineTool(
     const client = createClient(pexelsApiKey);
 
     try {
-        // ⬅️ USE RETRY FUNCTION HERE
         const response = await fetchWithRetry(async () => {
             return await client.photos.search({ 
                 query: input.query,

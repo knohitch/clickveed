@@ -4,107 +4,65 @@
  * It does NOT import prisma or any server-only modules
  */
 
+import {
+  getFeatureDisplayName,
+  ALWAYS_ACCESSIBLE_FEATURES,
+  DEFAULT_FREE_PLAN_FEATURES,
+  DEFAULT_STARTER_PLAN_FEATURES,
+  DEFAULT_PRO_PLAN_FEATURES,
+  DEFAULT_ENTERPRISE_PLAN_FEATURES,
+  FEATURE_MINIMUM_PLAN
+} from '@/lib/feature-config';
+
 export interface FeatureAccess {
   canAccess: boolean;
   requiresUpgrade: boolean;
   featureName: string;
 }
 
-function getFeatureDisplayName(featureId: string): string {
-  const displayNames: Record<string, string> = {
-    'ai-assistant': 'AI Assistant',
-    'creative-assistant': 'Creative Assistant',
-    'topic-researcher': 'Topic Researcher',
-    'thumbnail-tester': 'Thumbnail Tester',
-    'video-suite': 'Video Suite',
-    'video-pipeline': 'Video Pipeline',
-    'video-editor': 'Video Editor',
-    'magic-clips': 'Magic Clips',
-    'script-generator': 'Script Generator',
-    'voice-over': 'Voice Over',
-    'image-to-video': 'Image to Video',
-    'voice-cloning': 'Voice Cloning',
-    'video-from-url': 'Video from URL',
-    'stock-media': 'Stock Media Library',
-    'persona-studio': 'Persona Avatar Studio',
-    'ai-image-generator': 'AI Image Generator',
-    'flux-pro': 'Flux Pro Editor',
-    'background-remover': 'Background Remover',
-    'ai-agents': 'AI Agent Builder',
-    'n8n-integrations': 'N8n/Make Integrations',
-    'social-analytics': 'Social Analytics',
-    'social-scheduler': 'Social Scheduler',
-    'social-integrations': 'Social Integrations',
-    'media-library': 'Media Library',
-    'profile-settings': 'Profile Settings',
-    'brand-kit': 'Brand Kit',
-  };
-  
-  return displayNames[featureId] || featureId;
-}
-
 // Feature tier definitions - these are the actual tiers that determine access
 export type FeatureTier = 'free' | 'starter' | 'professional' | 'enterprise';
 
-// Free plan features - expanded to allow basic video creation
-const freePlanFeatures = [
-  'ai-assistant',
-  'creative-assistant',
-  'social-integrations',
-  'video-suite',
-  'video-pipeline',
-  'script-generator',
-  'stock-media',
-  'ai-image-generator',
-  'background-remover',
-  'media-library',
-  'profile-settings',
-];
-
-// Starter plan features
-const starterPlanFeatures = [
-  ...freePlanFeatures,
-  'topic-researcher',
-  'video-editor',
-  'video-from-url',
-  'social-analytics',
-  'brand-kit',
-];
-
-// Professional plan features
-const proPlanFeatures = [
-  ...starterPlanFeatures,
-  'thumbnail-tester',
-  'magic-clips',
-  'voice-over',
-  'image-to-video',
-  'persona-studio',
-  'flux-pro',
-  'ai-agents',
-  'social-scheduler',
-];
-
-// Enterprise plan features (all features)
-const enterprisePlanFeatures = [
-  ...proPlanFeatures,
-  'voice-cloning',
-  'n8n-integrations',
-];
-
 /**
- * Get features available for a specific tier
+ * Get features available for a specific tier (database-backed)
  */
-function getFeaturesForTier(tier: FeatureTier): string[] {
-  switch (tier) {
-    case 'enterprise':
-      return enterprisePlanFeatures;
-    case 'professional':
-      return proPlanFeatures;
-    case 'starter':
-      return starterPlanFeatures;
-    case 'free':
-    default:
-      return freePlanFeatures;
+export async function getFeaturesForTier(tier: FeatureTier): Promise<string[]> {
+  try {
+    const plan = await (await import('./prisma')).default.plan.findFirst({
+      where: { featureTier: tier },
+      include: { features: true }
+    });
+    
+    if (plan && plan.features.length > 0) {
+      return plan.features.map(f => f.name);
+    }
+    
+    // Fallback to default features if no database features
+    switch (tier) {
+      case 'enterprise':
+        return DEFAULT_ENTERPRISE_PLAN_FEATURES;
+      case 'professional':
+        return DEFAULT_PRO_PLAN_FEATURES;
+      case 'starter':
+        return DEFAULT_STARTER_PLAN_FEATURES;
+      case 'free':
+      default:
+        return DEFAULT_FREE_PLAN_FEATURES;
+    }
+  } catch (error) {
+    console.error('Error loading features for tier:', error);
+    // Fallback to defaults on error
+    switch (tier) {
+      case 'enterprise':
+        return DEFAULT_ENTERPRISE_PLAN_FEATURES;
+      case 'professional':
+        return DEFAULT_PRO_PLAN_FEATURES;
+      case 'starter':
+        return DEFAULT_STARTER_PLAN_FEATURES;
+      case 'free':
+      default:
+        return DEFAULT_FREE_PLAN_FEATURES;
+    }
   }
 }
 
@@ -133,12 +91,7 @@ export function checkFeatureAccess(
   featureTier?: string | null
 ): FeatureAccess {
   // Always allow basic features for all users
-  const alwaysAccessibleFeatures = [
-    'profile-settings',
-    'media-library',
-  ];
-
-  if (alwaysAccessibleFeatures.includes(featureId)) {
+  if (ALWAYS_ACCESSIBLE_FEATURES.includes(featureId)) {
     return {
       canAccess: true,
       requiresUpgrade: false,

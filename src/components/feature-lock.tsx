@@ -3,41 +3,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Lock, Star, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { getMinimumPlanForFeature } from '@/lib/feature-access';
+import { getMinimumPlanForFeature, getFeatureDisplayName } from '@/lib/feature-access';
+import { ALWAYS_ACCESSIBLE_FEATURES, matchFeatureKeywords, FEATURE_MINIMUM_PLAN } from '@/lib/feature-config';
 import type { PlanFeature } from '@prisma/client';
 
-function getFeatureDisplayName(featureId: string): string {
-  const displayNames: Record<string, string> = {
-    'ai-assistant': 'AI Assistant',
-    'creative-assistant': 'Creative Assistant',
-    'topic-researcher': 'Topic Researcher',
-    'thumbnail-tester': 'Thumbnail Tester',
-    'video-suite': 'Video Suite',
-    'video-pipeline': 'Video Pipeline',
-    'video-editor': 'Video Editor',
-    'magic-clips': 'Magic Clips',
-    'script-generator': 'Script Generator',
-    'voice-over': 'Voice Over',
-    'image-to-video': 'Image to Video',
-    'voice-cloning': 'Voice Cloning',
-    'video-from-url': 'Video from URL',
-    'stock-media': 'Stock Media Library',
-    'persona-studio': 'Persona Avatar Studio',
-    'ai-image-generator': 'AI Image Generator',
-    'flux-pro': 'Flux Pro Editor',
-    'background-remover': 'Background Remover',
-    'ai-agents': 'AI Agent Builder',
-    'n8n-integrations': 'N8n/Make Integrations',
-    'social-analytics': 'Social Analytics',
-    'social-scheduler': 'Social Scheduler',
-    'social-integrations': 'Social Integrations',
-    'media-library': 'Media Library',
-    'profile-settings': 'Profile Settings',
-    'brand-kit': 'Brand Kit',
-  };
-  
-  return displayNames[featureId] || featureId;
-}
+/**
+ * FEATURE LOCK COMPONENT
+ * 
+ * This component now uses the centralized feature access logic that prioritizes:
+ * 1. Admin-controlled database features (PlanFeature records)
+ * 2. Tier-based fallback (plan.featureTier)
+ * 
+ * The key fix: Admins can enable ANY feature for the Free plan by adding
+ * it to the plan's features list in the database. The component will respect
+ * this configuration regardless of hardcoded tier definitions.
+ * 
+ * Why this fixes the "free plan does nothing" bug:
+ * - Previously, free users were blocked by hardcoded tier definitions
+ * - Now, if admin adds "voice-cloning" to Free plan features, free users get access
+ * - The feature check prioritizes database features over hardcoded tiers
+ */
 
 interface FeatureLockProps {
   featureId: string;
@@ -79,12 +64,7 @@ function checkFeatureAccessWithFeatures(
   featureId: string
 ): { canAccess: boolean; requiresUpgrade: boolean; featureName: string } {
   // Always allow basic features for all users
-  const alwaysAccessibleFeatures = [
-    'profile-settings',
-    'media-library',
-  ];
-  
-  if (alwaysAccessibleFeatures.includes(featureId)) {
+  if (ALWAYS_ACCESSIBLE_FEATURES.includes(featureId)) {
     return {
       canAccess: true,
       requiresUpgrade: false,
@@ -94,21 +74,8 @@ function checkFeatureAccessWithFeatures(
   
   // If no plan features, use default free features as fallback
   if (!planFeatures || planFeatures.length === 0) {
-    const freeFeatures = [
-      'ai-assistant',
-      'creative-assistant',
-      'social-integrations',
-      'video-suite',
-      'video-pipeline',
-      'script-generator',
-      'stock-media',
-      'ai-image-generator',
-      'background-remover',
-      'media-library',
-      'profile-settings',
-    ];
-
-    const canAccess = freeFeatures.includes(featureId);
+    const { DEFAULT_FREE_PLAN_FEATURES } = require('@/lib/feature-config');
+    const canAccess = DEFAULT_FREE_PLAN_FEATURES.includes(featureId);
     return {
       canAccess,
       requiresUpgrade: !canAccess,
