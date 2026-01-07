@@ -39,7 +39,7 @@ interface ProviderMetadata {
 }
 
 // Import database config service
-import { getProviderMetadata as getDbProviderMetadata } from '@/lib/database-config-service';
+import { getProviderMetadata } from '@/lib/database-config-service';
 
 // Helper function to check provider setup status (now uses database)
 async function checkProviderSetup(provider: string): Promise<void> {

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Lock, Star, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { getMinimumPlanForFeature, getFeatureDisplayName } from '@/lib/feature-access';
-import { ALWAYS_ACCESSIBLE_FEATURES, matchFeatureKeywords, FEATURE_MINIMUM_PLAN } from '@/lib/feature-config';
+import { ALWAYS_ACCESSIBLE_FEATURES, FEATURE_MINIMUM_PLAN } from '@/lib/feature-config';
 import type { PlanFeature } from '@prisma/client';
 
 /**
@@ -89,7 +89,7 @@ function checkFeatureAccessWithFeatures(
     const featureText = feature.text.toLowerCase();
     const searchId = featureId.toLowerCase().replace('-', ' ');
     
-    // Direct text matching or keyword matching
+    // Direct text matching or keyword matching (using local function)
     return featureText.includes(searchId) || 
            featureText.includes(getFeatureDisplayName(featureId).toLowerCase()) ||
            matchFeatureKeywords(featureText, featureId);
