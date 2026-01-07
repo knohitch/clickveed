@@ -5,8 +5,14 @@
 
 import prisma from './prisma';
 
+export interface ProviderMetadata {
+  authType: 'apiKey' | 'oauth' | 'none';
+  requiresSetup: boolean;
+  setupInstructions?: string;
+}
+
 // Provider metadata defaults (fallback if not in database)
-const DEFAULT_PROVIDER_METADATA = {
+const DEFAULT_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
   openai: { authType: 'apiKey', requiresSetup: false },
   azureOpenai: { authType: 'apiKey', requiresSetup: false },
   claude: { authType: 'apiKey', requiresSetup: false },
@@ -28,12 +34,6 @@ const DEFAULT_PROVIDER_METADATA = {
   wan: { authType: 'apiKey', requiresSetup: false },
 };
 
-export interface ProviderMetadata {
-  authType: 'apiKey' | 'oauth' | 'none';
-  requiresSetup: boolean;
-  setupInstructions?: string;
-}
-
 /**
  * Get provider metadata from database or use defaults
  */
@@ -47,13 +47,13 @@ export async function getProviderMetadata(providerName: string): Promise<Provide
       return JSON.parse(setting.value);
     }
     
-    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] || {
+    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] as ProviderMetadata || {
       authType: 'apiKey',
       requiresSetup: false
     };
   } catch (error) {
     console.error(`Failed to load provider metadata for ${providerName}:`, error);
-    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] || {
+    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] as ProviderMetadata || {
       authType: 'apiKey',
       requiresSetup: false
     };
@@ -98,7 +98,7 @@ export async function updateProviderMetadata(
     });
     
     const value = JSON.stringify({
-      ...DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA],
+      ...DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] as ProviderMetadata,
       ...metadata
     });
     

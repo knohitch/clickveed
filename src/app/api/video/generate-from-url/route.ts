@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRateLimit } from '@/lib/rate-limit';
+import { z } from 'zod';
 
 // Rate limiting: 5 requests per minute for video generation
 const rateLimiter = createRateLimit({
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No extractable content found at URL' }, { status: 400 });
       }
 
-      const { ai } = await import('@/ai/genkit');
+      const { ai } = await import('../../../../ai/genkit');
 
       const prompt = `Generate a compelling video script (under 300 words) for content about:
       
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
 
       const scriptResponse = await ai.generate({
         prompt,
-        output: { schema: require('z').object({ script: require('z').string() }) }
+        output: { schema: z.object({ script: z.string() }) }
       });
 
       const script = scriptResponse.output?.script;

@@ -14,6 +14,8 @@ import {
   FEATURE_MINIMUM_PLAN
 } from '@/lib/feature-config';
 
+export { getFeatureDisplayName };
+
 export interface FeatureAccess {
   canAccess: boolean;
   requiresUpgrade: boolean;
