@@ -43,7 +43,7 @@ import { getProviderMetadata } from '@/lib/database-config-service';
 
 // Helper function to check provider setup status (now uses database)
 async function checkProviderSetup(provider: string): Promise<void> {
-  const metadata = await getDbProviderMetadata(provider);
+  const metadata = await getProviderMetadata(provider);
   if (metadata?.requiresSetup) {
     throw new Error(
       `[${provider}] Provider requires setup before use.\n` +
@@ -573,9 +573,4 @@ export async function createProviderClient(provider: string): Promise<any> {
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
-}
-
-// Export helper to get provider metadata (now wraps database call)
-export async function getProviderMetadata(provider: string): Promise<ProviderMetadata> {
-  return getDbProviderMetadata(provider);
 }
