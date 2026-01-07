@@ -13,6 +13,7 @@ interface AuthContextType {
   planFeatures: PlanFeature[];
   userPlanDetails: {
     hasActiveSubscription: boolean;
+    hasPremiumFeatures: boolean;
     status: string;
     renewsOn: string;
   };
