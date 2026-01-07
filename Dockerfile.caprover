@@ -56,9 +56,8 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy public directory if it exists, otherwise create an empty one
-RUN mkdir -p ./public
-RUN cp -r /app/public/* ./public/ 2>/dev/null || true
+# Copy public directory
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public 2>/dev/null || true
 
 # Set the correct permission for prerender cache
 RUN mkdir .next

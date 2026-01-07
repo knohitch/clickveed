@@ -53,4 +53,8 @@ echo "Database setup completed"
 
 # Start the application
 echo "Starting application..."
-node server.js
+if [ -f "server.js" ]; then
+    node server.js
+else
+    node .next/standalone/server.js
+fi
