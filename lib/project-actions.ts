@@ -17,22 +17,19 @@ export interface Project {
  */
 export async function getProjects(userId?: string): Promise<Project[]> {
   if (!userId) return [];
-  
+
   const projects = await prisma.project.findMany({
     where: { userId },
-    include: {
-      mediaAssets: true,
-    },
     orderBy: { updatedAt: 'desc' },
   });
   
   return projects.map(p => ({
-    id: p.id,
-    title: p.name,
+    id: String(p.id),
+    title: p.title,
     lastUpdated: formatDistanceToNow(p.updatedAt),
     status: p.status as "In Progress" | "Completed" | "Archived",
     thumbnail: p.thumbnailUrl || 'https://placehold.co/400x300.png',
-    hint: p.description?.substring(0, 50) || 'No description'
+    hint: p.thumbnailHint?.substring(0, 50) || 'No description'
   }));
 }
 
@@ -44,23 +41,19 @@ export async function getProjects(userId?: string): Promise<Project[]> {
 export async function createProject(title: string, userId: string): Promise<Project> {
   const newProject = await prisma.project.create({
     data: {
-      name: title,
+      title,
       status: 'In Progress',
       userId,
       thumbnailUrl: 'https://placehold.co/400x300.png',
-      description: 'New project',
-    },
-    include: {
-      mediaAssets: true,
     }
   });
 
   return {
-    id: newProject.id,
-    title: newProject.name,
+    id: String(newProject.id),
+    title: newProject.title,
     lastUpdated: formatDistanceToNow(newProject.updatedAt),
     status: newProject.status as "In Progress" | "Completed" | "Archived",
-    thumbnail: newProject.thumbnailUrl,
-    hint: newProject.description || 'new project'
+    thumbnail: newProject.thumbnailUrl || 'https://placehold.co/400x300.png',
+    hint: ''
   };
 }
