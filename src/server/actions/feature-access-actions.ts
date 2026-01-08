@@ -16,6 +16,7 @@ import type { FeatureAccess } from '@/lib/feature-access';
 import type { Plan, PlanFeature } from '@prisma/client';
 import prisma from '@/server/prisma';
 import { checkFeatureAccess } from '@/lib/feature-access';
+import { getFeatureDisplayName, matchFeatureKeywords } from '@/lib/feature-config';
 
 type PlanWithFeatures = Plan & { features: PlanFeature[] };
 
