@@ -25,6 +25,7 @@ export async function getAdminSettings() {
     const defaultEmailTemplates: EmailTemplates = {
         emailVerification: { subject: 'Email Verification', body: 'Verify your email at {{verifyLink}}' },
         userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
+        userInvitation: { subject: 'You have been invited!', body: 'Hello {{name}},\n\nYou have been invited to join our platform. Click on link below to set up your password:\n\n{{invitationLink}}' },
         accountApproved: { subject: 'Your Account Has Been Approved', body: 'Hello {{name}},\n\nGreat news! Your account has been approved by an administrator. You can now log in and access all features.\n\nClick here to log in: {{loginLink}}\n\nWelcome to {{appName}}!' },
         passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
         subscriptionActivated: { subject: 'Subscription Activated', body: 'Thanks for subscribing to {{planName}}.' },
