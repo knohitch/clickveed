@@ -118,9 +118,8 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     
     try {
       await sendEmail({
-        templateKey: 'user-invitation',
+        templateKey: 'userInvitation',
         to: userData.email,
-        subject: 'You\'ve been invited to join the platform',
         data: {
           name: userData.fullName,
           invitationLink: `${appUrl}/auth/reset-password?email=${encodeURIComponent(userData.email)}`
