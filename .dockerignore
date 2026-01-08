@@ -5,8 +5,12 @@ yarn-debug.log*
 yarn-error.log*
 
 # Next.js build output
-.next
 out
+# Keep .next during build but exclude after
+!.next/
+.next/*
+!.next/standalone/
+!.next/static/
 
 # Environment variables
 .env*.local
