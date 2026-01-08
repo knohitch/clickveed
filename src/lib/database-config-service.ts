@@ -5,21 +5,27 @@
 
 import prisma from './prisma';
 
+export interface ProviderMetadata {
+  authType: 'apiKey' | 'oauth' | 'none';
+  requiresSetup: boolean;
+  setupInstructions?: string;
+}
+
 // Provider metadata defaults (fallback if not in database)
-const DEFAULT_PROVIDER_METADATA = {
+const DEFAULT_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
   openai: { authType: 'apiKey', requiresSetup: false },
   azureOpenai: { authType: 'apiKey', requiresSetup: false },
   claude: { authType: 'apiKey', requiresSetup: false },
   elevenlabs: { authType: 'apiKey', requiresSetup: false },
   replicate: { authType: 'apiKey', requiresSetup: false },
   huggingface: { authType: 'apiKey', requiresSetup: false },
-  imagen: { 
-    authType: 'oauth', 
+  imagen: {
+    authType: 'oauth',
     requiresSetup: true,
     setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.'
   },
-  googleVeo: { 
-    authType: 'oauth', 
+  googleVeo: {
+    authType: 'oauth',
     requiresSetup: true,
     setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.'
   },
@@ -27,12 +33,6 @@ const DEFAULT_PROVIDER_METADATA = {
   seedance: { authType: 'apiKey', requiresSetup: false },
   wan: { authType: 'apiKey', requiresSetup: false },
 };
-
-export interface ProviderMetadata {
-  authType: 'apiKey' | 'oauth' | 'none';
-  requiresSetup: boolean;
-  setupInstructions?: string;
-}
 
 /**
  * Get provider metadata from database or use defaults
@@ -42,19 +42,21 @@ export async function getProviderMetadata(providerName: string): Promise<Provide
     const setting = await prisma.setting.findFirst({
       where: { key: `provider-${providerName}` }
     });
-    
+
     if (setting?.value) {
       return JSON.parse(setting.value);
     }
-    
-    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] || {
-      authType: 'apiKey',
+
+    const defaultMeta = DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA];
+    return defaultMeta ?? {
+      authType: 'apiKey' as const,
       requiresSetup: false
     };
   } catch (error) {
     console.error(`Failed to load provider metadata for ${providerName}:`, error);
-    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] || {
-      authType: 'apiKey',
+    const defaultMeta = DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA];
+    return defaultMeta ?? {
+      authType: 'apiKey' as const,
       requiresSetup: false
     };
   }

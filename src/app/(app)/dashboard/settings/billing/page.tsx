@@ -171,6 +171,32 @@ export default function BillingPage() {
         }
     }
 
+    const handleManageBilling = async () => {
+        if (!currentUser) {
+            toast({ variant: 'destructive', title: "Authentication Error", description: "You must be logged in to manage billing." });
+            return;
+        }
+
+        setIsRedirecting(true);
+        try {
+            const { url } = await createCustomerPortalSession();
+            if (url) {
+                window.location.href = url;
+            } else {
+                throw new Error("Failed to create billing portal session.");
+            }
+        } catch (error: any) {
+            console.error('[Billing] Manage billing error:', error);
+            toast({
+                variant: 'destructive',
+                title: "Billing Portal Error",
+                description: error.message || "An unexpected error occurred. Please try again."
+            });
+        } finally {
+            setIsRedirecting(false);
+        }
+    };
+
     const handleChoosePlan = (plan: Plan) => {
         // Remove plan check - allow free plan users to see payment UI
         // Payment will still check features via verifyFeatureAccess()

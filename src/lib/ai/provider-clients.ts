@@ -42,7 +42,7 @@ interface ProviderMetadata {
 import { getProviderMetadata } from '@/lib/database-config-service';
 
 // Helper function to check provider setup status (now uses database)
-async function checkProviderSetup(provider: string): Promise<void> {
+async function checkProviderSetup(provider: string): Promise<ProviderMetadata> {
   const metadata = await getProviderMetadata(provider);
   if (metadata?.requiresSetup) {
     throw new Error(
@@ -52,6 +52,7 @@ async function checkProviderSetup(provider: string): Promise<void> {
       `This provider is intentionally disabled until proper credentials are configured.`
     );
   }
+  return metadata;
 }
 
 // OpenAI Client
@@ -387,7 +388,7 @@ export class SeedanceClient {
       const videoResponse = await fetch(videoUrl);
       const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
       const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
-      const { publicUrl } = await uploadToWasabi(videoDataUri, 'video');
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
 
       return {
         videoUrl: publicUrl,
@@ -436,7 +437,7 @@ export class HeyGenClient {
       const videoResponse = await fetch(videoUrl);
       const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
       const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
-      const { publicUrl } = await uploadToWasabi(videoDataUri, 'video');
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
 
       return {
         videoUrl: publicUrl,
@@ -485,7 +486,7 @@ export class WanClient {
       const videoResponse = await fetch(videoUrl);
       const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
       const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
-      const { publicUrl } = await uploadToWasabi(videoDataUri, 'video');
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
 
       return {
         videoUrl: publicUrl,

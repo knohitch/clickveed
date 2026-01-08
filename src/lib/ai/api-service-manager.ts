@@ -190,7 +190,7 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
     
     if (customProviders.includes(providerInfo.provider)) {
         try {
-            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const client = await createProviderClient(providerInfo.provider);
             const response = await client.generateText(req.messages);
             
             // Return in Genkit-compatible format
@@ -220,7 +220,7 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
     
     if (customProviders.includes(providerInfo.provider)) {
         try {
-            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const client = await createProviderClient(providerInfo.provider);
             const stream = await client.generateTextStream(req.messages);
             
             // Create a Genkit-compatible response
@@ -247,7 +247,7 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
     
     if (customProviders.includes(providerInfo.provider)) {
         try {
-            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const client = await createProviderClient(providerInfo.provider);
             // For image generation, we would need to extract the prompt from the request
             // This is a simplified implementation
             const prompt = req.messages.map(msg => msg.content[0].text).join(' ');
@@ -280,7 +280,7 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
     
     if (customProviders.includes(providerInfo.provider)) {
         try {
-            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const client = await createProviderClient(providerInfo.provider);
             // For video generation, we would need to extract the prompt from the request
             // This is a simplified implementation
             const prompt = req.messages.map(msg => msg.content[0].text).join(' ');
@@ -313,7 +313,7 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
     
     if (customProviders.includes(providerInfo.provider)) {
         try {
-            const client = createProviderClient(providerInfo.provider, providerInfo.apiKey);
+            const client = await createProviderClient(providerInfo.provider);
             // For TTS, we would need to extract the text from the request
             // This is a simplified implementation
             const text = req.messages.map(msg => msg.content[0].text).join(' ');

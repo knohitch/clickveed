@@ -83,7 +83,7 @@ export async function hasFeatureAccess(userId: string, featureId: string): Promi
  * This is the PRIORITY method that respects admin control.
  */
 function checkAgainstDatabaseFeatures(planFeatures: any[], featureId: string): FeatureAccess {
-  if (ALWAYS_ACCESSIBLE_FEATURES.includes(featureId)) {
+  if ((ALWAYS_ACCESSIBLE_FEATURES as readonly string[]).includes(featureId)) {
     return {
       canAccess: true,
       requiresUpgrade: false,

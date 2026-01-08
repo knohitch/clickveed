@@ -26,45 +26,20 @@ export interface FeatureAccess {
 export type FeatureTier = 'free' | 'starter' | 'professional' | 'enterprise';
 
 /**
- * Get features available for a specific tier (database-backed)
+ * Get features available for a specific tier (synchronous - uses defaults only)
  */
-export async function getFeaturesForTier(tier: FeatureTier): Promise<string[]> {
-  try {
-    const plan = await (await import('./prisma')).default.plan.findFirst({
-      where: { featureTier: tier },
-      include: { features: true }
-    });
-    
-    if (plan && plan.features.length > 0) {
-      return plan.features.map(f => f.name);
-    }
-    
-    // Fallback to default features if no database features
-    switch (tier) {
-      case 'enterprise':
-        return DEFAULT_ENTERPRISE_PLAN_FEATURES;
-      case 'professional':
-        return DEFAULT_PRO_PLAN_FEATURES;
-      case 'starter':
-        return DEFAULT_STARTER_PLAN_FEATURES;
-      case 'free':
-      default:
-        return DEFAULT_FREE_PLAN_FEATURES;
-    }
-  } catch (error) {
-    console.error('Error loading features for tier:', error);
-    // Fallback to defaults on error
-    switch (tier) {
-      case 'enterprise':
-        return DEFAULT_ENTERPRISE_PLAN_FEATURES;
-      case 'professional':
-        return DEFAULT_PRO_PLAN_FEATURES;
-      case 'starter':
-        return DEFAULT_STARTER_PLAN_FEATURES;
-      case 'free':
-      default:
-        return DEFAULT_FREE_PLAN_FEATURES;
-    }
+export function getFeaturesForTier(tier: FeatureTier): string[] {
+  // Fallback to default features (database lookup removed for sync usage)
+  switch (tier) {
+    case 'enterprise':
+      return [...DEFAULT_ENTERPRISE_PLAN_FEATURES];
+    case 'professional':
+      return [...DEFAULT_PRO_PLAN_FEATURES];
+    case 'starter':
+      return [...DEFAULT_STARTER_PLAN_FEATURES];
+    case 'free':
+    default:
+      return [...DEFAULT_FREE_PLAN_FEATURES];
   }
 }
 
@@ -93,7 +68,7 @@ export function checkFeatureAccess(
   featureTier?: string | null
 ): FeatureAccess {
   // Always allow basic features for all users
-  if (ALWAYS_ACCESSIBLE_FEATURES.includes(featureId)) {
+  if ((ALWAYS_ACCESSIBLE_FEATURES as readonly string[]).includes(featureId)) {
     return {
       canAccess: true,
       requiresUpgrade: false,

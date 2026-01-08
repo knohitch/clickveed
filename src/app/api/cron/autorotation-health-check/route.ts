@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     // Test text generation providers
     try {
         const textProvider = await getAvailableTextGenerator();
-        const textClient = createProviderClient(textProvider.provider, textProvider.apiKey);
+        const textClient = await createProviderClient(textProvider.provider);
         if (textClient.generateText) {
             await textClient.generateText([{ role: 'user', content: [{ text: 'Hello, world!' }] }]);
             console.log(`Text provider ${textProvider.provider} is healthy`);
@@ -23,11 +23,11 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Text provider health check failed:', error);
     }
-    
+
     // Test image generation providers
     try {
         const imageProvider = await getAvailableImageGenerator();
-        const imageClient = createProviderClient(imageProvider.provider, imageProvider.apiKey);
+        const imageClient = await createProviderClient(imageProvider.provider);
         if (imageClient.generateImage) {
             await imageClient.generateImage('A test image');
             console.log(`Image provider ${imageProvider.provider} is healthy`);
@@ -35,11 +35,11 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Image provider health check failed:', error);
     }
-    
+
     // Test video generation providers
     try {
         const videoProvider = await getAvailableVideoGenerator();
-        const videoClient = createProviderClient(videoProvider.provider, videoProvider.apiKey);
+        const videoClient = await createProviderClient(videoProvider.provider);
         if (videoClient.generateVideo) {
             await videoClient.generateVideo('A test video');
             console.log(`Video provider ${videoProvider.provider} is healthy`);
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     // Test TTS providers
     try {
         const ttsProvider = await getAvailableTTSProvider();
-        const ttsClient = createProviderClient(ttsProvider.provider, ttsProvider.apiKey);
+        const ttsClient = await createProviderClient(ttsProvider.provider);
         if (ttsClient.generateSpeech) {
             await ttsClient.generateSpeech('Hello, world!');
             console.log(`TTS provider ${ttsProvider.provider} is healthy`);

@@ -121,9 +121,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userPlanDetails = {
     hasActiveSubscription: !!(subscriptionPlan && subscriptionPlan.priceMonthly > 0 && currentUser?.stripeSubscriptionStatus === 'active'),
-    hasPremiumFeatures: subscriptionPlan && subscriptionPlan.priceMonthly > 0,
+    hasPremiumFeatures: !!(subscriptionPlan && subscriptionPlan.priceMonthly > 0),
     status: currentUser?.stripeSubscriptionStatus || 'Free',
     renewsOn: currentUser?.stripeCurrentPeriodEnd ? format(new Date(currentUser.stripeCurrentPeriodEnd), 'MMMM dd, yyyy') : 'N/A',
+  };
+
+  const value = {
+    currentUser,
+    subscriptionPlan,
+    planFeatures,
+    userPlanDetails,
+    loading,
+    refreshing,
+    updateUserDisplayName,
+    refreshUser,
   };
 
   return (

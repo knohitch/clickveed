@@ -64,7 +64,7 @@ function checkFeatureAccessWithFeatures(
   featureId: string
 ): { canAccess: boolean; requiresUpgrade: boolean; featureName: string } {
   // Always allow basic features for all users
-  if (ALWAYS_ACCESSIBLE_FEATURES.includes(featureId)) {
+  if ((ALWAYS_ACCESSIBLE_FEATURES as readonly string[]).includes(featureId)) {
     return {
       canAccess: true,
       requiresUpgrade: false,

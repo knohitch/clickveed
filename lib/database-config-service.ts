@@ -46,15 +46,17 @@ export async function getProviderMetadata(providerName: string): Promise<Provide
     if (setting?.value) {
       return JSON.parse(setting.value);
     }
-    
-    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] as ProviderMetadata || {
-      authType: 'apiKey',
+
+    const defaultMeta = DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA];
+    return defaultMeta ?? {
+      authType: 'apiKey' as const,
       requiresSetup: false
     };
   } catch (error) {
     console.error(`Failed to load provider metadata for ${providerName}:`, error);
-    return DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA] as ProviderMetadata || {
-      authType: 'apiKey',
+    const defaultMeta = DEFAULT_PROVIDER_METADATA[providerName as keyof typeof DEFAULT_PROVIDER_METADATA];
+    return defaultMeta ?? {
+      authType: 'apiKey' as const,
       requiresSetup: false
     };
   }
