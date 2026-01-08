@@ -8,6 +8,7 @@ import { sendEmail } from '@/server/services/email-service';
 // Define default email templates
 const defaultEmailTemplates: EmailTemplates = {
     userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
+    userInvitation: { subject: 'You have been invited!', body: 'Hello {{name}},\n\nYou have been invited to join our platform. Click on link below to set up your password:\n\n{{invitationLink}}' },
     emailVerification: { subject: 'Verify Your Email Address', body: 'Hello {{name}}, please verify your email address by clicking the link below: {{verificationLink}}' },
     accountApproved: { subject: 'Your Account Has Been Approved', body: 'Hello {{name}},\n\nGreat news! Your account has been approved by an administrator. You can now log in and access all features.\n\nClick here to log in: {{loginLink}}\n\nWelcome to {{appName}}!' },
     passwordReset: { subject: 'Password Reset', body: 'Reset here: {{resetLink}}' },
