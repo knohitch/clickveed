@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -22,6 +21,12 @@ const templateInfo: Record<TemplateKey, { title: string; description: string; ic
         icon: UserPlus,
         description: "Sent to new users upon successful signup.",
         placeholders: ["{{name}}", "{{appName}}"]
+    },
+    userInvitation: {
+        title: "User Invitation",
+        icon: Mail,
+        description: "Sent when an admin invites a new user to join the platform.",
+        placeholders: ["{{name}}", "{{invitationLink}}"]
     },
     emailVerification: { 
         title: "Email Verification", 
@@ -185,6 +190,7 @@ export default function AdminEmailTemplatesPage() {
                 <CardTitle className="mb-4">User-Facing Emails</CardTitle>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                     <TemplateEditor templateKey="userSignup" template={localTemplates.userSignup} onChange={handleTemplateChange} />
+                    <TemplateEditor templateKey="userInvitation" template={localTemplates.userInvitation} onChange={handleTemplateChange} />
                     <TemplateEditor templateKey="emailVerification" template={localTemplates.emailVerification} onChange={handleTemplateChange} />
                     <TemplateEditor templateKey="accountApproved" template={localTemplates.accountApproved} onChange={handleTemplateChange} />
                     <TemplateEditor templateKey="passwordReset" template={localTemplates.passwordReset} onChange={handleTemplateChange} />
