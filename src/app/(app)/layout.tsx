@@ -34,34 +34,27 @@ import { useSession, signOut } from 'next-auth/react';
 import type { User } from 'next-auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession({ required: true, onUnauthenticated() { router.push('/login') } });
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    // This layout now ONLY handles the onboarding redirect for regular users.
-    // Admin/Super Admin redirects are handled by the AuthLayout for immediate routing.
     if (status === 'authenticated' && session.user) {
         if (session.user.role === 'USER' && !session.user.onboardingComplete) {
             router.push('/dashboard/onboarding');
         }
     }
   }, [session, status, router]);
-  
+
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
   };
-  
-  // Show a loader while session is loading, or if the user is an admin who shouldn't see this layout.
-  if (status === 'loading' || !session?.user || (session.user.role !== 'USER')) {
-    return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
-            <LoadingSpinner />
-        </div>
-    )
+
+  if (status === 'loading' || !session?.user) {
+    return null;
   }
-  
+
   const user = session.user;
-  
+
   return (
         <SidebarProvider>
           <div className="flex min-h-screen w-full">
@@ -103,7 +96,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </SidebarFooter>
                 <SidebarRail />
               </Sidebar>
-            
+
             <SidebarInset>
                 <header className="flex h-14 items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
                   <SidebarTrigger>
@@ -151,7 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </header>
-              
+
               <main className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 min-h-0">{children}</main>
               {session.user && <SupportChatWidget user={session.user as User} />}
             </SidebarInset>

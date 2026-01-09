@@ -31,7 +31,7 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 
 export default function KanriLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession({ required: true, onUnauthenticated() { router.push('/login') }});
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -39,23 +39,14 @@ export default function KanriLayout({ children }: { children: React.ReactNode })
   };
 
   if (status === 'loading' || !session) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <LoadingSpinner />
-      </div>
-    );
+    return null;
   }
 
   const user = session.user;
 
   if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    // If a regular user somehow lands here, redirect them.
     router.push('/dashboard');
-    return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
-            <LoadingSpinner />
-        </div>
-    );
+    return null;
   }
 
   return (
