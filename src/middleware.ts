@@ -123,5 +123,8 @@ export const config = {
     '/dashboard/:path*',
     '/chin/:path*',
     '/kanri/:path*'
-  ]
+  ],
+  // Force middleware to run in Node.js runtime (not Edge runtime)
+  // Required for Prisma, bcrypt, and crypto compatibility
+  runtime: 'nodejs'
 };
