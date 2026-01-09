@@ -21,7 +21,7 @@ else
 fi
 
 # Check Dockerfile.caprover for proper public directory handling
-if grep -q "Copy public directory with proper fallback" Dockerfile.caprover; then
+if grep -q "Copy public directory from builder stage" Dockerfile.caprover; then
     echo "✓ Dockerfile.caprover has the fix"
 else
     echo "✗ Dockerfile.caprover missing the fix"
@@ -29,7 +29,7 @@ else
 fi
 
 # Check Dockerfile for proper public directory handling
-if grep -q "Copy public directory with proper fallback" Dockerfile; then
+if grep -q "Copy public directory from builder stage" Dockerfile; then
     echo "✓ Dockerfile has the fix"
 else
     echo "✗ Dockerfile missing the fix"

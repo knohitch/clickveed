@@ -56,14 +56,8 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy public directory with proper fallback if it doesn't exist
-RUN if [ -d /app/public ]; then \
-        mkdir -p ./public && \
-        cp -r /app/public/* ./public/ 2>/dev/null || true; \
-    else \
-        mkdir -p ./public; \
-    fi
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public/ 2>/dev/null || true
+# Copy public directory from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public/ 2>/dev/null || mkdir -p ./public
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
