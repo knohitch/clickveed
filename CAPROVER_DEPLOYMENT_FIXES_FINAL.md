@@ -36,20 +36,34 @@ binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl"]
 }
 ```
 
-### 4. Fixed Dockerfile.caprover (Dockerfile.caprover:59-61)
-**Issue:** Dockerfile.caprover was trying to copy public files from the wrong path after the builder stage.
+### 4. Fixed Dockerfile.caprover (Dockerfile.caprover:59-62)
+**Issue:** Dockerfile.caprover was trying to copy public files from the wrong path after the builder stage using complex fallback logic that could fail with "stat public/ file does not exist" error.
 
-**Fix:** Updated to use proper COPY command with correct path:
+**Fix:** Updated to use proper RUN command with correct path and simplified fallback logic:
 ```dockerfile
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public 2>/dev/null || true
+# Copy public directory with proper fallback if it doesn't exist
+RUN if [ -d /app/public ]; then \
+        mkdir -p ./public && \
+        cp -r /app/public/* ./public/ 2>/dev/null || true; \
+    else \
+        mkdir -p ./public; \
+    fi
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public/ 2>/dev/null || true
 ```
 
-### 5. Fixed Dockerfile (Dockerfile:85-87)
-**Issue:** Main Dockerfile had the same public directory copy issue.
+### 5. Fixed Dockerfile (Dockerfile:85-88)
+**Issue:** Main Dockerfile had the same public directory copy issue that could cause "stat public/ file does not exist" error during build.
 
-**Fix:** Updated to use proper COPY command:
+**Fix:** Updated to use proper RUN command with correct path:
 ```dockerfile
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public 2>/dev/null || true
+# Copy public directory with proper fallback if it doesn't exist
+RUN if [ -d /app/public ]; then \
+        mkdir -p ./public && \
+        cp -r /app/public/* ./public/ 2>/dev/null || true; \
+    else \
+        mkdir -p ./public; \
+    fi
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public/ 2>/dev/null || true
 ```
 
 ### 6. Created ESLint Configuration (.eslintrc.json)
