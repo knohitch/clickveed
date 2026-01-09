@@ -80,15 +80,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function initializeUser() {
       if (status === 'authenticated' && session?.user?.id) {
+        console.log('[AuthContext] Initializing user for:', session.user.id);
         setLoading(true);
         await loadUserAndPlan(session.user.id);
         setLoading(false);
+        console.log('[AuthContext] User initialized successfully');
       } else if (status !== 'loading') {
+        console.log('[AuthContext] Status:', status, '- Setting loading to false');
         setLoading(false);
       }
     }
     initializeUser();
   }, [session, status, loadUserAndPlan]);
+
+  // Add timeout to prevent infinite loading state
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn('[AuthContext] Loading timeout exceeded, forcing loading to false');
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   // Refresh user data from database (useful after payment, plan changes, etc.)
   const refreshUser = useCallback(async () => {

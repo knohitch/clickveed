@@ -11,11 +11,16 @@ export default function LandingPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Debug session status
+    console.log('[Landing Page] Session status:', status);
+    console.log('[Landing Page] Session data:', session);
+    
     if (status === 'loading') {
       return;
     }
 
     if (status === 'authenticated') {
+      console.log('[Landing Page] Redirecting authenticated user, role:', session?.user?.role);
       // Redirect authenticated users based on role and onboarding status
       if (session?.user?.role === 'SUPER_ADMIN') {
         router.replace('/chin/dashboard');
@@ -30,11 +35,12 @@ export default function LandingPage() {
     }
     
     if (status === 'unauthenticated') {
+      console.log('[Landing Page] Redirecting to login');
       router.replace('/login');
     }
   }, [router, session, status]);
 
-  // Show a loading state while checking the session.
+  // Show a loading state while checking session.
   return (
     <div className="flex h-screen items-center justify-center">
         <LoadingSpinner />
