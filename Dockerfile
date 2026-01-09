@@ -50,6 +50,9 @@ RUN npx prisma generate
 ENV NODE_OPTIONS="--max-old-space-size=6144"
 RUN npm run build
 
+# BUILD ASSERTION: Verify public directory exists after build
+RUN ls -la /app/public && echo "Public directory exists at /app/public" || (echo "ERROR: Public directory missing at /app/public" && exit 1)
+
 # Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app
@@ -82,12 +85,17 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy public directory from builder stage
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public/ 2>/dev/null || mkdir -p ./public
-
 # Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+RUN mkdir -p .next && chown nextjs:nodejs .next
+
+# Copy public directory from builder stage - use RUN to handle missing gracefully
+RUN if [ -d "/app/public" ]; then \
+    cp -r /app/public /app/; \
+    chown -R nextjs:nodejs /app/public; \
+    else \
+    mkdir -p /app/public; \
+    echo "WARNING: Public directory not found in builder, created empty directory"; \
+    fi
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
@@ -113,3 +121,4 @@ ENV HOSTNAME="0.0.0.0"
 
 # Use the startup script as the entrypoint
 CMD ["./startup.sh"]
+
