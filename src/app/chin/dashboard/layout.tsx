@@ -42,7 +42,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen w-full items-center justify-center">
-        <LoadingSpinner size="lg" />
+        <LoadingSpinner />
       </div>
     );
   }
@@ -52,7 +52,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     router.push('/login');
     return (
       <div className="flex min-h-screen w-full items-center justify-center">
-        <LoadingSpinner size="lg" />
+        <LoadingSpinner />
       </div>
     );
   }
