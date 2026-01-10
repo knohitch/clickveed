@@ -36,15 +36,8 @@ const initialState = {
   userRole: '',
 };
 
-interface LoginFormState {
-  error: string;
-  success: boolean;
-  redirectUrl?: string;
-  userRole?: string;
-}
-
 export function LoginForm() {
-  const [state, formAction] = useFormState<LoginFormState>(login, initialState);
+  const [state, formAction] = useFormState(login, initialState as any);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const searchParams = useSearchParams();
