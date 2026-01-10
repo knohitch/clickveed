@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { GoogleIcon } from '@/components/icons/google-icon';
 import { LoginForm } from '@/components/auth/login-form';
 import { getAdminSettings } from '@/server/actions/admin-actions';
+import { Suspense } from 'react';
 
 export async function generateMetadata() {
   const { appName } = await getAdminSettings();
@@ -37,7 +38,9 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          <LoginForm />
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
