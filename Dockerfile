@@ -88,19 +88,11 @@ RUN adduser --system --uid 1001 nextjs
 # Set the correct permission for prerender cache
 RUN mkdir -p .next && chown nextjs:nodejs .next
 
-# Copy public directory from builder stage - use RUN to handle missing gracefully
-RUN if [ -d "/app/public" ]; then \
-    cp -r /app/public /app/; \
-    chown -R nextjs:nodejs /app/public; \
-    else \
-    mkdir -p /app/public; \
-    echo "WARNING: Public directory not found in builder, created empty directory"; \
-    fi
-
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone /app/.next/standalone
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static /app/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Copy Prisma files
 COPY --from=builder /app/prisma ./prisma
