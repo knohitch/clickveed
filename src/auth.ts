@@ -48,6 +48,12 @@ declare module "next-auth/jwt" {
   }
 }
 
+// Helper function to safely parse boolean from env
+const parseBooleanEnv = (value: string | undefined): boolean => {
+  if (!value) return false;
+  return value.toLowerCase() === 'true' || value === '1';
+};
+
 // Fix Bug #13: Remove PrismaAdapter to fix Edge Runtime incompatibility
 // Next.js middleware runs in Edge Runtime
 // Prisma doesn't support Edge Runtime
@@ -55,7 +61,7 @@ declare module "next-auth/jwt" {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  trustHost: process.env.AUTH_TRUST_HOST === 'true',
+  trustHost: parseBooleanEnv(process.env.AUTH_TRUST_HOST),
   // For multiple domain support
   ...(process.env.AUTH_URL && { url: process.env.AUTH_URL }),
   pages: {
@@ -72,6 +78,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     
+    // CRITICAL FIX: Add redirect callback to handle role-based redirects
+    async redirect({ url, baseUrl }) {
+      // If the url is relative or matches baseUrl, use it
+      if (url.startsWith('/')) return url;
+      // If the url starts with baseUrl, use it
+      if (url.startsWith(baseUrl)) return url;
+      // Otherwise fallback to baseUrl (which will be handled by signIn callback)
+      return baseUrl;
+    },
     
     // Fix Bug #7: Add error handling to JWT callback
     // The JWT callback is used to enrich the token with custom data
@@ -80,8 +95,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // On initial sign-in, add user details to the token
         if (user && user.id) {
           token.id = user.id;
-          token.role = user.role;
-          token.onboardingComplete = user.onboardingComplete;
+          token.role = user.role || 'USER';
+          token.onboardingComplete = user.onboardingComplete || false;
           token.status = user.status || 'Active';
           token.emailVerified = typeof user.emailVerified === 'boolean' ? user.emailVerified : !!user.emailVerified;
         }
@@ -187,9 +202,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: user.id,
             email: user.email,
             name: user.displayName || '',
-            role: user.role,
+            role: user.role || 'USER',
             onboardingComplete: user.onboardingComplete || false,
-            status: user.status,
+            status: user.status || 'Active',
             // SUPER_ADMIN bypasses email verification
             emailVerified: isSuperAdmin ? true : (user.emailVerified || false)
           };
