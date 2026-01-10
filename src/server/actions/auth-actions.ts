@@ -249,50 +249,39 @@ export async function login(prevState: any, formData: FormData) {
             };
         }
         
-        // Sign in without a race condition with the middleware
-        const result = await signIn('credentials', {
-            email,
-            password,
-            redirect: false, // Don't redirect here, let middleware handle it
-        });
-        
-        if (result?.error) {
-            return { error: 'Invalid email or password', success: false };
-        }
-        
-        // Check user role to determine redirect
+        // Check user role BEFORE signIn to determine callbackUrl
         const userWithRole = await prisma.user.findUnique({
             where: { email },
             select: { role: true }
         });
         
-        // Successful login - clear rate limit counter
+        // Determine callback URL based on role
+        let callbackUrl = '/dashboard';
+        if (userWithRole?.role === 'SUPER_ADMIN') {
+            callbackUrl = '/chin/dashboard';
+            console.log('Redirecting SUPER_ADMIN to:', callbackUrl);
+        } else if (userWithRole?.role === 'ADMIN') {
+            callbackUrl = '/kanri/dashboard';
+            console.log('Redirecting ADMIN to:', callbackUrl);
+        } else {
+            console.log('Redirecting USER to:', callbackUrl);
+        }
+        
+        // Clear rate limit counter
         clearLoginRateLimit(email);
         
-        // Successful login - return redirect URL based on role
-        if (userWithRole?.role === 'SUPER_ADMIN') {
-            console.log('Login successful for SUPER_ADMIN');
-            return { 
-                success: true, 
-                error: '', 
-                redirectUrl: '/chin/dashboard',
-                userRole: 'SUPER_ADMIN'
-            };
-        } else if (userWithRole?.role === 'ADMIN') {
-            return { 
-                success: true, 
-                error: '', 
-                redirectUrl: '/kanri/dashboard',
-                userRole: 'ADMIN'
-            };
-        } else {
-            return { 
-                success: true, 
-                error: '', 
-                redirectUrl: '/dashboard',
-                userRole: 'USER'
-            };
-        }
+        // Sign in with NextAuth's built-in redirect - this handles the redirect automatically
+        // When redirect: true, signIn never returns on success - it performs the redirect
+        await signIn('credentials', {
+            email,
+            password,
+            redirect: true,
+            callbackUrl
+        });
+        
+        // This line is theoretically unreachable because redirect: true performs the redirect
+        // We'll never reach here on successful login
+        throw new Error('Redirect failed');
         
     } catch (error: any) {
         console.error('Login error:', error);

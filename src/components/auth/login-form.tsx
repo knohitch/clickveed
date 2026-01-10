@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
@@ -8,10 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { login } from '@/server/actions/auth-actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
 
 function LoginButton() {
   const { pending } = useFormStatus();
@@ -32,66 +28,13 @@ function LoginButton() {
 const initialState = {
   error: '',
   success: false,
-  redirectUrl: '',
-  userRole: '',
 };
 
 export function LoginForm() {
   const [state, formAction] = useFormState(login, initialState as any);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  // Reset retry count on successful state change
-  useEffect(() => {
-    if (state?.success) {
-      setRetryCount(0);
-      setIsRetrying(false);
-    }
-  }, [state?.success]);
-
-  // Handle redirect after successful login
-  useEffect(() => {
-    if (state?.success && state?.redirectUrl) {
-      console.log('Login successful, redirecting to:', state.redirectUrl);
-      console.log('User role:', state.userRole);
-      // Store role in sessionStorage for middleware to access
-      if (state.userRole) {
-        sessionStorage.setItem('userRole', state.userRole);
-      }
-      // Use window.location for a more reliable redirect that bypasses Next.js router caching
-      window.location.href = state.redirectUrl;
-    }
-  }, [state?.success, state?.redirectUrl, state?.userRole, router]);
-
-  const handleRetry = async (formData: FormData) => {
-    if (retryCount < 3) {
-      setIsRetrying(true);
-      setRetryCount(prev => prev + 1);
-      
-      // Add a small delay before retry
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      formAction(formData);
-      setIsRetrying(false);
-    }
-  };
-
-  const enhancedFormAction = async (formData: FormData) => {
-    try {
-      await formAction(formData);
-    } catch (error) {
-      console.error('Form submission error:', error);
-      // If there's a network error or timeout, offer retry
-      if (retryCount < 3) {
-        await handleRetry(formData);
-      }
-    }
-  };
 
   return (
-    <form action={enhancedFormAction} className="grid gap-4">
+    <form action={formAction} className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -100,7 +43,6 @@ export function LoginForm() {
           name="email"
           placeholder="m@example.com"
           required
-          disabled={isRetrying}
         />
       </div>
       <div className="grid gap-2">
@@ -118,19 +60,8 @@ export function LoginForm() {
           name="password"
           type="password"
           required
-          disabled={isRetrying}
         />
       </div>
-
-      {searchParams.get('verified') === 'true' && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertTitle>Email Verified!</AlertTitle>
-          <AlertDescription>
-            Your email has been successfully verified. You can now sign in to your account.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {state?.error && (
         <Alert variant="destructive">
@@ -138,26 +69,6 @@ export function LoginForm() {
           <AlertTitle>Login Failed</AlertTitle>
           <AlertDescription>
             {state.error}
-            {retryCount > 0 && retryCount < 3 && (
-              <div className="mt-2 text-sm">
-                Attempt {retryCount + 1} of 3. Please try again.
-              </div>
-            )}
-            {retryCount >= 3 && (
-              <div className="mt-2 text-sm">
-                Maximum retry attempts reached. Please check your connection and try again later.
-              </div>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isRetrying && (
-        <Alert>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <AlertTitle>Retrying...</AlertTitle>
-          <AlertDescription>
-            Attempting to sign in again. Please wait.
           </AlertDescription>
         </Alert>
       )}
