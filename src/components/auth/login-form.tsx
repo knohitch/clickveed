@@ -37,9 +37,9 @@ export function LoginForm() {
   // Handle redirect after successful login
   React.useEffect(() => {
     if (state?.success && state?.redirectUrl) {
-      console.log('Login successful, redirecting to:', state.redirectUrl);
-      // Use window.location.href for a full page reload and proper redirect
-      window.location.href = state.redirectUrl;
+      console.log('Login successful, NextAuth will redirect to:', state.redirectUrl);
+      // NextAuth handles the redirect automatically when redirect: true is used
+      // No need for client-side redirect
     }
   }, [state?.success, state?.redirectUrl]);
 

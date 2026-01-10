@@ -270,21 +270,17 @@ export async function login(prevState: any, formData: FormData) {
         // Clear rate limit counter
         clearLoginRateLimit(email);
         
-        // Sign in without redirect - let the client handle the redirect
-        // This is more reliable for server actions
+        // Let NextAuth handle the redirect - this ensures session is properly established
+        // Use redirect: true and let NextAuth redirect to the callbackUrl
         const result = await signIn('credentials', {
             email,
             password,
-            redirect: false,
+            redirect: true,
             callbackUrl
         });
         
-        if (result?.error) {
-            console.error('SignIn error:', result.error);
-            return { error: 'Invalid email or password', success: false };
-        }
-        
-        // Login successful - return redirect URL for client to handle
+        // If we reach here, login was successful and NextAuth redirected
+        // This is just a fallback - redirect: true should handle everything
         return { 
             success: true, 
             error: '',
