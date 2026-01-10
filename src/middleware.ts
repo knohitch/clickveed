@@ -61,6 +61,58 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Protect admin dashboard routes
+  if (pathname.startsWith('/chin') || pathname.startsWith('/kanri')) {
+    try {
+      const session = await auth();
+
+      if (!session?.user) {
+        console.log('Unauthenticated user accessing admin route, redirecting to login');
+        return NextResponse.redirect(new URL('/login', request.url));
+      }
+
+      // Check role-based access
+      if (pathname.startsWith('/chin') && session.user.role !== 'SUPER_ADMIN') {
+        console.log('Non-SUPER_ADMIN accessing SUPER_ADMIN route, redirecting to user dashboard');
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+
+      if (pathname.startsWith('/kanri') && session.user.role !== 'ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+        console.log('Non-ADMIN accessing ADMIN route, redirecting to user dashboard');
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    } catch (error) {
+      console.warn('Session check failed for admin route:', error);
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+
+  // Protect user dashboard routes
+  if (pathname.startsWith('/dashboard')) {
+    try {
+      const session = await auth();
+
+      if (!session?.user) {
+        console.log('Unauthenticated user accessing dashboard, redirecting to login');
+        return NextResponse.redirect(new URL('/login', request.url));
+      }
+
+      // Prevent admin users from accessing user dashboard - redirect to appropriate admin dashboard
+      if (session.user.role === 'SUPER_ADMIN') {
+        console.log('SUPER_ADMIN accessing user dashboard, redirecting to admin dashboard');
+        return NextResponse.redirect(new URL('/chin/dashboard', request.url));
+      }
+
+      if (session.user.role === 'ADMIN') {
+        console.log('ADMIN accessing user dashboard, redirecting to admin dashboard');
+        return NextResponse.redirect(new URL('/kanri/dashboard', request.url));
+      }
+    } catch (error) {
+      console.warn('Session check failed for user dashboard:', error);
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+
   // Add performance monitoring headers
   const response = NextResponse.next();
   const duration = Date.now() - startTime;
@@ -70,14 +122,17 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Match root path and auth pages for redirects
-  // Don't match API routes or dashboard routes to prevent blocking
+  // Match root path, auth pages, and all dashboard routes for protection
+  // Don't match API routes to prevent blocking
   matcher: [
     '/',
     '/login',
     '/signup',
     '/forgot-password',
-    '/reset-password'
+    '/reset-password',
+    '/chin/:path*',
+    '/kanri/:path*',
+    '/dashboard/:path*'
   ],
   // Force middleware to run in Node.js runtime (not Edge runtime)
   // Required for Prisma, bcrypt, and crypto compatibility

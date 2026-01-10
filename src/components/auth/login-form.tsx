@@ -55,11 +55,13 @@ export function LoginForm() {
   useEffect(() => {
     if (state?.success && state?.redirectUrl) {
       console.log('Login successful, redirecting to:', state.redirectUrl);
+      console.log('User role:', state.userRole);
       // Store role in sessionStorage for middleware to access
       if (state.userRole) {
         sessionStorage.setItem('userRole', state.userRole);
       }
-      router.push(state.redirectUrl);
+      // Use window.location for a more reliable redirect that bypasses Next.js router caching
+      window.location.href = state.redirectUrl;
     }
   }, [state?.success, state?.redirectUrl, state?.userRole, router]);
 
