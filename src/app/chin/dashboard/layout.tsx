@@ -38,8 +38,23 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     await signOut({ callbackUrl: '/login' });
   };
 
-  if (status === 'loading' || !session) {
-    return null;
+  // Show loading spinner while session is being loaded
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  // Redirect if not logged in
+  if (!session) {
+    router.push('/login');
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
 
   const user = session.user;
