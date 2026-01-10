@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,15 @@ const initialState = {
 
 export function LoginForm() {
   const [state, formAction] = useFormState(login, initialState as any);
+
+  // Handle redirect after successful login
+  React.useEffect(() => {
+    if (state?.success && state?.redirectUrl) {
+      console.log('Login successful, redirecting to:', state.redirectUrl);
+      // Use window.location.href for a full page reload and proper redirect
+      window.location.href = state.redirectUrl;
+    }
+  }, [state?.success, state?.redirectUrl]);
 
   return (
     <form action={formAction} className="grid gap-4">
