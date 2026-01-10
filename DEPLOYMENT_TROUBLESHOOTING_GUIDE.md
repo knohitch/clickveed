@@ -65,9 +65,9 @@ ADMIN_EMAILS=tmoretvid@gmail.com,admin@vyydecourt.site
 # ============================================
 # Payment (Stripe)
 # ============================================
-STRIPE_SECRET_KEY=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
-STRIPE_PUBLISHABLE_KEY=pk_live_51S09PdE33L3kG055UJhi0kUmhvXK2zKAtHyegNigCBcQIinhl94VTM01QH5xXH9auHuwPZgq86sdnKTEg1ZMcCdI00KavmaQgv
-STRIPE_WEBHOOK_SECRET=whsec_68lghRlEY6DVTwZgPN6Vrwp3Cfohc0de
+STRIPE_SECRET_KEY=bug
+STRIPE_PUBLISHABLE_KEY=pbuyg
+STRIPE_WEBHOOK_SECRET=bug
 
 # ============================================
 # Application
