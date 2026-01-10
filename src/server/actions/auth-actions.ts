@@ -6,7 +6,6 @@ import { AuthError } from 'next-auth';
 import { z } from 'zod';
 import { hash, compare } from 'bcryptjs';
 import prisma from '@/server/prisma';
-import { redirect } from 'next/navigation';
 import { randomBytes, createHash } from 'crypto';
 import { sendEmail } from '@/server/services/email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
@@ -270,14 +269,29 @@ export async function login(prevState: any, formData: FormData) {
         // Successful login - clear rate limit counter
         clearLoginRateLimit(email);
         
-        // Successful login - redirect based on role
+        // Successful login - return redirect URL based on role
         if (userWithRole?.role === 'SUPER_ADMIN') {
-            console.log('Redirecting SUPER_ADMIN to /chin/dashboard');
-            return redirect('/chin/dashboard');
+            console.log('Login successful for SUPER_ADMIN');
+            return { 
+                success: true, 
+                error: '', 
+                redirectUrl: '/chin/dashboard',
+                userRole: 'SUPER_ADMIN'
+            };
         } else if (userWithRole?.role === 'ADMIN') {
-            return redirect('/kanri/dashboard');
+            return { 
+                success: true, 
+                error: '', 
+                redirectUrl: '/kanri/dashboard',
+                userRole: 'ADMIN'
+            };
         } else {
-            return redirect('/dashboard');
+            return { 
+                success: true, 
+                error: '', 
+                redirectUrl: '/dashboard',
+                userRole: 'USER'
+            };
         }
         
     } catch (error: any) {
@@ -289,11 +303,6 @@ export async function login(prevState: any, formData: FormData) {
                 error: 'Login is taking too long. Please check your connection and try again.',
                 success: false
             };
-        }
-        
-        // NextAuth throws redirect errors for successful logins
-        if (error?.message?.includes('NEXT_REDIRECT')) {
-            throw error; // Re-throw redirect errors (this is success)
         }
         
         if (error instanceof AuthError) {

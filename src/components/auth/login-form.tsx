@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 function LoginButton() {
   const { pending } = useFormStatus();
@@ -39,6 +39,7 @@ export function LoginForm() {
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Reset retry count on successful state change
   useEffect(() => {
@@ -47,6 +48,18 @@ export function LoginForm() {
       setIsRetrying(false);
     }
   }, [state?.success]);
+
+  // Handle redirect after successful login
+  useEffect(() => {
+    if (state?.success && state?.redirectUrl) {
+      console.log('Login successful, redirecting to:', state.redirectUrl);
+      // Store role in sessionStorage for middleware to access
+      if (state.userRole) {
+        sessionStorage.setItem('userRole', state.userRole);
+      }
+      router.push(state.redirectUrl);
+    }
+  }, [state?.success, state?.redirectUrl, state?.userRole, router]);
 
   const handleRetry = async (formData: FormData) => {
     if (retryCount < 3) {
