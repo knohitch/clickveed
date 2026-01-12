@@ -90,6 +90,7 @@ model Plan {
   aiCredits            Int?
   videoExports         Int?
   storageGB            Int?
+  featureTier          String              @default("free")
   stripePriceIdMonthly   String?
   stripePriceIdQuarterly String?
   stripePriceIdYearly    String?

@@ -35,7 +35,17 @@ export function getBaseUrl(request?: Request): string {
         return process.env.NEXTAUTH_URL.replace(/\/$/, '');
     }
 
-    // Second priority: Construct from request headers
+    // Second priority: AUTH_URL from environment (NextAuth v5+)
+    if (process.env.AUTH_URL) {
+        return process.env.AUTH_URL.replace(/\/$/, '');
+    }
+
+    // Third priority: NEXT_PUBLIC_SITE_URL for production
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+        return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+    }
+
+    // Fourth priority: Construct from request headers
     if (request) {
         const host = request.headers.get('host');
         const protocol = request.headers.get('x-forwarded-proto') || 'http';
@@ -44,12 +54,12 @@ export function getBaseUrl(request?: Request): string {
         }
     }
 
-    // Third priority: Check for VERCEL_URL (Vercel deployment)
+    // Fifth priority: Check for VERCEL_URL (Vercel deployment)
     if (process.env.VERCEL_URL) {
         return `https://${process.env.VERCEL_URL}`;
     }
 
     // Fallback to localhost for development
-    console.warn('NEXTAUTH_URL not configured, using localhost fallback');
+    console.warn('NEXTAUTH_URL or AUTH_URL not configured, using localhost fallback');
     return 'http://localhost:3000';
 }
