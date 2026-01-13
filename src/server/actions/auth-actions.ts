@@ -135,7 +135,6 @@ export async function signUp(prevState: any, formData: FormData) {
 
             // Send verification email
             const { appName } = await getAdminSettings();
-            // Use getBaseUrl utility for proper URL handling
             const baseUrl = getBaseUrl();
             const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
             
