@@ -51,5 +51,6 @@ export async function GET(request: Request) {
   });
 
   console.log('[verify-email] Email verified successfully for:', verificationToken.identifier);
-  return NextResponse.redirect(new URL('/login?verified=true', request.url));
+  const base = process.env.NEXTAUTH_URL || process.env.AUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || request.url;
+  return NextResponse.redirect(new URL('/login?verified=true', base));
 }
