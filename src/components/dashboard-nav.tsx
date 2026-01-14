@@ -129,23 +129,37 @@ export function DashboardNav() {
     const planName = subscriptionPlan?.name || null;
     const featureTier = (subscriptionPlan as any)?.featureTier || null;
 
-    // Debug logging for troubleshooting free tier issues
-    console.log('[DashboardNav] Auth loading:', authLoading);
-    console.log('[DashboardNav] Subscription plan:', subscriptionPlan);
-    console.log('[DashboardNav] Plan name:', planName);
-    console.log('[DashboardNav] Feature tier:', featureTier);
+    // Debug logging for troubleshooting free tier issues (only in development)
+    if (process.env.NODE_ENV === 'development') {
+        console.log('[DashboardNav] Auth loading:', authLoading);
+        console.log('[DashboardNav] Subscription plan:', subscriptionPlan);
+        console.log('[DashboardNav] Plan name:', planName);
+        console.log('[DashboardNav] Feature tier:', featureTier);
+    }
 
-    // Show all sections while loading to ensure buttons are clickable
-    const sectionsToRender = authLoading ? menuSections : menuSections;
+    // IMPORTANT: If still loading OR no plan data, show all free-tier features
+    // This ensures users can access the dashboard while plan data is being fetched
+    // or if they somehow don't have a plan assigned yet.
+    const shouldShowAllFreeFeatures = authLoading || (!planName && !featureTier);
 
-    const filteredMenuSections = sectionsToRender.filter(section => {
+    const filteredMenuSections = menuSections.filter(section => {
         if (!section.featureId) return true; // Always show sections without featureId
+        if (shouldShowAllFreeFeatures) {
+            // When loading or no plan, show sections that are part of free tier
+            const featureAccess = checkFeatureAccess(null, section.featureId, 'free');
+            return featureAccess.canAccess;
+        }
         const featureAccess = checkFeatureAccess(planName, section.featureId, featureTier);
         return featureAccess.canAccess;
     }).map(section => ({
         ...section,
         items: section.items.filter(item => {
             if (!item.featureId) return true; // Always show items without featureId
+            if (shouldShowAllFreeFeatures) {
+                // When loading or no plan, show items that are part of free tier
+                const featureAccess = checkFeatureAccess(null, item.featureId, 'free');
+                return featureAccess.canAccess;
+            }
             const featureAccess = checkFeatureAccess(planName, item.featureId, featureTier);
             return featureAccess.canAccess;
         })

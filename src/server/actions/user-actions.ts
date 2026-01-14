@@ -45,9 +45,10 @@ export async function getUsers(): Promise<UserWithRole[]> {
 
 /**
  * Retrieves a single user by their ID.
+ * If the user doesn't have a plan assigned, automatically assigns the Free plan.
  */
 export async function getUserById(id: string): Promise<(User & { plan: Plan & { features: PlanFeature[] } | null }) & { usage: UserUsage | null } | null> {
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
         where: { id },
         include: {
             plan: {
@@ -58,6 +59,46 @@ export async function getUserById(id: string): Promise<(User & { plan: Plan & { 
             usage: true
         }
     });
+
+    // If user exists but has no plan, auto-assign the Free plan
+    if (user && !user.planId) {
+        console.log('[getUserById] User has no plan, attempting to assign Free plan:', id);
+        
+        const freePlan = await prisma.plan.findFirst({
+            where: { 
+                OR: [
+                    { name: 'Free' },
+                    { featureTier: 'free' }
+                ]
+            },
+            include: {
+                features: true
+            }
+        });
+
+        if (freePlan) {
+            console.log('[getUserById] Assigning Free plan to user:', id);
+            
+            // Update user with Free plan
+            user = await prisma.user.update({
+                where: { id },
+                data: { planId: freePlan.id },
+                include: {
+                    plan: {
+                        include: {
+                            features: true
+                        }
+                    },
+                    usage: true
+                }
+            });
+            
+            console.log('[getUserById] Free plan assigned successfully');
+        } else {
+            console.warn('[getUserById] Free plan not found in database - seed may not have run properly');
+        }
+    }
+
     return user as any;
 }
 
