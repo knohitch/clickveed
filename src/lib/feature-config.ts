@@ -72,16 +72,11 @@ export function matchFeatureKeywords(featureText: string, featureId: string): bo
 }
 
 // Default free plan features (can be overridden by database)
+// FREE TIER: Basic features only - encourages upgrades to paid plans
 export const DEFAULT_FREE_PLAN_FEATURES = [
   'ai-assistant',
   'creative-assistant',
   'social-integrations',
-  'video-suite',
-  'video-pipeline',
-  'script-generator',
-  'stock-media',
-  'ai-image-generator',
-  'background-remover',
   'media-library',
   'profile-settings',
 ] as const;
@@ -89,8 +84,14 @@ export const DEFAULT_FREE_PLAN_FEATURES = [
 export const DEFAULT_STARTER_PLAN_FEATURES = [
   ...DEFAULT_FREE_PLAN_FEATURES,
   'topic-researcher',
+  'video-suite',
+  'video-pipeline',
   'video-editor',
+  'script-generator',
   'video-from-url',
+  'stock-media',
+  'ai-image-generator',
+  'background-remover',
   'social-analytics',
   'brand-kit',
 ] as const;
@@ -113,10 +114,13 @@ export const DEFAULT_ENTERPRISE_PLAN_FEATURES = [
   'n8n-integrations',
 ] as const;
 
-// Minimum plan tiers for features
+// Minimum plan tiers for features - ALIGNED with DEFAULT_*_PLAN_FEATURES above
 export const FEATURE_MINIMUM_PLAN: Record<string, string> = {
+  // Enterprise-only features
   'voice-cloning': 'Enterprise',
   'n8n-integrations': 'Enterprise',
+  
+  // Professional features
   'thumbnail-tester': 'Professional',
   'magic-clips': 'Professional',
   'voice-over': 'Professional',
@@ -125,6 +129,8 @@ export const FEATURE_MINIMUM_PLAN: Record<string, string> = {
   'flux-pro': 'Professional',
   'ai-agents': 'Professional',
   'social-scheduler': 'Professional',
+  
+  // Starter features
   'topic-researcher': 'Starter',
   'video-suite': 'Starter',
   'video-pipeline': 'Starter',
@@ -136,4 +142,11 @@ export const FEATURE_MINIMUM_PLAN: Record<string, string> = {
   'background-remover': 'Starter',
   'social-analytics': 'Starter',
   'brand-kit': 'Starter',
+  
+  // Free features (no entry needed - included by default)
+  // 'ai-assistant': 'Free',
+  // 'creative-assistant': 'Free',
+  // 'social-integrations': 'Free',
+  // 'media-library': 'Free',
+  // 'profile-settings': 'Free',
 } as const;

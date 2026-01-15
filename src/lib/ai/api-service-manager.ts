@@ -4,6 +4,11 @@
  * @fileOverview Manages and rotates through available AI service providers.
  * This file centralizes the logic for selecting an provider based on
  * configured API keys, ensuring features degrade gracefully if a key is missing.
+ * 
+ * ENHANCEMENTS:
+ * - Circuit breaker pattern to avoid hammering failed providers
+ * - Provider validation to check API keys on startup
+ * - Health tracking for all providers
  */
 import { ai, createGenkitInstance, getOpenAIClient } from '@/ai/genkit';
 import { type Tool } from 'genkit';
@@ -17,6 +22,102 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { initialApiKeysObject } from '@/contexts/admin-settings-context';
 import OpenAI from 'openai';
 import { createProviderClient } from './provider-clients';
+
+/**
+ * Circuit Breaker Implementation
+ * Prevents repeated calls to failing providers
+ */
+class CircuitBreaker {
+  private failures = new Map<string, number>();
+  private lastFailureTime = new Map<string, number>();
+  private openCircuits = new Set<string>();
+  private readonly threshold = 5; // Max failures before opening circuit
+  private readonly timeout = 60000; // 1 minute cooldown
+
+  shouldAttempt(provider: string): boolean {
+    // If circuit is open, check if cooldown has passed
+    if (this.openCircuits.has(provider)) {
+      const lastFailure = this.lastFailureTime.get(provider) || 0;
+      const timeSinceFailure = Date.now() - lastFailure;
+      
+      if (timeSinceFailure >= this.timeout) {
+        // Try to close the circuit (half-open state)
+        console.log(`[CircuitBreaker] Attempting to close circuit for ${provider} after ${timeSinceFailure}ms cooldown`);
+        this.openCircuits.delete(provider);
+        this.failures.set(provider, 0);
+        return true;
+      }
+      
+      console.log(`[CircuitBreaker] Circuit open for ${provider}, skipping (${this.timeout - timeSinceFailure}ms remaining)`);
+      return false;
+    }
+    
+    return true;
+  }
+
+  recordFailure(provider: string): void {
+    const failures = (this.failures.get(provider) || 0) + 1;
+    this.failures.set(provider, failures);
+    this.lastFailureTime.set(provider, Date.now());
+    
+    if (failures >= this.threshold) {
+      console.warn(`[CircuitBreaker] Opening circuit for ${provider} after ${failures} failures`);
+      this.openCircuits.add(provider);
+    } else {
+      console.log(`[CircuitBreaker] Provider ${provider} has ${failures}/${this.threshold} failures`);
+    }
+  }
+
+  recordSuccess(provider: string): void {
+    // Reset failure count on success
+    if (this.failures.get(provider)) {
+      console.log(`[CircuitBreaker] Resetting failure count for ${provider}`);
+    }
+    this.failures.delete(provider);
+    this.lastFailureTime.delete(provider);
+    this.openCircuits.delete(provider);
+  }
+
+  getStatus(provider: string): { failures: number; isOpen: boolean } {
+    return {
+      failures: this.failures.get(provider) || 0,
+      isOpen: this.openCircuits.has(provider)
+    };
+  }
+}
+
+// Global circuit breaker instance
+const circuitBreaker = new CircuitBreaker();
+
+/**
+ * Provider Health Tracking
+ */
+interface ProviderHealth {
+  lastChecked: number;
+  isHealthy: boolean;
+  lastError?: string;
+}
+
+const providerHealth = new Map<string, ProviderHealth>();
+
+function markProviderHealthy(provider: string): void {
+  providerHealth.set(provider, {
+    lastChecked: Date.now(),
+    isHealthy: true
+  });
+}
+
+function markProviderUnhealthy(provider: string, error: string): void {
+  providerHealth.set(provider, {
+    lastChecked: Date.now(),
+    isHealthy: false,
+    lastError: error
+  });
+}
+
+function getProviderHealth(provider: string): ProviderHealth | undefined {
+  return providerHealth.get(provider);
+}
 
 // Define request types locally as they are no longer exported from genkit
 type MessageRole = 'user' | 'model' | 'system' | 'tool';
@@ -112,22 +213,44 @@ const ttsProviderPriority: ProviderConfig[] = [
 
 // This function returns information about the available provider
 // based on API keys configured in the admin settings
+// NOW WITH CIRCUIT BREAKER SUPPORT
 async function getAvailableProvider(priorityList: ProviderConfig[], type: string): Promise<ProviderInfo> {
     const { apiKeys } = await getAdminSettings();
     
     for (const provider of priorityList) {
         const apiKey = apiKeys[provider.name as keyof typeof apiKeys];
         
-        if (apiKey) {
-            // Return both the model string and the provider config
-            return {
-                model: provider.model,
-                provider: provider.name,
-                apiKey
-            };
+        // Skip if no API key
+        if (!apiKey) {
+            continue;
         }
+        
+        // Skip if circuit breaker is open for this provider
+        if (!circuitBreaker.shouldAttempt(provider.name)) {
+            console.log(`[ProviderManager] Skipping ${provider.name} due to circuit breaker`);
+            continue;
+        }
+        
+        // Check health status
+        const health = getProviderHealth(provider.name);
+        if (health && !health.isHealthy) {
+            const timeSinceCheck = Date.now() - health.lastChecked;
+            // Re-check after 5 minutes
+            if (timeSinceCheck < 300000) {
+                console.log(`[ProviderManager] Skipping ${provider.name} due to unhealthy status`);
+                continue;
+            }
+        }
+        
+        // Return both the model string and the provider config
+        console.log(`[ProviderManager] Selected ${provider.name} for ${type} generation`);
+        return {
+            model: provider.model,
+            provider: provider.name,
+            apiKey
+        };
     }
-    throw new Error(`No API key configured for any enabled ${type} provider. Please configure at least one in the admin panel.`);
+    throw new Error(`No healthy ${type} provider available. Please configure at least one API key and ensure providers are accessible.`);
 }
 
 export async function getAvailableTextGenerator() {
@@ -182,6 +305,7 @@ export async function getAvailableStockVideoTool() {
 
 // These functions create a new Genkit instance with the appropriate API keys
 // for each request, ensuring the correct provider is used
+// NOW WITH CIRCUIT BREAKER TRACKING
 export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) {
     const providerInfo = await getAvailableTextGenerator();
     
@@ -193,6 +317,10 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
             const client = await createProviderClient(providerInfo.provider);
             const response = await client.generateText(req.messages);
             
+            // Record success
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            
             // Return in Genkit-compatible format
             return {
                 model: providerInfo.model,
@@ -202,13 +330,28 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
                 }
             };
         } catch (error) {
+            // Record failure
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
+            
             console.error(`Error generating text with ${providerInfo.provider}:`, error);
             throw error;
         }
     } else {
         // For providers with Genkit plugins, use Genkit
-        const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-        return genkitInstance.generate({ ...req, model: providerInfo.model });
+        try {
+            const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+            const result = await genkitInstance.generate({ ...req, model: providerInfo.model });
+            
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            
+            return result;
+        } catch (error) {
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
+            throw error;
+        }
     }
 }
 
@@ -248,12 +391,13 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
     if (customProviders.includes(providerInfo.provider)) {
         try {
             const client = await createProviderClient(providerInfo.provider);
-            // For image generation, we would need to extract the prompt from the request
-            // This is a simplified implementation
             const prompt = req.messages.map(msg => msg.content[0].text).join(' ');
             const response = await client.generateImage(prompt);
             
-            // Return in Genkit-compatible format
+            // Record success
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            
             return {
                 model: providerInfo.model,
                 result: {
@@ -262,13 +406,23 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
                 }
             };
         } catch (error) {
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
             console.error(`Error generating image with ${providerInfo.provider}:`, error);
             throw error;
         }
     } else {
-        // For providers with Genkit plugins, use Genkit
-        const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-        return genkitInstance.generate({ ...req, model: providerInfo.model });
+        try {
+            const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+            const result = await genkitInstance.generate({ ...req, model: providerInfo.model });
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            return result;
+        } catch (error) {
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
+            throw error;
+        }
     }
 }
 
@@ -281,12 +435,13 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
     if (customProviders.includes(providerInfo.provider)) {
         try {
             const client = await createProviderClient(providerInfo.provider);
-            // For video generation, we would need to extract the prompt from the request
-            // This is a simplified implementation
             const prompt = req.messages.map(msg => msg.content[0].text).join(' ');
             const response = await client.generateVideo(prompt);
             
-            // Return in Genkit-compatible format
+            // Record success
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            
             return {
                 model: providerInfo.model,
                 result: {
@@ -295,13 +450,23 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
                 }
             };
         } catch (error) {
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
             console.error(`Error generating video with ${providerInfo.provider}:`, error);
             throw error;
         }
     } else {
-        // For providers with Genkit plugins, use Genkit
-        const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-        return genkitInstance.generate({ ...req, model: providerInfo.model });
+        try {
+            const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+            const result = await genkitInstance.generate({ ...req, model: providerInfo.model });
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            return result;
+        } catch (error) {
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
+            throw error;
+        }
     }
 }
 

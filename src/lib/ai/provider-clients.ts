@@ -202,80 +202,190 @@ export class ElevenLabsClient {
   }
 }
 
-// Imagen Client
+// Imagen Client - FIXED for proper Google Cloud integration
 export class ImagenClient {
-  private apiKey: string;
+  private accessToken: string;
+  private projectId: string;
   private baseUrl: string = 'https://us-central1-aiplatform.googleapis.com';
   
   constructor(apiKey: string) {
-    this.apiKey = apiKey;
+    // apiKey is actually the OAuth access token for Google Cloud
+    this.accessToken = apiKey;
+    // Get project ID from environment variable
+    this.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || '';
+    
+    if (!this.projectId) {
+      console.warn('[Imagen] GOOGLE_CLOUD_PROJECT_ID not set. Image generation may fail.');
+    }
   }
   
-  async generateImage(prompt: string, model: string = 'imagen-3.0'): Promise<ImageGenerationResponse> {
+  async generateImage(prompt: string, model: string = 'imagegeneration@006'): Promise<ImageGenerationResponse> {
     try {
-      // Using the correct Google Cloud Vertex AI endpoint for Imagen
+      if (!this.projectId) {
+        throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
+      }
+      
+      // Using the correct Google Cloud Vertex AI endpoint with actual project ID
+      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${model}:predict`;
+      
       const response = await axios.post(
-        `${this.baseUrl}/v1/projects/-/locations/us-central1/publishers/google/models/${model}:predict`,
+        endpoint,
         {
-          instances: [{ prompt }],
+          instances: [{ 
+            prompt: prompt 
+          }],
+          parameters: {
+            sampleCount: 1,
+          }
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': `Bearer ${this.accessToken}`,
             'Content-Type': 'application/json',
           },
+          timeout: 60000, // 60 second timeout
         }
       );
       
-      // Extract the image URL from the response
-      const imageUrl = response.data.predictions[0].bytesBase64Encoded;
+      // Extract the base64 image from the response
+      const prediction = response.data.predictions[0];
+      const imageBase64 = prediction.bytesBase64Encoded;
+      
+      if (!imageBase64) {
+        throw new Error('No image data returned from Imagen API');
+      }
+      
+      // Upload to Wasabi for permanent storage
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const imageDataUri = `data:image/png;base64,${imageBase64}`;
+      const { publicUrl } = await uploadToWasabi(imageDataUri, 'images');
+      
       return {
-        imageUrl: `data:image/png;base64,${imageUrl}`,
+        imageUrl: publicUrl,
         model,
         provider: 'imagen'
       };
     } catch (error) {
-      console.error('Imagen image generation error:', error);
+      console.error('[Imagen] Image generation error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('[Imagen] API Response:', error.response.data);
+        throw new Error(`Imagen API error (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+      }
       throw error;
     }
   }
 }
 
-// Google VEO Client
+// Google VEO Client - FIXED for proper Google Cloud integration with job polling
 export class GoogleVeoClient {
-  private apiKey: string;
+  private accessToken: string;
+  private projectId: string;
   private baseUrl: string = 'https://us-central1-aiplatform.googleapis.com';
   
   constructor(apiKey: string) {
-    this.apiKey = apiKey;
+    // apiKey is actually the OAuth access token for Google Cloud
+    this.accessToken = apiKey;
+    // Get project ID from environment variable
+    this.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || '';
+    
+    if (!this.projectId) {
+      console.warn('[GoogleVeo] GOOGLE_CLOUD_PROJECT_ID not set. Video generation may fail.');
+    }
   }
   
-  async generateVideo(prompt: string, model: string = 'veo-2.0'): Promise<VideoGenerationResponse> {
+  async generateVideo(prompt: string, model: string = 'imagen-video-001'): Promise<VideoGenerationResponse> {
     try {
-      // Using the Google Cloud Vertex AI endpoint for VEO
-      const response = await axios.post(
-        `${this.baseUrl}/v1/projects/-/locations/us-central1/publishers/google/models/${model}:predict`,
+      if (!this.projectId) {
+        throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
+      }
+      
+      // Using the correct Google Cloud Vertex AI endpoint with actual project ID
+      // Video generation is async, so we use predictLongRunning
+      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
+      
+      const startResponse = await axios.post(
+        endpoint,
         {
-          instances: [{ prompt }],
+          instances: [{ 
+            prompt: prompt 
+          }],
+          parameters: {
+            sampleCount: 1,
+          }
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': `Bearer ${this.accessToken}`,
             'Content-Type': 'application/json',
           },
+          timeout: 60000, // 60 second timeout for initial request
         }
       );
       
-      // Extract the video URL from the response
-      // Note: This is a simplified implementation - actual response format may vary
-      const videoUrl = response.data.predictions[0].videoUrl;
+      // Get the operation name for polling
+      const operationName = startResponse.data.name;
+      
+      if (!operationName) {
+        throw new Error('No operation name returned from Google Veo API');
+      }
+      
+      // Poll for completion (video generation takes time)
+      let result;
+      const maxAttempts = 120; // 10 minutes max (5 sec intervals)
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        
+        const statusResponse = await axios.get(
+          `${this.baseUrl}/v1/${operationName}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`,
+            },
+            timeout: 30000,
+          }
+        );
+        
+        if (statusResponse.data.done) {
+          result = statusResponse.data.response;
+          break;
+        }
+        
+        if (statusResponse.data.error) {
+          throw new Error(`Video generation failed: ${JSON.stringify(statusResponse.data.error)}`);
+        }
+        
+        console.log(`[GoogleVeo] Polling attempt ${attempt + 1}/${maxAttempts}...`);
+      }
+      
+      if (!result) {
+        throw new Error('Video generation timed out after 10 minutes');
+      }
+      
+      // Extract the video from the response
+      const prediction = result.predictions?.[0];
+      const videoBase64 = prediction?.bytesBase64Encoded;
+      
+      if (!videoBase64) {
+        throw new Error('No video data returned from Google Veo API');
+      }
+      
+      // Upload to Wasabi for permanent storage
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const videoDataUri = `data:video/mp4;base64,${videoBase64}`;
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
+      
       return {
-        videoUrl: videoUrl,
+        videoUrl: publicUrl,
         model,
         provider: 'googleVeo'
       };
     } catch (error) {
-      console.error('Google VEO video generation error:', error);
+      console.error('[GoogleVeo] Video generation error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('[GoogleVeo] API Response:', error.response.data);
+        throw new Error(`Google Veo API error (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+      }
       throw error;
     }
   }
@@ -353,7 +463,7 @@ export class ReplicateClient {
   }
 }
 
-// Seedance Client
+// Seedance Client - FIXED with proper job polling
 export class SeedanceClient {
   private apiKey: string;
   private baseUrl: string = 'https://api.seedance.ai';
@@ -364,8 +474,9 @@ export class SeedanceClient {
   
   async generateVideo(prompt: string, style: string = 'default'): Promise<VideoGenerationResponse> {
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/v1/video.generate`,
+      // Start video generation
+      const startResponse = await axios.post(
+        `${this.baseUrl}/v1/video/generate`,
         {
           prompt,
           style,
@@ -375,13 +486,66 @@ export class SeedanceClient {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
+          timeout: 30000, // 30 second timeout for initial request
         }
       );
 
-      const videoUrl = response.data?.video_url || response.data?.videoUrl;
+      const jobId = startResponse.data?.job_id || startResponse.data?.id;
+
+      if (!jobId) {
+        // If no job ID, maybe it's synchronous
+        const videoUrl = startResponse.data?.video_url || startResponse.data?.videoUrl;
+        if (videoUrl) {
+          const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+          const videoResponse = await fetch(videoUrl);
+          const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+          const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+          const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
+          
+          return { videoUrl: publicUrl, model: 'seedance-video', provider: 'seedance' };
+        }
+        throw new Error('No job ID or video URL returned from Seedance API');
+      }
+
+      // Poll for completion
+      let result;
+      const maxAttempts = 60; // 5 minutes max (5 sec intervals)
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        
+        const statusResponse = await axios.get(
+          `${this.baseUrl}/v1/video/status/${jobId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+            },
+            timeout: 30000,
+          }
+        );
+        
+        const status = statusResponse.data?.status;
+        
+        if (status === 'completed' || status === 'succeeded') {
+          result = statusResponse.data;
+          break;
+        }
+        
+        if (status === 'failed' || status === 'error') {
+          throw new Error(`Video generation failed: ${statusResponse.data?.error || 'Unknown error'}`);
+        }
+        
+        console.log(`[Seedance] Polling attempt ${attempt + 1}/${maxAttempts}, status: ${status}`);
+      }
+
+      if (!result) {
+        throw new Error('Video generation timed out after 5 minutes');
+      }
+
+      const videoUrl = result?.video_url || result?.videoUrl || result?.url;
 
       if (!videoUrl) {
-        throw new Error('No video URL returned from Seedance API');
+        throw new Error('No video URL in completed job response');
       }
 
       const { uploadToWasabi } = await import('@/server/services/wasabi-service');
@@ -396,13 +560,16 @@ export class SeedanceClient {
         provider: 'seedance'
       };
     } catch (error) {
-      console.error('Seedance video generation error:', error);
+      console.error('[Seedance] Video generation error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('[Seedance] API Response:', error.response.data);
+      }
       throw error;
     }
   }
 }
 
-// HeyGen Client
+// HeyGen Client - FIXED with proper job polling
 export class HeyGenClient {
   private apiKey: string;
   private baseUrl: string = 'https://api.heygen.com';
@@ -413,24 +580,70 @@ export class HeyGenClient {
   
   async generateVideo(prompt: string, avatar: string = 'default'): Promise<VideoGenerationResponse> {
     try {
-      const response = await axios.post(
+      // Start video generation
+      const startResponse = await axios.post(
         `${this.baseUrl}/v1/video.generate`,
         {
-          avatar,
-          text: prompt,
+        avatar_id: avatar,
+          script: {
+            type: 'text',
+            input_text: prompt,
+          },
         },
         {
           headers: {
             'X-Api-Key': this.apiKey,
             'Content-Type': 'application/json',
           },
+          timeout: 30000, // 30 second timeout
         }
       );
 
-      const videoUrl = response.data?.data?.video_url || response.data?.videoUrl;
+      const videoId = startResponse.data?.data?.video_id || startResponse.data?.video_id;
+
+      if (!videoId) {
+        throw new Error('No video ID returned from HeyGen API');
+      }
+
+      // Poll for completion
+      let result;
+      const maxAttempts = 120; // 10 minutes max (5 sec intervals)
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        
+        const statusResponse = await axios.get(
+          `${this.baseUrl}/v1/video_status.get?video_id=${videoId}`,
+          {
+            headers: {
+              'X-Api-Key': this.apiKey,
+            },
+            timeout: 30000,
+          }
+        );
+        
+        const status = statusResponse.data?.data?.status;
+        
+        if (status === 'completed') {
+          result = statusResponse.data.data;
+          break;
+        }
+        
+        if (status === 'failed') {
+          throw new Error(`Video generation failed: ${statusResponse.data?.data?.error || 'Unknown error'}`);
+        }
+        
+        console.log(`[HeyGen] Polling attempt ${attempt + 1}/${maxAttempts}, status: ${status}`);
+      }
+
+      if (!result) {
+        throw new Error('Video generation timed out after 10 minutes');
+      }
+
+      const videoUrl = result?.video_url || result?.url;
 
       if (!videoUrl) {
-        throw new Error('No video URL returned from HeyGen API');
+        throw new Error('No video URL in completed response');
       }
 
       const { uploadToWasabi } = await import('@/server/services/wasabi-service');
@@ -445,13 +658,16 @@ export class HeyGenClient {
         provider: 'heygen'
       };
     } catch (error) {
-      console.error('HeyGen video generation error:', error);
+      console.error('[HeyGen] Video generation error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('[HeyGen] API Response:', error.response.data);
+      }
       throw error;
     }
   }
 }
 
-// Wan Client
+// Wan Client - FIXED with proper job polling
 export class WanClient {
   private apiKey: string;
   private baseUrl: string = 'https://api.wan.ai';
@@ -462,8 +678,9 @@ export class WanClient {
   
   async generateVideo(prompt: string, style: string = 'default'): Promise<VideoGenerationResponse> {
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/v1/video.generate`,
+      // Start video generation
+      const startResponse = await axios.post(
+        `${this.baseUrl}/v1/video/generate`,
         {
           prompt,
           style,
@@ -473,13 +690,66 @@ export class WanClient {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
+          timeout: 30000, // 30 second timeout
         }
       );
 
-      const videoUrl = response.data?.data?.video_url || response.data?.videoUrl;
+      const taskId = startResponse.data?.task_id || startResponse.data?.id;
+
+      if (!taskId) {
+        // If no task ID, maybe it's synchronous
+        const videoUrl = startResponse.data?.video_url || startResponse.data?.videoUrl;
+        if (videoUrl) {
+          const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+          const videoResponse = await fetch(videoUrl);
+          const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+          const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+          const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
+          
+          return { videoUrl: publicUrl, model: 'wan-video', provider: 'wan' };
+        }
+        throw new Error('No task ID or video URL returned from Wan API');
+      }
+
+      // Poll for completion
+      let result;
+      const maxAttempts = 60; // 5 minutes max (5 sec intervals)
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        
+        const statusResponse = await axios.get(
+          `${this.baseUrl}/v1/video/task/${taskId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+            },
+            timeout: 30000,
+          }
+        );
+        
+        const status = statusResponse.data?.status;
+        
+        if (status === 'completed' || status === 'success') {
+          result = statusResponse.data;
+          break;
+        }
+        
+        if (status === 'failed' || status === 'error') {
+          throw new Error(`Video generation failed: ${statusResponse.data?.error || 'Unknown error'}`);
+        }
+        
+        console.log(`[Wan] Polling attempt ${attempt + 1}/${maxAttempts}, status: ${status}`);
+      }
+
+      if (!result) {
+        throw new Error('Video generation timed out after 5 minutes');
+      }
+
+      const videoUrl = result?.video_url || result?.videoUrl || result?.url;
 
       if (!videoUrl) {
-        throw new Error('No video URL returned from Wan API');
+        throw new Error('No video URL in completed task response');
       }
 
       const { uploadToWasabi } = await import('@/server/services/wasabi-service');
@@ -494,7 +764,10 @@ export class WanClient {
         provider: 'wan'
       };
     } catch (error) {
-      console.error('Wan video generation error:', error);
+      console.error('[Wan] Video generation error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('[Wan] API Response:', error.response.data);
+      }
       throw error;
     }
   }
