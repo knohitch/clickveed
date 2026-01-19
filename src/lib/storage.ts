@@ -42,30 +42,76 @@ class StorageManager {
   private config: StorageConfig = defaultConfig;
   private s3Client: AWS.S3 | null = null;
   private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   /**
    * Initialize storage manager with configuration
    */
   async initialize(config?: Partial<StorageConfig>): Promise<void> {
     if (config) {
-      this.config = { ...defaultConfig, ...config };
+      this.config = { 
+        wasabi: { ...defaultConfig.wasabi, ...config.wasabi },
+        bunny: { ...defaultConfig.bunny, ...config.bunny }
+      };
     }
+
+    console.log('[Storage] Initializing with config:', {
+      endpoint: this.config.wasabi.endpoint,
+      region: this.config.wasabi.region,
+      bucket: this.config.wasabi.bucket,
+      hasAccessKey: !!this.config.wasabi.accessKeyId,
+      hasSecretKey: !!this.config.wasabi.secretAccessKey,
+    });
 
     // Initialize Wasabi S3 client if credentials are available
     if (this.config.wasabi.accessKeyId && this.config.wasabi.secretAccessKey) {
-      this.s3Client = new AWS.S3({
-        endpoint: `https://${this.config.wasabi.endpoint}`,
-        region: this.config.wasabi.region,
-        credentials: {
-          accessKeyId: this.config.wasabi.accessKeyId,
-          secretAccessKey: this.config.wasabi.secretAccessKey,
-        },
-        s3ForcePathStyle: true, // Required for Wasabi
-        signatureVersion: 'v4',
-      });
+      try {
+        this.s3Client = new AWS.S3({
+          endpoint: `https://${this.config.wasabi.endpoint}`,
+          region: this.config.wasabi.region,
+          credentials: {
+            accessKeyId: this.config.wasabi.accessKeyId,
+            secretAccessKey: this.config.wasabi.secretAccessKey,
+          },
+          s3ForcePathStyle: true, // Required for Wasabi
+          signatureVersion: 'v4',
+        });
 
-      this.initialized = true;
+        this.initialized = true;
+        console.log('[Storage] S3 client initialized successfully');
+      } catch (error) {
+        console.error('[Storage] Failed to initialize S3 client:', error);
+        this.initialized = false;
+      }
+    } else {
+      console.warn('[Storage] Missing Wasabi credentials - storage will not work');
+      this.initialized = false;
     }
+  }
+
+  /**
+   * Ensure storage is initialized before performing operations
+   */
+  async ensureInitialized(): Promise<boolean> {
+    if (this.initialized && this.s3Client) {
+      return true;
+    }
+
+    // If already initializing, wait for it
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return this.initialized;
+    }
+
+    // Try to initialize from database
+    this.initializationPromise = initializeStorageFromDB();
+    try {
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+
+    return this.initialized;
   }
 
   /**

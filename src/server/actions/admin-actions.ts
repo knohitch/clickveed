@@ -39,18 +39,18 @@ export async function getAdminSettings() {
         const settings = await prisma.setting.findMany();
         const apiKeys = await prisma.apiKey.findMany();
         
-        // Environment variables take precedence over database for sensitive keys
+        // Build API keys from database
         const mergedApiKeys: Record<string, string> = { ...apiKeys.reduce((acc, key) => {
           acc[key.name] = key.value;
           return acc;
         }, {} as Record<string, string>) };
         
-        // Override with environment variables if they exist (more secure for production)
-        if (process.env.STRIPE_SECRET_KEY) mergedApiKeys.stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-        if (process.env.STRIPE_PUBLISHABLE_KEY) mergedApiKeys.stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
-        if (process.env.STRIPE_WEBHOOK_SECRET) mergedApiKeys.stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-        if (process.env.OPENAI_API_KEY) mergedApiKeys.openaiApiKey = process.env.OPENAI_API_KEY;
-        if (process.env.ELEVENLABS_API_KEY) mergedApiKeys.elevenlabsApiKey = process.env.ELEVENLABS_API_KEY;
+        // REMOVED: Environment variable override for API keys
+        // Previously, env vars would override DB values which caused confusion
+        // when users tried to delete keys in admin panel but they kept coming back.
+        // Now: Database is the single source of truth for API keys configured via admin panel.
+        // For production security, use environment variables directly in code that needs them,
+        // not through the admin settings system.
         
         const emailSettingsData = await prisma.emailSettings.findFirst();
         const emailTemplatesData = await prisma.emailTemplate.findMany();

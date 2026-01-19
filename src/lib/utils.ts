@@ -39,7 +39,7 @@ export function getBaseUrl(request?: Request): string {
     // Construct from request headers when available (CapRover/NGINX sets x-forwarded-proto)
     if (request) {
         const host = request.headers.get('host');
-        const protocol = request.headers.get('x-forwarded-proto') || 'http';
+        const protocol = request.headers.get('x-forwarded-proto') || 'https';
         if (host) {
             return `${protocol}://${host}`.replace(/\/$/, '');
         }
@@ -50,9 +50,21 @@ export function getBaseUrl(request?: Request): string {
         return `https://${process.env.VERCEL_URL}`.replace(/\/$/, '');
     }
 
-    // In production, fail fast instead of emitting localhost links
+    // CRITICAL FIX: In production, log error but don't throw - return a warning URL
+    // This prevents the app from crashing entirely while alerting about misconfiguration
     if (process.env.NODE_ENV === 'production') {
-        throw new Error('Base URL is not configured. Set NEXTAUTH_URL or AUTH_URL (or NEXT_PUBLIC_SITE_URL) in the environment.');
+        console.error('CRITICAL: Base URL is not configured! Set NEXTAUTH_URL or AUTH_URL (or NEXT_PUBLIC_SITE_URL) in environment.');
+        // Return the request URL origin if available, otherwise fallback
+        if (request) {
+            try {
+                const url = new URL(request.url);
+                return `${url.protocol}//${url.host}`;
+            } catch (e) {
+                // Ignore URL parsing errors
+            }
+        }
+        // Last resort - return empty to prevent localhost links in production
+        return '';
     }
 
     // Development fallback

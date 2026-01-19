@@ -141,10 +141,29 @@ export async function uploadToStorage(
   }
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    if (!storageManager.isConfigured()) {
+    // CRITICAL FIX: Ensure storage is initialized before checking configuration
+    const isInitialized = await storageManager.ensureInitialized();
+    
+    if (!isInitialized || !storageManager.isConfigured()) {
+      console.error('[Storage] Storage not configured. Checking admin settings...');
+      
+      // Try to get more info about the configuration
+      try {
+        const adminSettings = await getAdminSettings();
+        const hasWasabiKey = !!adminSettings.apiKeys.wasabiAccessKey;
+        const hasWasabiSecret = !!adminSettings.apiKeys.wasabiSecretKey;
+        console.error('[Storage] Admin settings check:', {
+          hasWasabiKey,
+          hasWasabiSecret,
+          bucket: adminSettings.apiKeys.wasabiBucket || 'not set'
+        });
+      } catch (e) {
+        console.error('[Storage] Failed to check admin settings:', e);
+      }
+      
       return {
         success: false,
-        error: 'Storage not configured. Please configure storage settings first.'
+        error: 'Storage not configured. Please configure Wasabi storage settings in the admin panel (Storage Settings).'
       };
     }
 

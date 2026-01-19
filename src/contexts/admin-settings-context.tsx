@@ -3,7 +3,6 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { getAdminSettings, updateAdminSettings, updatePlans, updatePromotions, updateApiKeys, updateEmailSettings, updateEmailTemplates, deletePlan } from '@/server/actions/admin-actions';
-import { revalidatePath } from 'next/cache';
 import type { Prisma } from '@prisma/client';
 
 // Use Prisma-generated types for consistency
@@ -177,40 +176,59 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     fetchSettings();
   }, []);
 
+  // Function to refetch settings from server
+  const refetchSettings = useCallback(async () => {
+    try {
+      const fetchedSettings = await getAdminSettings();
+      setSettings(prev => ({
+        ...prev,
+        ...fetchedSettings,
+        apiKeys: { ...initialApiKeysObject, ...fetchedSettings.apiKeys }
+      }));
+      console.log('[AdminSettings] Settings refetched from server');
+    } catch (error) {
+      console.error('[AdminSettings] Failed to refetch settings:', error);
+    }
+  }, []);
+
   const handleSettingChange = useCallback(async (key: keyof AllSettings, value: any) => {
+    // Optimistically update local state
     setSettings(prev => ({ ...prev, [key]: value }));
+    
     try {
         switch(key) {
             case 'plans':
                 await updatePlans(value as Plan[]);
-                revalidatePath('/chin/dashboard/plans', 'page');
                 break;
             case 'promotions':
-                 await updatePromotions(value as Promotion[]);
+                await updatePromotions(value as Promotion[]);
                 break;
             case 'apiKeys':
-                 await updateApiKeys(value as ApiKeys);
-                revalidatePath('/chin/dashboard/api-integrations', 'page');
+                await updateApiKeys(value as ApiKeys);
                 break;
             case 'emailSettings':
-                 await updateEmailSettings(value as EmailSettings);
-                 revalidatePath('/chin/dashboard/settings', 'page');
-                 break;
+                await updateEmailSettings(value as EmailSettings);
+                break;
             case 'emailTemplates':
-                 await updateEmailTemplates(value as EmailTemplates);
-                 break;
+                await updateEmailTemplates(value as EmailTemplates);
+                break;
             default:
-                 await updateAdminSettings({ [key]: value });
-                 // Revalidate settings page for general settings changes
-                 if (['appName', 'logoUrl', 'faviconUrl', 'allowAdminSignup', 'isSupportOnline'].includes(key)) {
-                    revalidatePath('/chin/dashboard/settings', 'page');
-                 }
+                await updateAdminSettings({ [key]: value });
         }
-        console.log(`[AdminSettings] Setting ${key} saved and UI refreshed`);
+        
+        console.log(`[AdminSettings] Setting ${key} saved successfully`);
+        
+        // CRITICAL FIX: Refetch settings from server to ensure UI is in sync with database
+        // This replaces the broken revalidatePath calls which don't work on client side
+        await refetchSettings();
+        
     } catch (error) {
         console.error(`Failed to update setting ${key}:`, error);
+        // On error, refetch to restore correct state
+        await refetchSettings();
+        throw error; // Re-throw so calling code can handle it
     }
-  }, []);
+  }, [refetchSettings]);
   
   const value: AdminSettingsContextType = useMemo(() => ({
     ...settings,

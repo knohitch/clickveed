@@ -1,6 +1,7 @@
-import prisma from '@lib/prisma';
+// CRITICAL FIX: Re-export from the consolidated Prisma client
+// All Prisma imports should use @/server/prisma to ensure consistency
+// This file exists for backwards compatibility with @/lib/prisma imports
 
-// Fix Bug #3: Consolidate to single Prisma client
-// Import main prisma instance which has encryption middleware
-// This ensures consistent behavior and proper encryption across the app
+// Use relative path to avoid module resolution issues
+import prisma from '../server/prisma';
 export default prisma;
