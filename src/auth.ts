@@ -3,12 +3,11 @@ import { z } from 'zod';
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
-import { compare, hash } from 'bcryptjs';
-import { createHash, randomBytes } from 'crypto';
 
-// Fix Bug #13: Lazy import Prisma to avoid loading in Edge Runtime
-// Only import Prisma when actually needed (in authorize() function)
-// This allows middleware to use auth() without loading Prisma
+// Fix Bug #13: Lazy load bcryptjs and crypto to avoid loading in Edge Runtime
+// These Node.js APIs are not supported in Edge Runtime
+// Only import when actually needed (in authorize() function)
+// This allows middleware to use auth() without loading Node.js modules
 
 // Define custom types directly in the auth config for co-location and clarity.
 declare module 'next-auth' {
@@ -120,8 +119,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         return token;
       } catch (error) {
-        console.error('JWT callback error:', error);
-        // Return token even if there's an error to prevent auth failures
+        // JWT callback error - log silently
         return token;
       }
     },
@@ -143,9 +141,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.status = token.status as string;
         }
         if (token.emailVerified !== undefined) {
-          (session.user as any).emailVerified = token.emailVerified as boolean;
+          session.user.emailVerified = token.emailVerified as boolean;
         }
-        console.log('Session callback - user role:', session.user.role, 'status:', session.user.status);
         return session;
       } catch (error) {
         console.error('Session callback error:', error);
@@ -166,32 +163,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) {
-          console.error('Missing credentials');
           return null;
         }
 
         try {
-          // Fix Bug #13: Lazy import Prisma only in authorize() (Node.js runtime)
-          // This prevents Prisma from being loaded in Edge Runtime
+          // Fix Bug #13: Lazy import Prisma and bcryptjs only in authorize() (Node.js runtime)
+          // This prevents Prisma and bcryptjs from being loaded in Edge Runtime
+          const { compare } = await import('bcryptjs');
           const { findUserForAuth } = await import('@/lib/db-utils');
           const prismaModule = await import('../lib/prisma');
           const prisma = prismaModule.default;
           
           // Use optimized database utility with timeout and retry logic
+
           const user = await findUserForAuth(prisma, credentials.email as string);
 
           if (!user || !user.passwordHash) {
-            console.error('User not found or no password hash');
             return null;
           }
-
           const isValidPassword = await compare(
             credentials.password as string,
             user.passwordHash
           );
 
           if (!isValidPassword) {
-            console.error('Invalid password');
             return null;
           }
 
@@ -209,10 +204,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             emailVerified: isSuperAdmin ? true : (user.emailVerified || false)
           };
         } catch (error) {
-          console.error('Authorization error:', error);
           return null;
         }
       },
-    } as any,
+    },
   ],
 });
