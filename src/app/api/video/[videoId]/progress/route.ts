@@ -29,11 +29,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
+    // Check if video belongs to user
     if (video.userId !== session.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const updateData: any = {
+    const updateData: {
+      watchProgress: number;
+      lastWatchedAt: Date;
+      watchDuration?: number;
+    } = {
       watchProgress: progress,
       lastWatchedAt: new Date(),
     };
@@ -53,7 +58,6 @@ export async function PATCH(
       duration: updatedVideo.watchDuration,
     });
   } catch (error) {
-    console.error('Error updating video progress:', error);
     return NextResponse.json(
       { error: 'Failed to update video progress' },
       { status: 500 }
