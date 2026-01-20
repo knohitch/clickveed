@@ -4,10 +4,9 @@ import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
 
-// Fix Bug #13: Lazy load bcryptjs and crypto to avoid loading in Edge Runtime
-// These Node.js APIs are not supported in Edge Runtime
-// Only import when actually needed (in authorize() function)
-// This allows middleware to use auth() without loading Node.js modules
+// Fix Bug #13: Use separate module for authorize to avoid loading bcryptjs in Edge Runtime
+// This prevents bcryptjs from being loaded during build analysis
+import { authorizeCredentials } from './lib/auth-credentials';
 
 // Define custom types directly in the auth config for co-location and clarity.
 declare module 'next-auth' {
@@ -162,50 +161,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials: any) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        try {
-          // Fix Bug #13: Lazy import Prisma and bcryptjs only in authorize() (Node.js runtime)
-          // This prevents Prisma and bcryptjs from being loaded in Edge Runtime
-          const { compare } = await import('bcryptjs');
-          const { findUserForAuth } = await import('@/lib/db-utils');
-          const prismaModule = await import('../lib/prisma');
-          const prisma = prismaModule.default;
-          
-          // Use optimized database utility with timeout and retry logic
-
-          const user = await findUserForAuth(prisma, credentials.email as string);
-
-          if (!user || !user.passwordHash) {
-            return null;
-          }
-          const isValidPassword = await compare(
-            credentials.password as string,
-            user.passwordHash
-          );
-
-          if (!isValidPassword) {
-            return null;
-          }
-
-          // SUPER_ADMIN bypasses email verification requirement
-          const isSuperAdmin = user.role === 'SUPER_ADMIN';
-          
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.displayName || '',
-            role: user.role || 'USER',
-            onboardingComplete: user.onboardingComplete || false,
-            status: user.status || 'Active',
-            // SUPER_ADMIN bypasses email verification
-            emailVerified: isSuperAdmin ? true : (user.emailVerified || false)
-          };
-        } catch (error) {
-          return null;
-        }
+        return authorizeCredentials(credentials);
       },
     },
   ],
