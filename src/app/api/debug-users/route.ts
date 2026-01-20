@@ -7,11 +7,11 @@ export async function GET() {
     // Check current user session
     const session = await auth();
     
-    // Get all users with their display names
+    // Get all users with their display names (sanitized for debug purposes)
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        email: true,
+        email: false, // Don't expose emails in debug endpoint
         displayName: true,
         role: true,
         status: true,

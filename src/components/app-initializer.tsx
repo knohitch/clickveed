@@ -16,9 +16,11 @@ export default function AppInitializer({ children }: { children: React.ReactNode
         
         const handleChange = () => {
             // If theme is set to system, update the class based on system preference
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'system') {
-                document.documentElement.classList.toggle('dark', mediaQuery.matches);
+            if (typeof window !== 'undefined') {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'system') {
+                    document.documentElement.classList.toggle('dark', mediaQuery.matches);
+                }
             }
         };
         

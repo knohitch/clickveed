@@ -224,13 +224,16 @@ model Agent {
 }
 
 model Video {
-  id           String      @id @default(cuid())
-  name         String
-  url          String
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String
-  transcript   Transcript?
-  createdAt    DateTime    @default(now())
+  id              String      @id @default(cuid())
+  name            String
+  url             String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  transcript      Transcript?
+  watchProgress   Float       @default(0)
+  watchDuration   Float       @default(0)
+  lastWatchedAt   DateTime?
+  createdAt       DateTime    @default(now())
 }
 
 model Transcript {

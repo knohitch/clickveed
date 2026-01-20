@@ -88,7 +88,7 @@ export default function SchedulerPage() {
         fetchUserProjects();
     }, []);
 
-    const selectedProject = allProjects.find(p => p.id === selectedProjectId);
+    const selectedProject = allProjects.find(p => p.id === selectedProjectId) || null;
 
     useEffect(() => {
         // Sync custom captions with the main caption if they haven't been customized yet.

@@ -48,6 +48,7 @@ export default function VideoEditorPage() {
     const [mediaBin, setMediaBin] = useState<StockVideoResult[]>([]);
     const [fetchIsPending, startFetchTransition] = useTransition();
     const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
+    const [blobUrls, setBlobUrls] = useState<string[]>([]);
     const { subscriptionPlan } = useAuth();
 
     useEffect(() => {
@@ -58,9 +59,13 @@ export default function VideoEditorPage() {
             }
         };
         loadBrandKit();
-    }, []);
+        
+        return () => {
+            blobUrls.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, [blobUrls]);
 
-    const selectedScene = scenes.find(s => s.id === selectedSceneId);
+    const selectedScene = scenes.find(s => s.id === selectedSceneId) || null;
 
     const addScene = () => {
         const newScene: Scene = {
@@ -90,14 +95,17 @@ export default function VideoEditorPage() {
     const handleBrollUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            const url = URL.createObjectURL(file);
+            const thumbnail = file.type.startsWith('image') ? URL.createObjectURL(file) : 'https://placehold.co/400x300.png?text=Video';
             const newMediaItem: StockVideoResult = {
                 id: `local-${Date.now()}`,
-                url: URL.createObjectURL(file),
-                thumbnail: file.type.startsWith('image') ? URL.createObjectURL(file) : 'https://placehold.co/400x300.png?text=Video',
+                url,
+                thumbnail,
                 description: file.name,
                 photographer: "Local file",
             };
             setMediaBin(prev => [newMediaItem, ...prev]);
+            setBlobUrls(prev => [...prev, url, thumbnail]);
             toast({ title: 'B-Roll Added', description: `${file.name} has been added to your media bin.` });
         }
     };

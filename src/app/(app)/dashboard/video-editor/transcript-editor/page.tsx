@@ -2,11 +2,11 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useTransition } from 'react';
+import { useState, useRef, useEffect, useTransition, useCallback } from 'react';
 import { useFormState } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UploadCloud, Sparkles, FilePenLine, Play, Pause, AlertCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, Sparkles, FilePenLine, Play, Pause, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import { generateTimedTranscriptAction } from '@/lib/actions';
 import type { TimedWord } from '@/server/ai/flows/generate-timed-transcript';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +20,12 @@ const initialState = {
   transcript: null,
   errors: {},
 };
+
+function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 function SubmitButton({ disabled, isUploading, isPending }: { disabled: boolean, isUploading: boolean, isPending: boolean }) {
   const isDisabled = disabled || isUploading || isPending;
@@ -57,6 +63,10 @@ export default function TranscriptEditorPage() {
     
     const [isUploading, setIsUploading] = useState(false);
     const [state, formAction] = useFormState(generateTimedTranscriptAction, initialState);
+    
+    const [watchProgress, setWatchProgress] = useState<number>(0);
+    const [hasSavedProgress, setHasSavedProgress] = useState(false);
+    const progressSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (state.message === 'success' && state.transcript) {
@@ -66,6 +76,51 @@ export default function TranscriptEditorPage() {
             toast({ variant: 'destructive', title: "Error", description: state.message });
         }
     }, [state, toast]);
+
+    useEffect(() => {
+        return () => {
+            if (previewVideoUrl) {
+                URL.revokeObjectURL(previewVideoUrl);
+            }
+        };
+    }, [previewVideoUrl]);
+
+    useEffect(() => {
+        if (videoFile && typeof window !== 'undefined') {
+            const storageKey = `video-progress-${videoFile.name}-${videoFile.size}`;
+            const savedProgress = localStorage.getItem(storageKey);
+            if (savedProgress) {
+                const progress = parseFloat(savedProgress);
+                setWatchProgress(progress);
+                setHasSavedProgress(true);
+            } else {
+                setWatchProgress(0);
+                setHasSavedProgress(false);
+            }
+        }
+    }, [videoFile]);
+
+    useEffect(() => {
+        if (videoRef.current && videoFile && previewVideoUrl) {
+            const video = videoRef.current;
+            
+            const handleLoadedMetadata = () => {
+                if (watchProgress > 0 && watchProgress < video.duration) {
+                    video.currentTime = watchProgress;
+                    toast({ 
+                        title: "Progress Restored", 
+                        description: `Resuming from ${formatTime(watchProgress)}` 
+                    });
+                }
+            };
+
+            video.addEventListener('loadedmetadata', handleLoadedMetadata);
+            
+            return () => {
+                video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            };
+        }
+    }, [previewVideoUrl, watchProgress, toast]);
 
     const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -116,12 +171,43 @@ export default function TranscriptEditorPage() {
     };
     
     const handleTimeUpdate = () => {
-        if (!videoRef.current) return;
+        if (!videoRef.current || !videoFile) return;
         const currentTime = videoRef.current.currentTime;
+        
         const newIndex = timedTranscript.findIndex(word => currentTime >= word.start && currentTime <= word.end);
         if (newIndex !== -1 && newIndex !== activeWordIndex) {
             setActiveWordIndex(newIndex);
         }
+        
+        setWatchProgress(currentTime);
+        
+        if (progressSaveTimeoutRef.current) {
+            clearTimeout(progressSaveTimeoutRef.current);
+        }
+        
+        progressSaveTimeoutRef.current = setTimeout(() => {
+            if (videoFile && typeof window !== 'undefined') {
+                const storageKey = `video-progress-${videoFile.name}-${videoFile.size}`;
+                localStorage.setItem(storageKey, currentTime.toString());
+            }
+        }, 1000);
+    }
+    
+    const handleResetProgress = () => {
+        if (!videoFile) return;
+        
+        if (typeof window !== 'undefined') {
+            const storageKey = `video-progress-${videoFile.name}-${videoFile.size}`;
+            localStorage.removeItem(storageKey);
+        }
+        setWatchProgress(0);
+        setHasSavedProgress(false);
+        
+        if (videoRef.current) {
+            videoRef.current.currentTime = 0;
+        }
+        
+        toast({ title: "Progress Reset", description: "Video progress has been cleared." });
     }
 
     const handleWordClick = (word: TimedWord) => {
@@ -143,14 +229,26 @@ export default function TranscriptEditorPage() {
     return (
         <div className="grid lg:grid-cols-12 gap-6 items-start h-full">
             <div className="lg:col-span-8 space-y-6">
-                <Card>
+                 <Card>
                     <CardHeader>
                          <CardTitle className="flex justify-between items-center">
                             Video Preview
                             {previewVideoUrl && (
-                                <Button size="icon" variant="outline" onClick={handlePlayPause}>
-                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    {hasSavedProgress && (
+                                        <Badge variant="secondary" className="text-xs">
+                                            Resuming from {formatTime(watchProgress)}
+                                        </Badge>
+                                    )}
+                                    <Button size="icon" variant="outline" onClick={handlePlayPause}>
+                                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                    </Button>
+                                    {hasSavedProgress && (
+                                        <Button size="icon" variant="ghost" onClick={handleResetProgress} title="Reset progress">
+                                            <RotateCcw className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
                             )}
                          </CardTitle>
                     </CardHeader>

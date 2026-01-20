@@ -24,8 +24,9 @@ export async function POST(req: Request) {
         
         return NextResponse.json({ url });
 
-    } catch (error: any) {
-        console.error("Stripe Portal Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error("Stripe Portal Error:", errorMessage);
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }

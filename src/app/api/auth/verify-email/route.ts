@@ -91,10 +91,16 @@ export async function GET(request: Request) {
     }
 
     // Now check if token is valid (not expired)
+    // Fix: Use UTC time for comparison to avoid timezone issues
+    const now = new Date();
+    const currentUtcTime = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds()));
+    
+    console.log('[verify-email] Current UTC time:', currentUtcTime.toISOString());
+    
     const verificationToken = await prisma.verificationToken.findFirst({
       where: {
         token: hashedToken,
-        expires: { gt: new Date() },
+        expires: { gt: currentUtcTime },
       },
     });
 

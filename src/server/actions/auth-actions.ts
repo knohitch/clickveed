@@ -111,7 +111,15 @@ export async function signUp(prevState: any, formData: FormData) {
             // Regular User: Requires email verification
             const verificationToken = randomBytes(32).toString('hex');
             const hashedToken = createHash('sha256').update(verificationToken).digest('hex');
-            const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+            // Fix: Use UTC time to avoid timezone issues
+            const now = new Date();
+            const tokenExpires = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours() + 24, now.getUTCMinutes(), now.getUTCSeconds()));
+            
+            console.log('[signUp] Token expiration calculation:', {
+                now: now.toISOString(),
+                tokenExpires: tokenExpires.toISOString(),
+                hoursUntilExpiry: 24
+            });
 
             await prisma.verificationToken.create({
               data: {

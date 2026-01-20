@@ -5,7 +5,12 @@ import prisma from '@/server/prisma';
  * Health check endpoint for monitoring application status
  */
 export async function GET() {
-  const checks: Record<string, any> = {
+  const checks: Record<string, {
+    status: 'healthy' | 'unhealthy';
+    message?: string;
+    error?: string;
+    missing?: string[];
+  }> = {
     timestamp: new Date().toISOString(),
     status: 'healthy',
     checks: {}
@@ -52,7 +57,7 @@ export async function GET() {
   }
 
   // Overall status check
-  const isHealthy = Object.values(checks.checks).every((check: any) => 
+  const isHealthy = Object.values(checks.checks).every((check: { status: string }) => 
     check.status !== 'unhealthy'
   );
 
