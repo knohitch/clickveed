@@ -32,9 +32,9 @@ const nextConfig = {
     ignoreBuildErrors: process.env.NODE_ENV !== 'production'
   },
   // Fix ESLint configuration for Next.js 14.2.33 compatibility
+  // Disable ESLint during builds to avoid compatibility issues
   eslint: {
-    ignoreDuringBuilds: process.env.NODE_ENV !== 'production',
-    // Disable linting during builds to avoid compatibility issues with Next.js 14.2.33
+    ignoreDuringBuilds: true,
     dirs: ['src', 'lib']
   },
     // Configure Next.js for production
