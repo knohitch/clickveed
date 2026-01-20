@@ -4,9 +4,9 @@ import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
 
-// Fix Bug #13: Use separate module for authorize to avoid loading bcryptjs in Edge Runtime
+// Fix Bug #13: Dynamic import authorize to avoid loading bcryptjs in Edge Runtime
 // This prevents bcryptjs from being loaded during build analysis
-import { authorizeCredentials } from './lib/auth-credentials';
+// The authorize function is now in a separate module
 
 // Define custom types directly in the auth config for co-location and clarity.
 declare module 'next-auth' {
@@ -161,7 +161,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials: any) {
-        return authorizeCredentials(credentials);
+        const { authorizeCredentials } = await import('./lib/auth-credentials');
+        return authorizeCredentials.default(credentials);
       },
     },
   ],
