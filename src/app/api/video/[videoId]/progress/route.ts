@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
 
+type VideoWithProgress = {
+  id: string;
+  userId: string;
+  name: string;
+  url: string;
+  watchProgress: number;
+  watchDuration: number;
+  lastWatchedAt: Date | null;
+  createdAt: Date;
+};
+
 export async function PATCH(
   request: Request,
   { params }: { params: { videoId: string } }
@@ -23,7 +34,7 @@ export async function PATCH(
 
     const video = await prisma.video.findUnique({
       where: { id: videoId },
-    });
+    }) as VideoWithProgress | null;
 
     if (!video) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
