@@ -105,8 +105,16 @@ function GeneratorUI({ videoUrl, audioUrl }: { videoUrl: string | null, audioUrl
     )
 }
 
+// Define a compatible type for the form state
+type VideoFormState = {
+  message?: string;
+  videoUrl?: string | null;
+  audioUrl?: string | null;
+  errors?: Record<string, string[] | undefined>;
+};
+
 export function ImageToVideoGenerator() {
-  const [state, formAction] = useFormState(generateVideoAction, initialState);
+  const [state, formAction] = useFormState(generateVideoAction as any, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
