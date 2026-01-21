@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import prisma from '@/server/prisma';
 import { checkUserFeatureAccess } from '@/server/actions/feature-access-actions';
+import { consumeAICredits } from '@/server/actions/ai-credits-actions';
 
 /**
  * Helper function to verify feature access for the current user
@@ -65,6 +66,12 @@ export async function generateAutomationWorkflowAction(prevState: any, formData:
     try {
         // Check feature access for AI agents
         await verifyFeatureAccess('ai-agents');
+        
+        // Consume AI credits
+        const creditResult = await consumeAICredits(2); // AI agents cost 2 credits
+        if (!creditResult.success) {
+            return { message: creditResult.error, workflow: null, errors: {} };
+        }
         const systemPrompt = `You are an expert automation engineer specializing in ${platform}.
     Create a JSON representation of a workflow that accomplishes the following task: "${prompt}".
     Return ONLY validity JSON code for the workflow. Do not include any markdown formatting, explanations, or code blocks.
@@ -238,6 +245,12 @@ export async function generateVideoAction(prevState: any, formData: FormData) {
     try {
         // Check feature access for image-to-video
         await verifyFeatureAccess('image-to-video');
+        
+        // Consume AI credits (image-to-video costs 3 credits)
+        const creditResult = await consumeAICredits(3);
+        if (!creditResult.success) {
+            return { message: creditResult.error, videoUrl: null, audioUrl: null, errors: {} };
+        }
 
         const result = await generateVideoFromImage(input);
         return {

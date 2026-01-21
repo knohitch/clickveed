@@ -19,7 +19,6 @@ declare module 'next-auth' {
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
       status: string;
-      emailVerified: boolean;
     };
   }
 
@@ -30,7 +29,7 @@ declare module 'next-auth' {
       image?: string | null;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
       onboardingComplete: boolean;
-      emailVerified?: boolean | null;
+      emailVerified?: boolean | Date | null;
       status?: string;
       passwordHash?: string;
   }
@@ -42,7 +41,7 @@ declare module "next-auth/jwt" {
     role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
     onboardingComplete: boolean;
     status: string;
-    emailVerified: boolean;
+    emailVerified?: boolean | Date | null;
   }
 }
 
@@ -139,9 +138,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (token.status !== undefined) {
           session.user.status = token.status as string;
         }
-        if (token.emailVerified !== undefined) {
-          session.user.emailVerified = token.emailVerified as boolean;
-        }
+        // Note: emailVerified is handled by NextAuth's default Session type (Date | null)
+        // For credentials auth, we don't need to expose it in session
         return session;
       } catch (error) {
         console.error('Session callback error:', error);
@@ -155,15 +153,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     {
       id: 'credentials',
       name: 'credentials',
-      type: 'credentials',
+      type: 'credentials' as const,
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials: any) {
         const { authorizeCredentials } = await import('./lib/auth-credentials');
-        return authorizeCredentials.default(credentials);
+        const user = await authorizeCredentials(credentials, undefined as any);
+        if (user) {
+          return user as any;
+        }
+        return null;
       },
-    },
+    } as any,
   ],
 });
