@@ -123,6 +123,7 @@ const featureTierOptions = [
 ];
 
 const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSave: (plan: Plan) => void, onCancel: () => void }) => {
+    const { toast } = useToast();
     const [name, setName] = React.useState(plan?.name || '');
     const [description, setDescription] = React.useState(plan?.description || '');
     const [priceMonthly, setPriceMonthly] = React.useState(plan?.priceMonthly ? String(plan.priceMonthly) : '0');
@@ -132,13 +133,61 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
     const [stripePriceIdMonthly, setStripePriceIdMonthly] = React.useState(plan?.stripePriceIdMonthly || '');
     const [stripePriceIdQuarterly, setStripePriceIdQuarterly] = React.useState(plan?.stripePriceIdQuarterly || '');
     const [stripePriceIdYearly, setStripePriceIdYearly] = React.useState(plan?.stripePriceIdYearly || '');
-    const [features, setFeatures] = React.useState(plan?.features?.map(f => f.text).join('\n') || '');
+    const [featureItems, setFeatureItems] = React.useState<string[]>(plan?.features?.map(f => f.text) || []);
+
+    const addFeature = () => {
+        setFeatureItems([...featureItems, '']);
+    };
+
+    const removeFeature = (index: number) => {
+        setFeatureItems(featureItems.filter((_, i) => i !== index));
+    };
+
+    const updateFeature = (index: number, value: string) => {
+        const updated = [...featureItems];
+        updated[index] = value;
+        setFeatureItems(updated);
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        // Validation: Check if paid plan has Stripe Price IDs
+        const isPaidPlan = Number(priceMonthly) > 0 || Number(priceQuarterly) > 0 || Number(priceYearly) > 0;
+        
+        if (isPaidPlan) {
+            const missingStripeIds = [];
+            if (!stripePriceIdMonthly?.trim()) missingStripeIds.push('Monthly');
+            if (!stripePriceIdQuarterly?.trim()) missingStripeIds.push('Quarterly');
+            if (!stripePriceIdYearly?.trim()) missingStripeIds.push('Yearly');
+            
+            if (missingStripeIds.length > 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Missing Stripe Price IDs',
+                    description: `Paid plans require Stripe Price IDs for: ${missingStripeIds.join(', ')}. Get these from your Stripe Dashboard → Products → Price IDs.`,
+                });
+                return;
+            }
+            
+            // Validate Stripe Price ID format (starts with price_)
+            const invalidStripeIds = [];
+            if (stripePriceIdMonthly && !stripePriceIdMonthly.startsWith('price_')) invalidStripeIds.push('Monthly');
+            if (stripePriceIdQuarterly && !stripePriceIdQuarterly.startsWith('price_')) invalidStripeIds.push('Quarterly');
+            if (stripePriceIdYearly && !stripePriceIdYearly.startsWith('price_')) invalidStripeIds.push('Yearly');
+            
+            if (invalidStripeIds.length > 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Invalid Stripe Price ID Format',
+                    description: `Stripe Price IDs for ${invalidStripeIds.join(', ')} must start with "price_" (e.g., price_1PqR9t2eZvKYlo2C4p6zQwLf).`,
+                });
+                return;
+            }
+        }
+
         const planId = plan?.id || `plan_${Date.now()}`;
-        const newFeaturesList = features.split('\n').filter(f => f.trim() !== '');
+        const newFeaturesList = featureItems.filter(f => f.trim() !== '');
 
         const finalFeatures: PlanFeature[] = newFeaturesList.map((text, index) => {
             const existingFeature = plan?.features?.find(f => f.text === text) ?? plan?.features?.[index];
@@ -231,9 +280,40 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                 </div>
             </div>
             <Separator />
-             <div className="space-y-2">
-                <Label htmlFor="features">Features (one per line)</Label>
-                <Textarea id="features" value={features} onChange={e => setFeatures(e.target.value)} rows={6} placeholder="Enter each feature on a new line." required />
+             <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="features" className="text-sm font-semibold">Features</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addFeature}>
+                        <PlusCircle className="h-3.5 w-3.5 mr-1" />
+                        Add Feature
+                    </Button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {featureItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No features added yet. Click "Add Feature" to start.</p>
+                    ) : (
+                        featureItems.map((feature, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <Input
+                                    value={feature}
+                                    onChange={e => updateFeature(index, e.target.value)}
+                                    placeholder={`Feature ${index + 1}`}
+                                    className="flex-1"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeFeature(index)}
+                                    className="h-9 w-9 text-destructive hover:text-destructive"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">Each feature will be displayed as a bullet point in the plan card.</p>
             </div>
             <DialogFooter>
                  <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
