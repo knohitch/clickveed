@@ -160,7 +160,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials: any) {
         const { authorizeCredentials } = await import('./lib/auth-credentials');
-        const user = await authorizeCredentials(credentials, undefined as any);
+        const user = await authorizeCredentials(credentials);
         if (user) {
           return user as any;
         }

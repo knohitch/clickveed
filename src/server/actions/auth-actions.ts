@@ -226,12 +226,15 @@ export async function login(prevState: any, formData: FormData) {
         }
         
         // Check if user exists and their email verification status
+        console.log('[LOGIN] Checking user existence for:', email);
         const user = await prisma.user.findUnique({
             where: { email },
             select: { emailVerified: true, status: true, role: true }
         });
 
+        console.log('[LOGIN] User query result:', user ? 'Found' : 'Not found');
         if (!user) {
+            console.log('[LOGIN] User not found in database');
             return { error: 'Invalid email or password', success: false };
         }
 
@@ -308,6 +311,16 @@ export async function login(prevState: any, formData: FormData) {
             return {
                 error: 'Login is taking too long. Please check your connection and try again.',
                 success: false
+            };
+        }
+        
+        // Handle database connection errors specifically
+        if (error?.code === 'P1001' || error?.message?.includes('Can\'t reach database server')) {
+            console.error('DATABASE CONNECTION FAILED:', error.message);
+            return {
+                error: 'Database connection failed. Please check if the database server is running and accessible.',
+                success: false,
+                databaseError: true
             };
         }
         
