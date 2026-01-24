@@ -24,6 +24,12 @@ const SuggestBrollOutputSchema = z.object({
 export type SuggestBrollOutput = z.infer<typeof SuggestBrollOutputSchema>;
 
 export async function suggestBroll(input: SuggestBrollInput): Promise<SuggestBrollOutput> {
+    console.log('[suggestBroll] Starting B-roll suggestion generation...');
+    
+    // Get an available text generator with model info
+    const textGenerator = await getAvailableTextGenerator();
+    console.log('[suggestBroll] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
+    
     const prompt = `You are an expert video editor. Your task is to analyze the provided video script segment and suggest relevant B-roll footage.
 
     Provide a list of 3-5 short, descriptive search terms that would yield good stock video clips for the following script:
@@ -34,8 +40,9 @@ export async function suggestBroll(input: SuggestBrollInput): Promise<SuggestBro
     The search terms should be specific and actionable.
     `;
 
-    // Use direct generation to avoid type issues
+    // Use direct generation with model from available provider
     const result = await ai.generate({
+        model: textGenerator.model,
         prompt,
         output: { schema: SuggestBrollOutputSchema }
     });

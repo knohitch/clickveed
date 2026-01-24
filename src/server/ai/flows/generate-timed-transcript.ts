@@ -44,6 +44,12 @@ const generateTimedTranscriptFlow = ai.defineFlow(
     outputSchema: GenerateTimedTranscriptOutputSchema,
   },
   async (input) => {
+    console.log('[generateTimedTranscript] Starting transcript generation...');
+    
+    // Get an available text generator with model info
+    const textGenerator = await getAvailableTextGenerator();
+    console.log('[generateTimedTranscript] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
+    
     const prompt = `You are a highly accurate video transcription service that provides word-level timestamps.
 Analyze the following video and provide a complete and accurate transcript.
 For each word, provide its start and end time in seconds.
@@ -52,6 +58,7 @@ Video for transcription:
 ${input.videoUrl}`;
 
     const {output} = await ai.generate({
+      model: textGenerator.model,
       prompt,
       output: {schema: GenerateTimedTranscriptOutputSchema}
     });

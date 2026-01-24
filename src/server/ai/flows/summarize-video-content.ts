@@ -39,6 +39,12 @@ const summarizeVideoContentFlow = ai.defineFlow(
     outputSchema: SummarizeVideoContentOutputSchema,
   },
   async input => {
+    console.log('[summarizeVideoContent] Starting video summarization...');
+    
+    // Get an available text generator with model info
+    const textGenerator = await getAvailableTextGenerator();
+    console.log('[summarizeVideoContent] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
+    
     const prompt = `You are an expert summarizer of video content.
 
 You will be given a video transcript and your job is to summarize the video content in a concise and informative way, extracting the key points.
@@ -48,6 +54,7 @@ Video Transcript: ${input.transcript}
 
     // Generate the summary using the AI service
     const { output } = await ai.generate({
+      model: textGenerator.model,
       prompt,
       output: { schema: SummarizeVideoContentOutputSchema }
     });

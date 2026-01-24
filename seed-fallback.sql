@@ -28,7 +28,12 @@ VALUES
     (gen_random_uuid()::text, '5 Video Exports / mo', 'plan_free'),
     (gen_random_uuid()::text, '1,000 AI Credits', 'plan_free'),
     (gen_random_uuid()::text, '2 GB Storage', 'plan_free'),
-    (gen_random_uuid()::text, 'Standard Support', 'plan_free');
+    (gen_random_uuid()::text, 'Standard Support', 'plan_free'),
+    (gen_random_uuid()::text, 'AI Assistant', 'plan_free'),
+    (gen_random_uuid()::text, 'Creative Assistant', 'plan_free'),
+    (gen_random_uuid()::text, 'Social Integrations', 'plan_free'),
+    (gen_random_uuid()::text, 'Media Library', 'plan_free'),
+    (gen_random_uuid()::text, 'Profile Settings', 'plan_free');
 
 -- Insert plan features for Creator plan
 INSERT INTO "PlanFeature" (id, text, "planId")
@@ -36,10 +41,27 @@ VALUES
     (gen_random_uuid()::text, '15 Video Exports / mo', 'plan_creator'),
     (gen_random_uuid()::text, '15,000 AI Credits', 'plan_creator'),
     (gen_random_uuid()::text, '20 GB Storage', 'plan_creator'),
-    (gen_random_uuid()::text, 'AI Script & Image Generation', 'plan_creator'),
+    (gen_random_uuid()::text, 'Standard Support', 'plan_creator'),
+    -- Free tier features
+    (gen_random_uuid()::text, 'AI Assistant', 'plan_creator'),
+    (gen_random_uuid()::text, 'Creative Assistant', 'plan_creator'),
+    (gen_random_uuid()::text, 'Social Integrations', 'plan_creator'),
+    (gen_random_uuid()::text, 'Media Library', 'plan_creator'),
+    (gen_random_uuid()::text, 'Profile Settings', 'plan_creator'),
+    -- Starter tier additional features
+    (gen_random_uuid()::text, 'Topic Researcher', 'plan_creator'),
+    (gen_random_uuid()::text, 'Video Suite', 'plan_creator'),
+    (gen_random_uuid()::text, 'Video Pipeline', 'plan_creator'),
+    (gen_random_uuid()::text, 'Video Editor', 'plan_creator'),
+    (gen_random_uuid()::text, 'Script Generator', 'plan_creator'),
+    (gen_random_uuid()::text, 'Video from URL', 'plan_creator'),
+    (gen_random_uuid()::text, 'Stock Media Library', 'plan_creator'),
+    (gen_random_uuid()::text, 'AI Image Generator', 'plan_creator'),
+    (gen_random_uuid()::text, 'Background Remover', 'plan_creator'),
+    (gen_random_uuid()::text, 'Social Analytics', 'plan_creator'),
+    (gen_random_uuid()::text, 'Brand Kit', 'plan_creator'),
     (gen_random_uuid()::text, 'Standard AI Voices', 'plan_creator'),
-    (gen_random_uuid()::text, 'Social Scheduler', 'plan_creator'),
-    (gen_random_uuid()::text, 'Standard Support', 'plan_creator');
+    (gen_random_uuid()::text, 'Social Scheduler', 'plan_creator');
 
 -- Insert plan features for Pro plan
 INSERT INTO "PlanFeature" (id, text, "planId")
@@ -47,20 +69,77 @@ VALUES
     (gen_random_uuid()::text, 'Unlimited Video Exports', 'plan_pro'),
     (gen_random_uuid()::text, '50,000 AI Credits', 'plan_pro'),
     (gen_random_uuid()::text, '100 GB Storage', 'plan_pro'),
+    (gen_random_uuid()::text, 'Priority Support', 'plan_pro'),
+    -- All Free and Starter tier features
+    (gen_random_uuid()::text, 'AI Assistant', 'plan_pro'),
+    (gen_random_uuid()::text, 'Creative Assistant', 'plan_pro'),
+    (gen_random_uuid()::text, 'Social Integrations', 'plan_pro'),
+    (gen_random_uuid()::text, 'Media Library', 'plan_pro'),
+    (gen_random_uuid()::text, 'Profile Settings', 'plan_pro'),
+    (gen_random_uuid()::text, 'Topic Researcher', 'plan_pro'),
+    (gen_random_uuid()::text, 'Video Suite', 'plan_pro'),
+    (gen_random_uuid()::text, 'Video Pipeline', 'plan_pro'),
+    (gen_random_uuid()::text, 'Video Editor', 'plan_pro'),
+    (gen_random_uuid()::text, 'Script Generator', 'plan_pro'),
+    (gen_random_uuid()::text, 'Video from URL', 'plan_pro'),
+    (gen_random_uuid()::text, 'Stock Media Library', 'plan_pro'),
+    (gen_random_uuid()::text, 'AI Image Generator', 'plan_pro'),
+    (gen_random_uuid()::text, 'Background Remover', 'plan_pro'),
+    (gen_random_uuid()::text, 'Social Analytics', 'plan_pro'),
+    (gen_random_uuid()::text, 'Brand Kit', 'plan_pro'),
+    (gen_random_uuid()::text, 'Standard AI Voices', 'plan_pro'),
+    (gen_random_uuid()::text, 'Social Scheduler', 'plan_pro'),
+    -- Professional tier additional features
+    (gen_random_uuid()::text, 'Thumbnail Tester', 'plan_pro'),
+    (gen_random_uuid()::text, 'Magic Clips', 'plan_pro'),
+    (gen_random_uuid()::text, 'Voice Over', 'plan_pro'),
+    (gen_random_uuid()::text, 'Image to Video', 'plan_pro'),
+    (gen_random_uuid()::text, 'Persona Avatar Studio', 'plan_pro'),
+    (gen_random_uuid()::text, 'Flux Pro Editor', 'plan_pro'),
+    (gen_random_uuid()::text, 'AI Agent Builder', 'plan_pro'),
     (gen_random_uuid()::text, 'AI Voice Cloning', 'plan_pro'),
-    (gen_random_uuid()::text, 'Magic Clips Generator', 'plan_pro'),
-    (gen_random_uuid()::text, 'Advanced Analytics', 'plan_pro'),
-    (gen_random_uuid()::text, 'Priority Support', 'plan_pro');
+    (gen_random_uuid()::text, 'Advanced Analytics', 'plan_pro');
 
 -- Insert plan features for Agency plan
 INSERT INTO "PlanFeature" (id, text, "planId")
 VALUES 
-    (gen_random_uuid()::text, 'All Pro Features', 'plan_agency'),
     (gen_random_uuid()::text, 'Unlimited AI Credits', 'plan_agency'),
     (gen_random_uuid()::text, '500 GB Storage', 'plan_agency'),
+    (gen_random_uuid()::text, 'Dedicated Account Manager', 'plan_agency'),
+    -- All Pro features (explicitly listed for clarity)
+    (gen_random_uuid()::text, 'AI Assistant', 'plan_agency'),
+    (gen_random_uuid()::text, 'Creative Assistant', 'plan_agency'),
+    (gen_random_uuid()::text, 'Social Integrations', 'plan_agency'),
+    (gen_random_uuid()::text, 'Media Library', 'plan_agency'),
+    (gen_random_uuid()::text, 'Profile Settings', 'plan_agency'),
+    (gen_random_uuid()::text, 'Topic Researcher', 'plan_agency'),
+    (gen_random_uuid()::text, 'Video Suite', 'plan_agency'),
+    (gen_random_uuid()::text, 'Video Pipeline', 'plan_agency'),
+    (gen_random_uuid()::text, 'Video Editor', 'plan_agency'),
+    (gen_random_uuid()::text, 'Script Generator', 'plan_agency'),
+    (gen_random_uuid()::text, 'Video from URL', 'plan_agency'),
+    (gen_random_uuid()::text, 'Stock Media Library', 'plan_agency'),
+    (gen_random_uuid()::text, 'AI Image Generator', 'plan_agency'),
+    (gen_random_uuid()::text, 'Background Remover', 'plan_agency'),
+    (gen_random_uuid()::text, 'Social Analytics', 'plan_agency'),
+    (gen_random_uuid()::text, 'Brand Kit', 'plan_agency'),
+    (gen_random_uuid()::text, 'Standard AI Voices', 'plan_agency'),
+    (gen_random_uuid()::text, 'Social Scheduler', 'plan_agency'),
+    (gen_random_uuid()::text, 'Thumbnail Tester', 'plan_agency'),
+    (gen_random_uuid()::text, 'Magic Clips', 'plan_agency'),
+    (gen_random_uuid()::text, 'Voice Over', 'plan_agency'),
+    (gen_random_uuid()::text, 'Image to Video', 'plan_agency'),
+    (gen_random_uuid()::text, 'Persona Avatar Studio', 'plan_agency'),
+    (gen_random_uuid()::text, 'Flux Pro Editor', 'plan_agency'),
+    (gen_random_uuid()::text, 'AI Agent Builder', 'plan_agency'),
+    (gen_random_uuid()::text, 'AI Voice Cloning', 'plan_agency'),
+    (gen_random_uuid()::text, 'Advanced Analytics', 'plan_agency'),
+    -- Enterprise tier additional features
+    (gen_random_uuid()::text, 'N8n/Make Integrations', 'plan_agency'),
     (gen_random_uuid()::text, 'Team Collaboration (5 Seats)', 'plan_agency'),
     (gen_random_uuid()::text, 'API Access & Integrations', 'plan_agency'),
-    (gen_random_uuid()::text, 'Dedicated Account Manager', 'plan_agency');
+    (gen_random_uuid()::text, 'Unlimited Video Exports', 'plan_agency'),
+    (gen_random_uuid()::text, 'Priority Support', 'plan_agency');
 
 -- Insert basic settings
 INSERT INTO "Setting" (key, value)

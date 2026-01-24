@@ -61,6 +61,12 @@ const findViralClipsFlow = ai.defineFlow(
     outputSchema: FindViralClipsOutputSchema,
   },
   async ({ videoId }) => {
+    console.log('[findViralClips] Starting viral clips analysis for video:', videoId);
+    
+    // Get an available text generator with model info
+    const textGenerator = await getAvailableTextGenerator();
+    console.log('[findViralClips] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
+    
     // Step 1: Get the video and its transcript from the database.
     const videoData = await getVideoWithTranscript(videoId);
     if (!videoData) {
@@ -72,6 +78,7 @@ const findViralClipsFlow = ai.defineFlow(
     const prompt = promptTemplate.replace('{{{transcript}}}', transcript);
 
     const { output } = await ai.generate({
+        model: textGenerator.model,
         prompt,
         output: { schema: FindViralClipsOutputSchema }
     });

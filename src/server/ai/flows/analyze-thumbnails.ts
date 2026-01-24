@@ -57,6 +57,12 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     outputSchema: AnalyzeThumbnailsOutputSchema,
   },
   async input => {
+    console.log('[analyzeThumbnails] Starting thumbnail analysis...');
+    
+    // Get an available image generator with model info
+    const imageGenerator = await getAvailableImageGenerator();
+    console.log('[analyzeThumbnails] Using model:', imageGenerator.model, 'provider:', imageGenerator.provider);
+    
     const prompt = `You are a world-class YouTube strategy expert with a keen eye for what makes a thumbnail successful.
     Your task is to analyze two competing thumbnails for a video and determine which is more likely to get a higher click-through rate (CTR).
 
@@ -80,6 +86,7 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     After analyzing both, provide a final recommendation ('A' or 'B') and a brief, conclusive reasoning for your choice.`;
 
     const {output} = await ai.generate({
+      model: imageGenerator.model,
       prompt,
       output: {schema: AnalyzeThumbnailsOutputSchema}
     });

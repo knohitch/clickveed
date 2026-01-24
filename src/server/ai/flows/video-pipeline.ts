@@ -29,6 +29,12 @@ const GeneratePipelineScriptOutputSchema = z.object({
 export type GeneratePipelineScriptOutput = z.infer<typeof GeneratePipelineScriptOutputSchema>;
 
 export async function generatePipelineScript(input: GeneratePipelineScriptInput): Promise<GeneratePipelineScriptOutput> {
+  console.log('[generatePipelineScript] Starting script generation...');
+  
+  // Get an available text generator with model info
+  const textGenerator = await getAvailableTextGenerator();
+  console.log('[generatePipelineScript] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
+  
   const prompt = `You are an expert AI video scriptwriter. Your task is to generate a compelling and well-structured video script based on the user's requirements.
 
   Pay close attention to all the details provided:
@@ -41,6 +47,7 @@ export async function generatePipelineScript(input: GeneratePipelineScriptInput)
   Based on this, create a complete script. The script should include scene descriptions (like "[SCENE: A programmer's desk with code on screen]"), dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.`;
 
   const {output} = await ai.generate({
+    model: textGenerator.model,
     prompt,
     output: {schema: GeneratePipelineScriptOutputSchema}
   });
