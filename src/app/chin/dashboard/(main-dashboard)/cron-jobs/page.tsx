@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, Play, Eye, Copy, Terminal, HeartPulse } from "lucide-react";
+import { Clock, Play, Eye, Copy, Terminal, HeartPulse, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, subMinutes } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -21,14 +21,24 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { getCronJobSettings, toggleCronJob } from '@/server/actions/admin-actions';
 
-const initialCronJobs = [
-    { id: 1, name: "Daily User Signup Report", schedule: "0 1 * * *", description: "Sends an email report of new user signups from the previous day.", isActive: true, commandSlug: "daily-signup-report" },
-    { id: 2, name: "Weekly Content Analytics Rollup", schedule: "0 2 * * 1", description: "Aggregates content generation metrics for the past week into summary tables.", isActive: true, commandSlug: "weekly-analytics-rollup" },
-    { id: 3, name: "Hourly API Health Check", schedule: "0 * * * *", description: "Pings critical third-party API endpoints and flags any services that are down.", isActive: true, commandSlug: "hourly-api-health-check" },
-    { id: 4, name: "Monthly Subscription Renewal", schedule: "0 0 1 * *", description: "Processes recurring subscription payments for all active users.", isActive: false, commandSlug: "monthly-subscription-renewal" },
-    { id: 5, name: "Nightly Database Backup", schedule: "0 3 * * *", description: "Creates a backup of the PostgreSQL database.", isActive: true, commandSlug: "nightly-db-backup" },
-    { id: 6, name: "Autorotation Health Check", schedule: "*/30 * * * *", description: "Checks the status of autorotation providers for video and audio generation.", isActive: true, commandSlug: "autorotation-health-check" },
+interface CronJob {
+    id: number;
+    name: string;
+    schedule: string;
+    description: string;
+    isActive: boolean;
+    commandSlug: string;
+}
+
+const cronJobDefinitions: Omit<CronJob, 'isActive'>[] = [
+    { id: 1, name: "Daily User Signup Report", schedule: "0 1 * * *", description: "Sends an email report of new user signups from the previous day.", commandSlug: "daily-signup-report" },
+    { id: 2, name: "Weekly Content Analytics Rollup", schedule: "0 2 * * 1", description: "Aggregates content generation metrics for the past week into summary tables.", commandSlug: "weekly-analytics-rollup" },
+    { id: 3, name: "Hourly API Health Check", schedule: "0 * * * *", description: "Pings critical third-party API endpoints and flags any services that are down.", commandSlug: "hourly-api-health-check" },
+    { id: 4, name: "Monthly Subscription Renewal", schedule: "0 0 1 * *", description: "Processes recurring subscription payments for all active users.", commandSlug: "monthly-subscription-renewal" },
+    { id: 5, name: "Nightly Database Backup", schedule: "0 3 * * *", description: "Creates a backup of the PostgreSQL database.", commandSlug: "nightly-db-backup" },
+    { id: 6, name: "Autorotation Health Check", schedule: "*/30 * * * *", description: "Checks the status of autorotation providers for video and audio generation.", commandSlug: "autorotation-health-check" },
 ];
 
 const generateSimulatedLogs = (jobName: string) => {
@@ -45,15 +55,48 @@ const generateSimulatedLogs = (jobName: string) => {
 export default function CronJobsPage() {
     const { toast } = useToast();
     const [runningJob, setRunningJob] = useState<number | null>(null);
-    const [cronJobs, setCronJobs] = useState(initialCronJobs);
+    const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
     const [appUrl, setAppUrl] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [togglingJob, setTogglingJob] = useState<string | null>(null);
 
     useEffect(() => {
         // This ensures the window object is available before trying to access it.
         if (typeof window !== 'undefined') {
             setAppUrl(window.location.origin);
         }
+        
+        // Load cron job settings from database
+        loadCronJobSettings();
     }, []);
+
+    const loadCronJobSettings = async () => {
+        try {
+            setIsLoading(true);
+            const settings = await getCronJobSettings();
+            
+            const jobsWithSettings = cronJobDefinitions.map(job => ({
+                ...job,
+                isActive: settings[job.commandSlug] ?? true
+            }));
+            
+            setCronJobs(jobsWithSettings);
+        } catch (error) {
+            console.error('Error loading cron job settings:', error);
+            toast({
+                variant: 'destructive',
+                title: "Error",
+                description: "Failed to load cron job settings."
+            });
+            // Use defaults on error
+            setCronJobs(cronJobDefinitions.map(job => ({
+                ...job,
+                isActive: job.commandSlug !== 'monthly-subscription-renewal'
+            })));
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleRunJob = (jobId: number, jobName: string) => {
         setRunningJob(jobId);
@@ -71,13 +114,58 @@ export default function CronJobsPage() {
         }, 3000); // Simulate a 3-second job run
     };
 
-    const toggleJobStatus = (jobId: number) => {
-        setCronJobs(prevJobs => 
-            prevJobs.map(job => 
-                job.id === jobId ? { ...job, isActive: !job.isActive } : job
-            )
-        );
-    }
+    const handleToggleJobStatus = async (jobId: number, commandSlug: string) => {
+        const job = cronJobs.find(j => j.id === jobId);
+        if (!job) return;
+        
+        const newStatus = !job.isActive;
+        setTogglingJob(commandSlug);
+        
+        try {
+            // Optimistically update UI
+            setCronJobs(prevJobs => 
+                prevJobs.map(j => 
+                    j.id === jobId ? { ...j, isActive: newStatus } : j
+                )
+            );
+            
+            // Persist to database
+            const result = await toggleCronJob(commandSlug, newStatus);
+            
+            if (!result.success) {
+                // Revert on failure
+                setCronJobs(prevJobs => 
+                    prevJobs.map(j => 
+                        j.id === jobId ? { ...j, isActive: !newStatus } : j
+                    )
+                );
+                toast({
+                    variant: 'destructive',
+                    title: "Error",
+                    description: result.message
+                });
+            } else {
+                toast({
+                    title: newStatus ? "Cron Job Enabled" : "Cron Job Disabled",
+                    description: `${job.name} has been ${newStatus ? 'enabled' : 'disabled'}.`
+                });
+            }
+        } catch (error: any) {
+            // Revert on error
+            setCronJobs(prevJobs => 
+                prevJobs.map(j => 
+                    j.id === jobId ? { ...j, isActive: !newStatus } : j
+                )
+            );
+            toast({
+                variant: 'destructive',
+                title: "Error",
+                description: error.message || "Failed to update cron job status."
+            });
+        } finally {
+            setTogglingJob(null);
+        }
+    };
     
     const copyCommand = (command: string) => {
         navigator.clipboard.writeText(command);
@@ -86,6 +174,14 @@ export default function CronJobsPage() {
             description: "The cron command has been copied to your clipboard.",
         });
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
@@ -145,12 +241,17 @@ export default function CronJobsPage() {
                                             <Switch
                                                 id={`status-${job.id}`}
                                                 checked={job.isActive}
-                                                onCheckedChange={() => toggleJobStatus(job.id)}
+                                                onCheckedChange={() => handleToggleJobStatus(job.id, job.commandSlug)}
+                                                disabled={togglingJob === job.commandSlug}
                                                 aria-label="Toggle job status"
                                             />
-                                            <Badge variant={job.isActive ? 'default' : 'secondary'}>
-                                                {job.isActive ? 'Active' : 'Paused'}
-                                            </Badge>
+                                            {togglingJob === job.commandSlug ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Badge variant={job.isActive ? 'default' : 'secondary'}>
+                                                    {job.isActive ? 'Active' : 'Paused'}
+                                                </Badge>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
@@ -203,4 +304,3 @@ export default function CronJobsPage() {
         </div>
     );
 }
-

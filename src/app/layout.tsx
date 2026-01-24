@@ -3,6 +3,7 @@ import { Nunito, Poppins } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import ClientLayout from '@/components/client-layout';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 
 const nunito = Nunito({
   subsets: ['latin'],
@@ -17,10 +18,16 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: 'ClickVid',
-  description: 'The All-in-One AI Video Creation Suite',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { appName } = await getAdminSettings();
+  return {
+    title: {
+      default: appName,
+      template: `%s | ${appName}`,
+    },
+    description: 'The All-in-One AI Video Creation Suite',
+  };
+}
 
 export default function RootLayout({
   children,

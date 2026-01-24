@@ -403,3 +403,77 @@ export async function sendTestEmail(testEmail: string) {
         return { success: false, message: `Failed to send test email: ${error.message || 'Unknown error'}` };
     }
 }
+
+/**
+ * Get cron job settings from the database
+ */
+export async function getCronJobSettings(): Promise<Record<string, boolean>> {
+    try {
+        const setting = await prisma.setting.findUnique({
+            where: { key: 'cronJobSettings' }
+        });
+        
+        if (setting?.value) {
+            return JSON.parse(setting.value);
+        }
+        
+        // Return default settings if none exist
+        return {
+            'daily-signup-report': true,
+            'weekly-analytics-rollup': true,
+            'hourly-api-health-check': true,
+            'monthly-subscription-renewal': false,
+            'nightly-db-backup': true,
+            'autorotation-health-check': true,
+        };
+    } catch (error) {
+        console.error('Error getting cron job settings:', error);
+        return {
+            'daily-signup-report': true,
+            'weekly-analytics-rollup': true,
+            'hourly-api-health-check': true,
+            'monthly-subscription-renewal': false,
+            'nightly-db-backup': true,
+            'autorotation-health-check': true,
+        };
+    }
+}
+
+/**
+ * Save cron job settings to the database
+ */
+export async function saveCronJobSettings(settings: Record<string, boolean>): Promise<{ success: boolean; message: string }> {
+    try {
+        await prisma.setting.upsert({
+            where: { key: 'cronJobSettings' },
+            update: { value: JSON.stringify(settings) },
+            create: { key: 'cronJobSettings', value: JSON.stringify(settings) }
+        });
+        
+        return { success: true, message: 'Cron job settings saved successfully.' };
+    } catch (error: any) {
+        console.error('Error saving cron job settings:', error);
+        return { success: false, message: `Failed to save cron job settings: ${error.message}` };
+    }
+}
+
+/**
+ * Toggle a single cron job setting
+ */
+export async function toggleCronJob(commandSlug: string, isActive: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+        const currentSettings = await getCronJobSettings();
+        currentSettings[commandSlug] = isActive;
+        
+        await prisma.setting.upsert({
+            where: { key: 'cronJobSettings' },
+            update: { value: JSON.stringify(currentSettings) },
+            create: { key: 'cronJobSettings', value: JSON.stringify(currentSettings) }
+        });
+        
+        return { success: true, message: `Cron job "${commandSlug}" ${isActive ? 'enabled' : 'disabled'}.` };
+    } catch (error: any) {
+        console.error('Error toggling cron job:', error);
+        return { success: false, message: `Failed to toggle cron job: ${error.message}` };
+    }
+}
