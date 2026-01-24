@@ -8,9 +8,8 @@
  * - AnalyzeThumbnailsOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
+import { z } from 'zod';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 
 const AnalyzeThumbnailsInputSchema = z.object({
   thumbnailA_DataUri: z
@@ -46,24 +45,9 @@ export type AnalyzeThumbnailsOutput = z.infer<typeof AnalyzeThumbnailsOutputSche
 export async function analyzeThumbnails(
   input: AnalyzeThumbnailsInput
 ): Promise<AnalyzeThumbnailsOutput> {
-  return analyzeThumbnailsFlow(input);
-}
-
-
-const analyzeThumbnailsFlow = ai.defineFlow(
-  {
-    name: 'analyzeThumbnailsFlow',
-    inputSchema: AnalyzeThumbnailsInputSchema,
-    outputSchema: AnalyzeThumbnailsOutputSchema,
-  },
-  async input => {
-    console.log('[analyzeThumbnails] Starting thumbnail analysis...');
-    
-    // Get an available image generator with model info
-    const imageGenerator = await getAvailableImageGenerator();
-    console.log('[analyzeThumbnails] Using model:', imageGenerator.model, 'provider:', imageGenerator.provider);
-    
-    const prompt = `You are a world-class YouTube strategy expert with a keen eye for what makes a thumbnail successful.
+  console.log('[analyzeThumbnails] Starting thumbnail analysis...');
+  
+  const prompt = `You are a world-class YouTube strategy expert with a keen eye for what makes a thumbnail successful.
     Your task is to analyze two competing thumbnails for a video and determine which is more likely to get a higher click-through rate (CTR).
 
     **Video Context:**
@@ -71,8 +55,8 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     - **Target Audience:** "${input.targetAudience}"
 
     **Thumbnails for Analysis:**
-    - **Thumbnail A:** ${input.thumbnailA_DataUri}
-    - **Thumbnail B:** ${input.thumbnailB_DataUri}
+    - **Thumbnail A:** (First image provided)
+    - **Thumbnail B:** (Second image provided)
 
     **Your Analysis Criteria:**
     Evaluate each thumbnail based on the following principles. For each, provide a score from 0-100, a list of 2-3 pros, and 2-3 cons.
@@ -83,18 +67,23 @@ const analyzeThumbnailsFlow = ai.defineFlow(
     4.  **Relevance to Context:** How well does the thumbnail align with the video title and target audience? Does it accurately represent the video's content and promise?
 
     **Final Recommendation:**
-    After analyzing both, provide a final recommendation ('A' or 'B') and a brief, conclusive reasoning for your choice.`;
+    After analyzing both, provide a final recommendation ('A' or 'B') and a brief, conclusive reasoning for your choice.
+    
+    Respond with a JSON object like:
+    {
+      "analysisA": {"score": 75, "pros": ["Pro 1", "Pro 2"], "cons": ["Con 1", "Con 2"], "summary": "Summary A"},
+      "analysisB": {"score": 85, "pros": ["Pro 1", "Pro 2"], "cons": ["Con 1", "Con 2"], "summary": "Summary B"},
+      "recommendation": "B",
+      "reasoning": "Explanation here"
+    }`;
 
-    const {output} = await ai.generate({
-      model: imageGenerator.model,
-      prompt,
-      output: {schema: AnalyzeThumbnailsOutputSchema}
-    });
-    
-    if (!output) {
-      throw new Error("The AI failed to generate a thumbnail analysis.");
-    }
-    
-    return output;
+  // Use the unified structured output function that handles all providers
+  const result = await generateStructuredOutput(prompt, AnalyzeThumbnailsOutputSchema);
+  console.log('[analyzeThumbnails] Using provider:', result.provider, 'model:', result.model);
+  
+  if (!result.output) {
+    throw new Error("The AI failed to generate a thumbnail analysis.");
   }
-);
+  
+  return result.output;
+}

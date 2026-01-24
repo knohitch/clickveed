@@ -4,9 +4,8 @@
  * @fileOverview An AI agent that transcribes a video and provides word-level timestamps.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
+import { z } from 'zod';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 
 const GenerateTimedTranscriptInputSchema = z.object({
   videoUrl: z
@@ -34,38 +33,23 @@ export type GenerateTimedTranscriptOutput = z.infer<typeof GenerateTimedTranscri
 export async function generateTimedTranscript(
   input: GenerateTimedTranscriptInput
 ): Promise<GenerateTimedTranscriptOutput> {
-  return generateTimedTranscriptFlow(input);
-}
-
-const generateTimedTranscriptFlow = ai.defineFlow(
-  {
-    name: 'generateTimedTranscriptFlow',
-    inputSchema: GenerateTimedTranscriptInputSchema,
-    outputSchema: GenerateTimedTranscriptOutputSchema,
-  },
-  async (input) => {
-    console.log('[generateTimedTranscript] Starting transcript generation...');
-    
-    // Get an available text generator with model info
-    const textGenerator = await getAvailableTextGenerator();
-    console.log('[generateTimedTranscript] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
-    
-    const prompt = `You are a highly accurate video transcription service that provides word-level timestamps.
+  console.log('[generateTimedTranscript] Starting transcript generation...');
+  
+  const prompt = `You are a highly accurate video transcription service that provides word-level timestamps.
 Analyze the following video and provide a complete and accurate transcript.
 For each word, provide its start and end time in seconds.
 
 Video for transcription:
-${input.videoUrl}`;
+${input.videoUrl}
 
-    const {output} = await ai.generate({
-      model: textGenerator.model,
-      prompt,
-      output: {schema: GenerateTimedTranscriptOutputSchema}
-    });
-    
-    if (!output?.transcript) {
-      throw new Error("The AI failed to generate a timed transcript.");
-    }
-    return output;
+Respond with a JSON object like: {"transcript": [{"word": "Hello", "start": 0.0, "end": 0.5}, {"word": "world", "start": 0.6, "end": 1.0}]}`;
+
+  // Use the unified structured output function that handles all providers
+  const result = await generateStructuredOutput(prompt, GenerateTimedTranscriptOutputSchema);
+  console.log('[generateTimedTranscript] Using provider:', result.provider, 'model:', result.model);
+  
+  if (!result.output?.transcript) {
+    throw new Error("The AI failed to generate a timed transcript.");
   }
-);
+  return result.output;
+}

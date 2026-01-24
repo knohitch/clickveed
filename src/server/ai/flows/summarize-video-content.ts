@@ -9,9 +9,8 @@
  * - SummarizeVideoContentOutput - The return type for the summarizeVideoContent function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
+import { z } from 'zod';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 
 const SummarizeVideoContentInputSchema = z.object({
   videoUrl: z
@@ -29,40 +28,24 @@ const SummarizeVideoContentOutputSchema = z.object({
 export type SummarizeVideoContentOutput = z.infer<typeof SummarizeVideoContentOutputSchema>;
 
 export async function summarizeVideoContent(input: SummarizeVideoContentInput): Promise<SummarizeVideoContentOutput> {
-  return summarizeVideoContentFlow(input);
-}
-
-const summarizeVideoContentFlow = ai.defineFlow(
-  {
-    name: 'summarizeVideoContentFlow',
-    inputSchema: SummarizeVideoContentInputSchema,
-    outputSchema: SummarizeVideoContentOutputSchema,
-  },
-  async input => {
-    console.log('[summarizeVideoContent] Starting video summarization...');
-    
-    // Get an available text generator with model info
-    const textGenerator = await getAvailableTextGenerator();
-    console.log('[summarizeVideoContent] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
-    
-    const prompt = `You are an expert summarizer of video content.
+  console.log('[summarizeVideoContent] Starting video summarization...');
+  
+  const prompt = `You are an expert summarizer of video content.
 
 You will be given a video transcript and your job is to summarize the video content in a concise and informative way, extracting the key points.
 
 Video Transcript: ${input.transcript}
+
+Respond with a JSON object like: {"summary": "Your summary here..."}
 `;
 
-    // Generate the summary using the AI service
-    const { output } = await ai.generate({
-      model: textGenerator.model,
-      prompt,
-      output: { schema: SummarizeVideoContentOutputSchema }
-    });
-    
-    if (!output?.summary) {
-      throw new Error("The AI failed to generate a summary for this content.");
-    }
-    
-    return output;
+  // Use the unified structured output function that handles all providers
+  const result = await generateStructuredOutput(prompt, SummarizeVideoContentOutputSchema);
+  console.log('[summarizeVideoContent] Using provider:', result.provider, 'model:', result.model);
+  
+  if (!result.output?.summary) {
+    throw new Error("The AI failed to generate a summary for this content.");
   }
-);
+  
+  return result.output;
+}

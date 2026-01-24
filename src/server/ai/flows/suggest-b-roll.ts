@@ -4,12 +4,8 @@
  * and fetches stock video clips based on those suggestions using custom tools.
  */
 
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getAvailableTextGenerator, getAvailableStockPhotoTool } from '@/lib/ai/api-service-manager';
-import { uploadToWasabi } from '@/server/services/wasabi-service';
-import prisma from '@/server/prisma';
-import { auth } from '@/auth';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 
 // ========= Suggest B-Roll Flow =========
 
@@ -26,10 +22,6 @@ export type SuggestBrollOutput = z.infer<typeof SuggestBrollOutputSchema>;
 export async function suggestBroll(input: SuggestBrollInput): Promise<SuggestBrollOutput> {
     console.log('[suggestBroll] Starting B-roll suggestion generation...');
     
-    // Get an available text generator with model info
-    const textGenerator = await getAvailableTextGenerator();
-    console.log('[suggestBroll] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
-    
     const prompt = `You are an expert video editor. Your task is to analyze the provided video script segment and suggest relevant B-roll footage.
 
     Provide a list of 3-5 short, descriptive search terms that would yield good stock video clips for the following script:
@@ -38,14 +30,13 @@ export async function suggestBroll(input: SuggestBrollInput): Promise<SuggestBro
     "${input.script}"
 
     The search terms should be specific and actionable.
+    
+    Respond with a JSON object like: {"suggestions": ["search term 1", "search term 2", "search term 3"]}
     `;
 
-    // Use direct generation with model from available provider
-    const result = await ai.generate({
-        model: textGenerator.model,
-        prompt,
-        output: { schema: SuggestBrollOutputSchema }
-    });
+    // Use the unified structured output function that handles all providers
+    const result = await generateStructuredOutput(prompt, SuggestBrollOutputSchema);
+    console.log('[suggestBroll] Using provider:', result.provider, 'model:', result.model);
 
     if (!result.output?.suggestions || result.output.suggestions.length === 0) {
         throw new Error("Failed to generate B-roll suggestions.");

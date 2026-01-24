@@ -8,7 +8,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import wav from 'wav';
-import { getAvailableTTSProvider, getAvailableTextGenerator, getAvailableVideoGenerator } from '@/lib/ai/api-service-manager';
+import { getAvailableTTSProvider, getAvailableVideoGenerator, generateStructuredOutput } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -31,10 +31,6 @@ export type GeneratePipelineScriptOutput = z.infer<typeof GeneratePipelineScript
 export async function generatePipelineScript(input: GeneratePipelineScriptInput): Promise<GeneratePipelineScriptOutput> {
   console.log('[generatePipelineScript] Starting script generation...');
   
-  // Get an available text generator with model info
-  const textGenerator = await getAvailableTextGenerator();
-  console.log('[generatePipelineScript] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
-  
   const prompt = `You are an expert AI video scriptwriter. Your task is to generate a compelling and well-structured video script based on the user's requirements.
 
   Pay close attention to all the details provided:
@@ -44,18 +40,17 @@ export async function generatePipelineScript(input: GeneratePipelineScriptInput)
   - **Desired Tone:** ${input.tone}
   - **Target Duration:** ${input.duration}
 
-  Based on this, create a complete script. The script should include scene descriptions (like "[SCENE: A programmer's desk with code on screen]"), dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.`;
+  Based on this, create a complete script. The script should include scene descriptions (like "[SCENE: A programmer's desk with code on screen]"), dialogue/voiceover, and camera/action cues where appropriate. Ensure the final script is plausible for the specified duration.
+  
+  Respond with a JSON object like: {"script": "Your complete script here..."}`;
 
-  const {output} = await ai.generate({
-    model: textGenerator.model,
-    prompt,
-    output: {schema: GeneratePipelineScriptOutputSchema}
-  });
+  const result = await generateStructuredOutput(prompt, GeneratePipelineScriptOutputSchema);
+  console.log('[generatePipelineScript] Using provider:', result.provider, 'model:', result.model);
     
-  if (!output?.script) {
+  if (!result.output?.script) {
     throw new Error("The AI failed to generate a script based on the provided inputs.");
   }
-  return output;
+  return result.output;
 }
 
 

@@ -1,13 +1,11 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that analyzes a video transcript to find potentially viral clips.
  * This flow now gets the transcript from the `transcribeVideo` flow.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
+import { z } from 'zod';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 import { getVideoWithTranscript } from '@/server/services/clipService';
 
 const FindViralClipsInputSchema = z.object({
@@ -33,15 +31,22 @@ export type FindViralClipsOutput = z.infer<typeof FindViralClipsOutputSchema>;
 export async function findViralClips(
   input: FindViralClipsInput
 ): Promise<FindViralClipsOutput> {
-  return findViralClipsFlow(input);
-}
+  console.log('[findViralClips] Starting viral clips analysis for video:', input.videoId);
+  
+  // Step 1: Get the video and its transcript from the database.
+  const videoData = await getVideoWithTranscript(input.videoId);
+  if (!videoData) {
+      throw new Error(`Video with ID ${input.videoId} not found or has no transcript.`);
+  }
+  const { transcript } = videoData;
 
-const promptTemplate = `You are a viral content expert for platforms like TikTok and YouTube Shorts.
+  // Step 2: Use the transcript to find viral clips.
+  const prompt = `You are a viral content expert for platforms like TikTok and YouTube Shorts.
 Your task is to analyze the provided video transcript and identify 3-5 short, engaging, and potentially viral clips.
 
 Video Transcript with Timestamps:
 """
-{{{transcript}}}
+${transcript}
 """
 
 For each clip you identify, you must determine the start and end times in seconds based on the timestamps in the transcript.
@@ -52,40 +57,20 @@ Then, provide:
 4.  A "virality score" from 0-100 based on the text content.
 
 Analyze the transcript to find the most impactful moments.
-`;
 
-const findViralClipsFlow = ai.defineFlow(
-  {
-    name: 'findViralClipsFlow',
-    inputSchema: FindViralClipsInputSchema,
-    outputSchema: FindViralClipsOutputSchema,
-  },
-  async ({ videoId }) => {
-    console.log('[findViralClips] Starting viral clips analysis for video:', videoId);
-    
-    // Get an available text generator with model info
-    const textGenerator = await getAvailableTextGenerator();
-    console.log('[findViralClips] Using model:', textGenerator.model, 'provider:', textGenerator.provider);
-    
-    // Step 1: Get the video and its transcript from the database.
-    const videoData = await getVideoWithTranscript(videoId);
-    if (!videoData) {
-        throw new Error(`Video with ID ${videoId} not found or has no transcript.`);
-    }
-    const { transcript } = videoData;
+Respond with a JSON object like:
+{
+  "clips": [
+    {"id": 1, "title": "Clip Title", "startTime": 10, "endTime": 25, "reason": "Why it's viral", "score": 85}
+  ]
+}`;
 
-    // Step 2: Use the transcript to find viral clips.
-    const prompt = promptTemplate.replace('{{{transcript}}}', transcript);
-
-    const { output } = await ai.generate({
-        model: textGenerator.model,
-        prompt,
-        output: { schema: FindViralClipsOutputSchema }
-    });
-    
-    if (!output || !output.clips || output.clips.length === 0) {
-        throw new Error("AI failed to generate viral clip suggestions from the transcript.");
-    }
-    return output;
+  // Use the unified structured output function that handles all providers
+  const result = await generateStructuredOutput(prompt, FindViralClipsOutputSchema);
+  console.log('[findViralClips] Using provider:', result.provider, 'model:', result.model);
+  
+  if (!result.output || !result.output.clips || result.output.clips.length === 0) {
+      throw new Error("AI failed to generate viral clip suggestions from the transcript.");
   }
-);
+  return result.output;
+}

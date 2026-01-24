@@ -502,3 +502,92 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
         return genkitInstance.generate({ ...req, model: providerInfo.model });
     }
 }
+
+/**
+ * Generate text with structured output using the best available provider.
+ * This function handles both Genkit providers (Gemini) and custom providers (OpenAI/Claude).
+ *
+ * @param prompt - The prompt to send to the model
+ * @param outputSchema - Zod schema for structured output parsing
+ * @returns The parsed output matching the schema
+ */
+export async function generateStructuredOutput<T>(
+    prompt: string,
+    outputSchema: z.ZodType<T>
+): Promise<{ output: T | null; provider: string; model: string }> {
+    const providerInfo = await getAvailableTextGenerator();
+    
+    console.log(`[generateStructuredOutput] Using provider: ${providerInfo.provider}, model: ${providerInfo.model}`);
+    
+    // Providers that don't have Genkit plugins - use custom API clients
+    const customProviders = ['openai', 'azureOpenai', 'claude', 'huggingface', 'deepseek', 'grok', 'qwen', 'perplexity', 'openrouter'];
+    
+    if (customProviders.includes(providerInfo.provider)) {
+        try {
+            const client = await createProviderClient(providerInfo.provider);
+            
+            // Add JSON instruction to prompt for structured output
+            const structuredPrompt = `${prompt}
+
+IMPORTANT: You must respond with ONLY a valid JSON object that matches this structure. No additional text or explanation.
+Return your response as a JSON object.`;
+
+            const messages = [{ role: 'user' as const, content: [{ text: structuredPrompt }] }];
+            const response = await client.generateText(messages);
+            
+            // Record success
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            
+            // Parse the response as JSON
+            let parsed: T | null = null;
+            try {
+                // Try to extract JSON from the response
+                const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const jsonData = JSON.parse(jsonMatch[0]);
+                    parsed = outputSchema.parse(jsonData);
+                }
+            } catch (parseError) {
+                console.error('Failed to parse structured output:', parseError);
+                console.error('Response text:', response.text);
+            }
+            
+            return {
+                output: parsed,
+                provider: providerInfo.provider,
+                model: providerInfo.model
+            };
+        } catch (error) {
+            // Record failure
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
+            
+            console.error(`Error generating structured output with ${providerInfo.provider}:`, error);
+            throw error;
+        }
+    } else {
+        // For providers with Genkit plugins (like Gemini), use Genkit
+        try {
+            const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+            const result = await genkitInstance.generate({
+                model: providerInfo.model,
+                prompt,
+                output: { schema: outputSchema }
+            });
+            
+            circuitBreaker.recordSuccess(providerInfo.provider);
+            markProviderHealthy(providerInfo.provider);
+            
+            return {
+                output: result.output,
+                provider: providerInfo.provider,
+                model: providerInfo.model
+            };
+        } catch (error) {
+            circuitBreaker.recordFailure(providerInfo.provider);
+            markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
+            throw error;
+        }
+    }
+}
