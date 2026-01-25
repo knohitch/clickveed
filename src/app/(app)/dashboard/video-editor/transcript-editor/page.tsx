@@ -130,27 +130,31 @@ export default function TranscriptEditorPage() {
         toast({ title: "Uploading video...", description: "Please wait while your file is uploaded." });
 
         try {
+            // Create FormData to upload the actual file
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', videoFile);
+            
             const response = await fetch('/api/upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: videoFile.name, contentType: videoFile.type }),
+                body: uploadFormData, // Don't set Content-Type - browser will add multipart boundary
             });
             
-            if (!response.ok) throw new Error('Failed to prepare upload.');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to upload video.');
+            }
             
-            const { publicUrl } = await response.json();
-
-            // We need to fetch the content from the public URL to send to the AI
-            const fileResponse = await fetch(publicUrl);
-            const fileBuffer = await fileResponse.arrayBuffer();
-            const dataUri = `data:${videoFile.type};base64,${Buffer.from(fileBuffer).toString('base64')}`;
-
+            const { success, url } = await response.json();
+            
+            if (!success || !url) {
+                throw new Error('Upload failed - no URL returned');
+            }
             
             setIsUploading(false);
             toast({ title: "Upload Complete!", description: "Now generating transcript..." });
 
             const formData = new FormData();
-            formData.set('videoUrl', dataUri);
+            formData.set('videoUrl', url);
             
             formAction(formData);
 

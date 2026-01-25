@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, assetId: mediaAsset.id });
+    return NextResponse.json({ success: true, assetId: mediaAsset.id, url: publicUrl });
   } catch (error) {
     logError(error as Error, 'File upload failed');
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
