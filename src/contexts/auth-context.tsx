@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserById } from '@/server/actions/user-actions';
+import { getUserPlanFeatures } from '@/server/actions/feature-management-actions';
 import type { Plan, PlanFeature } from '@prisma/client';
 import { format } from 'date-fns';
 
@@ -11,6 +12,7 @@ interface AuthContextType {
   currentUser: UserWithPlan | null;
   subscriptionPlan: Plan | null;
   planFeatures: PlanFeature[];
+  accessibleFeatures: string[];  // Feature IDs the user can access
   userPlanDetails: {
     hasActiveSubscription: boolean;
     hasPremiumFeatures: boolean;
@@ -21,6 +23,7 @@ interface AuthContextType {
   refreshing: boolean;
   updateUserDisplayName: (name: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  hasFeatureAccess: (featureId: string) => boolean;
 }
 
 interface UserWithPlan {
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<UserWithPlan | null>(null);
   const [subscriptionPlan, setSubscriptionPlan] = useState<Plan | null>(null);
   const [planFeatures, setPlanFeatures] = useState<PlanFeature[]>([]);
+  const [accessibleFeatures, setAccessibleFeatures] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -60,6 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userDetails = await getUserById(userId);
       console.log('[AuthContext] Loaded user details:', userDetails ? { id: userDetails.id, plan: userDetails.plan?.name, planId: userDetails.planId } : 'null');
       setCurrentUser(userDetails);
+
+      // Load dynamic feature access
+      const features = await getUserPlanFeatures(userId);
+      setAccessibleFeatures(features);
+      console.log('[AuthContext] Loaded accessible features:', features.length);
+
       if (userDetails?.plan) {
         setSubscriptionPlan(userDetails.plan);
         setPlanFeatures(userDetails.plan.features || []);
@@ -118,19 +128,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserDisplayName = async (displayName: string) => {
     if (!currentUser) throw new Error("User not authenticated.");
-    
+
     // Optimistic UI update - use displayName (matching User model field)
     setCurrentUser((prev: UserWithPlan | null) => prev ? { ...prev, displayName } : null);
-    
+
     // Update the session, which is what the UI primarily uses
     await updateSession({ name: displayName });
 
     // Persist to backend (this is now a background task from the user's perspective)
     // In a real app, handle potential errors from this call.
     fetch(`/api/user/${currentUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: displayName }), // API expects 'name', maps to displayName
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: displayName }), // API expects 'name', maps to displayName
     });
   };
 
@@ -141,15 +151,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     renewsOn: currentUser?.stripeCurrentPeriodEnd ? format(new Date(currentUser.stripeCurrentPeriodEnd), 'MMMM dd, yyyy') : 'N/A',
   };
 
+  // Check if user has access to a specific feature
+  const hasFeatureAccess = useCallback((featureId: string) => {
+    // Always allow basic features
+    const alwaysAccessible = ['profile-settings', 'media-library'];
+    if (alwaysAccessible.includes(featureId)) return true;
+    return accessibleFeatures.includes(featureId);
+  }, [accessibleFeatures]);
+
   const value = {
     currentUser,
     subscriptionPlan,
     planFeatures,
+    accessibleFeatures,
     userPlanDetails,
     loading,
     refreshing,
     updateUserDisplayName,
     refreshUser,
+    hasFeatureAccess,
   };
 
   return (

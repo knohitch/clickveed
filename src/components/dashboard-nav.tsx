@@ -1,14 +1,14 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    Settings, 
-    Palette, 
-    Bot, 
-    Cpu, 
-    Share2, 
-    Database, 
+import {
+    LayoutDashboard,
+    Settings,
+    Palette,
+    Bot,
+    Cpu,
+    Share2,
+    Database,
     KeyRound,
     Wand2,
     Sparkles,
@@ -79,8 +79,8 @@ const aiAssistantTools = [
 ];
 
 const aiAgents = [
-     { href: "/dashboard/ai-agents", icon: Bot, label: "AI Agent Builder", featureId: "ai-agents" },
-     { href: "/dashboard/ai-agents/integrations", icon: Cpu, label: "N8n/Make Integrations", featureId: "n8n-integrations" },
+    { href: "/dashboard/ai-agents", icon: Bot, label: "AI Agent Builder", featureId: "ai-agents" },
+    { href: "/dashboard/ai-agents/integrations", icon: Cpu, label: "N8n/Make Integrations", featureId: "n8n-integrations" },
 ]
 
 const socialSuiteLinks = [
@@ -90,7 +90,7 @@ const socialSuiteLinks = [
 ];
 
 const mediaManagement = [
-     { href: "/dashboard/media/library", icon: Database, label: "Media Library", featureId: "media-library" },
+    { href: "/dashboard/media/library", icon: Database, label: "Media Library", featureId: "media-library" },
 ];
 
 const settingsLinks = [
@@ -110,7 +110,7 @@ const menuSections = [
 
 export function DashboardNav() {
     const pathname = usePathname();
-    const { subscriptionPlan, loading: authLoading } = useAuth();
+    const { subscriptionPlan, loading: authLoading, accessibleFeatures } = useAuth();
     const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
         // Initialize all sections as closed
         const initialOpenSections: Record<string, boolean> = {};
@@ -121,7 +121,7 @@ export function DashboardNav() {
     });
 
     const toggleSection = (name: string) => {
-        setOpenSections(prev => ({...prev, [name]: !prev[name]}));
+        setOpenSections(prev => ({ ...prev, [name]: !prev[name] }));
     }
 
     // Filter menu sections based on user's plan
@@ -149,6 +149,11 @@ export function DashboardNav() {
             const featureAccess = checkFeatureAccess(null, section.featureId, 'free');
             return featureAccess.canAccess;
         }
+        // Use dynamic feature access from auth context if available
+        if (accessibleFeatures && accessibleFeatures.length > 0) {
+            return accessibleFeatures.includes(section.featureId);
+        }
+        // Fall back to hardcoded feature access
         const featureAccess = checkFeatureAccess(planName, section.featureId, featureTier);
         return featureAccess.canAccess;
     }).map(section => ({
@@ -160,6 +165,11 @@ export function DashboardNav() {
                 const featureAccess = checkFeatureAccess(null, item.featureId, 'free');
                 return featureAccess.canAccess;
             }
+            // Use dynamic feature access from auth context if available
+            if (accessibleFeatures && accessibleFeatures.length > 0) {
+                return accessibleFeatures.includes(item.featureId);
+            }
+            // Fall back to hardcoded feature access
             const featureAccess = checkFeatureAccess(planName, item.featureId, featureTier);
             return featureAccess.canAccess;
         })
@@ -185,7 +195,7 @@ export function DashboardNav() {
                     </SidebarMenuItem>
                 ))}
             </SidebarMenu>
-            
+
             <SidebarMenu className="mt-4 space-y-1">
                 {filteredMenuSections.map((section) => {
                     const isSectionActive = section.path === '/dashboard/video-suite'

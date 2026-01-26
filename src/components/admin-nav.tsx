@@ -3,9 +3,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    Settings, 
+import {
+    LayoutDashboard,
+    Settings,
     Users,
     ShieldCheck,
     BarChart,
@@ -16,7 +16,8 @@ import {
     TicketPercent,
     Database,
     Clock,
-    Mail
+    Mail,
+    ToggleRight
 } from "lucide-react";
 import Link from "next/link";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "./ui/sidebar";
@@ -26,6 +27,7 @@ const superAdminLinks = [
     { href: '/chin/dashboard/users', icon: Users, label: 'Users' },
     { href: '/chin/dashboard/subscriptions', icon: ShieldCheck, label: 'Subscriptions' },
     { href: '/chin/dashboard/plans', icon: Package, label: 'Plans' },
+    { href: '/chin/dashboard/features', icon: ToggleRight, label: 'Features' },
     { href: '/chin/dashboard/promotions', icon: TicketPercent, label: 'Promotions' },
     { href: '/chin/dashboard/analytics', icon: BarChart, label: 'Analytics' },
     { href: '/chin/dashboard/support', icon: MessageSquare, label: 'Support Tickets' },
@@ -49,13 +51,13 @@ const adminLinks = [
 export function AdminNav({ type }: { type: 'admin' | 'superAdmin' }) {
     const pathname = usePathname();
     const links = type === 'superAdmin' ? superAdminLinks : adminLinks;
-    
+
     return (
         <div className="flex flex-col gap-2 px-4 py-2">
             <SidebarMenu className="space-y-1">
                 {links.map((item) => {
-                    const isActive = (item.href === '/kanri/dashboard' || item.href === '/chin/dashboard') 
-                        ? pathname === item.href 
+                    const isActive = (item.href === '/kanri/dashboard' || item.href === '/chin/dashboard')
+                        ? pathname === item.href
                         : pathname.startsWith(item.href);
 
                     return (

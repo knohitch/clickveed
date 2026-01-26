@@ -108,6 +108,7 @@ model Plan {
   stripePriceIdQuarterly String?     @unique
   stripePriceIdYearly  String?       @unique
   features             PlanFeature[]
+  featureAccess        PlanFeatureAccess[]  // Dynamic feature access
   promotions           PromotionOnPlan[]
   applicablePromotions  ApplicablePromotionPlan[] // Added
   users                User[]
@@ -325,4 +326,35 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, isRead])
+}
+
+// ==================================
+//         Feature Management
+// ==================================
+
+// Feature definitions - stores all available app features
+model FeatureDefinition {
+  id          String   @id @default(cuid())
+  featureId   String   @unique  // e.g., 'video-suite', 'ai-assistant'
+  displayName String              // e.g., 'Video Suite'
+  description String?             // Optional description
+  category    String   @default("other") // video, content, audio, media, automation, social, settings
+  isActive    Boolean  @default(true) // Can disable a feature entirely
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  planAccess  PlanFeatureAccess[]
+}
+
+// Many-to-many relationship between plans and features
+model PlanFeatureAccess {
+  id          String            @id @default(cuid())
+  planId      String
+  plan        Plan              @relation(fields: [planId], references: [id], onDelete: Cascade)
+  featureId   String
+  feature     FeatureDefinition @relation(fields: [featureId], references: [featureId], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+
+  @@unique([planId, featureId])
+  @@index([planId])
+  @@index([featureId])
 }
