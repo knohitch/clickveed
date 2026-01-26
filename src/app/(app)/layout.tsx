@@ -67,7 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <Sidebar collapsible="none">
+        <Sidebar collapsible="icon">
           <SidebarHeader className="p-4">
             <Logo inSidebar={true} />
           </SidebarHeader>

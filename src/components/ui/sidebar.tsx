@@ -630,7 +630,7 @@ const SidebarMenuAction = React.forwardRef<
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className
       )}
       {...props}
@@ -701,19 +701,23 @@ SidebarMenuSkeleton.displayName = "SidebarMenuSkeleton"
 
 const SidebarMenuSub = React.forwardRef<
   HTMLUListElement,
-  React.ComponentProps<typeof CollapsibleContent>
->(({ className, ...props }, ref) => {
-    return (
-        <CollapsibleContent className={cn("block", className)} {...props}>
-          <ul
-            ref={ref}
-            data-sidebar="menu-sub"
-            className={cn(
-              "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-1",
-              "group-data-[collapsible=icon]:hidden"
-            )}
-          />
-        </CollapsibleContent>
+  React.ComponentProps<"ul">
+>(({ className, children, ...props }, ref) => {
+  return (
+    <CollapsibleContent className="block">
+      <ul
+        ref={ref}
+        data-sidebar="menu-sub"
+        className={cn(
+          "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-1",
+          "group-data-[collapsible=icon]:hidden",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </ul>
+    </CollapsibleContent>
   )
 })
 SidebarMenuSub.displayName = "SidebarMenuSub"
