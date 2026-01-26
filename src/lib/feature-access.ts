@@ -127,7 +127,7 @@ export function getMinimumPlanForFeature(featureId: string): string {
   if (enterpriseFeatures.includes(featureId)) {
     return 'Enterprise';
   }
-  
+
   // Professional-only features
   const proFeatures = [
     'thumbnail-tester', 'magic-clips', 'voice-over',
@@ -137,18 +137,16 @@ export function getMinimumPlanForFeature(featureId: string): string {
   if (proFeatures.includes(featureId)) {
     return 'Professional';
   }
-  
+
   // Starter-only features
   const starterFeatures = [
-    'topic-researcher', 'video-suite', 'video-pipeline',
-    'video-editor', 'script-generator', 'video-from-url',
     'stock-media', 'ai-image-generator', 'background-remover',
     'social-analytics', 'brand-kit'
   ];
   if (starterFeatures.includes(featureId)) {
     return 'Starter';
   }
-  
-  // Free features
+
+  // Free features (including video tools)
   return 'Free';
 }

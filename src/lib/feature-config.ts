@@ -72,13 +72,20 @@ export function matchFeatureKeywords(featureText: string, featureId: string): bo
 }
 
 // Default free plan features (can be overridden by database)
-// FREE TIER: Basic features only - encourages upgrades to paid plans
+// FREE TIER: Includes essential video creation tools to provide value
 export const DEFAULT_FREE_PLAN_FEATURES = [
   'ai-assistant',
   'creative-assistant',
   'social-integrations',
   'media-library',
   'profile-settings',
+  // Video tools for free users
+  'video-suite',
+  'video-editor',
+  'video-pipeline',
+  'script-generator',
+  'video-from-url',
+  'topic-researcher',
 ] as const;
 
 export const DEFAULT_STARTER_PLAN_FEATURES = [
@@ -119,7 +126,7 @@ export const FEATURE_MINIMUM_PLAN: Record<string, string> = {
   // Enterprise-only features
   'voice-cloning': 'Enterprise',
   'n8n-integrations': 'Enterprise',
-  
+
   // Professional features
   'thumbnail-tester': 'Professional',
   'magic-clips': 'Professional',
@@ -129,20 +136,22 @@ export const FEATURE_MINIMUM_PLAN: Record<string, string> = {
   'flux-pro': 'Professional',
   'ai-agents': 'Professional',
   'social-scheduler': 'Professional',
-  
+
   // Starter features
-  'topic-researcher': 'Starter',
-  'video-suite': 'Starter',
-  'video-pipeline': 'Starter',
-  'video-editor': 'Starter',
-  'script-generator': 'Starter',
-  'video-from-url': 'Starter',
   'stock-media': 'Starter',
   'ai-image-generator': 'Starter',
   'background-remover': 'Starter',
   'social-analytics': 'Starter',
   'brand-kit': 'Starter',
-  
+
+  // Free features (explicitly listed for clarity)
+  'topic-researcher': 'Free',
+  'video-suite': 'Free',
+  'video-pipeline': 'Free',
+  'video-editor': 'Free',
+  'script-generator': 'Free',
+  'video-from-url': 'Free',
+
   // Free features (no entry needed - included by default)
   // 'ai-assistant': 'Free',
   // 'creative-assistant': 'Free',
