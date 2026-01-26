@@ -226,7 +226,6 @@ const Sidebar = React.forwardRef<
         ref={ref}
         className="group peer hidden md:block text-sidebar-foreground"
         data-state={state}
-        // @ts-expect-error - comparison against "none" is intentional to prevent collapsible behavior
         data-collapsible={state === "collapsed" && (collapsible === "icon" || collapsible === "offcanvas") ? collapsible : ""}
         data-variant={variant}
         data-side={side}
