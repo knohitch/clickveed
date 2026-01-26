@@ -188,7 +188,7 @@ export function DashboardNav() {
             
             <SidebarMenu className="mt-4 space-y-1">
                 {filteredMenuSections.map((section) => {
-                    const isSectionActive = section.path === '/dashboard/video-suite' 
+                    const isSectionActive = section.path === '/dashboard/video-suite'
                         ? pathname.startsWith(section.path) || pathname === '/dashboard/video-pipeline' || pathname === '/dashboard/video-editor'
                         : pathname.startsWith(section.path);
 
