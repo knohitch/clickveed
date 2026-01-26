@@ -177,7 +177,14 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, open, openMobile, setOpenMobile, setOpen } = useSidebar()
+
+    // Force sidebar to stay open when collapsible="none"
+    React.useEffect(() => {
+      if (collapsible === "none" && !open) {
+        setOpen(true)
+      }
+    }, [collapsible, open, setOpen])
 
     if (collapsible === "none") {
       return (
@@ -219,7 +226,7 @@ const Sidebar = React.forwardRef<
         ref={ref}
         className="group peer hidden md:block text-sidebar-foreground"
         data-state={state}
-        data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-collapsible={state === "collapsed" && collapsible !== "none" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
       >
