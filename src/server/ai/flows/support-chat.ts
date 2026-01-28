@@ -1,27 +1,19 @@
-// This file was blank; implementing streaming Genkit flow for support chat, similar to creative-assistant-chat.
-
 'use server';
+/**
+ * @fileOverview A streaming Genkit flow for support chat.
+ */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { generateStreamWithProvider } from '@/lib/ai/api-service-manager';
+import {
+  SupportChatSchema,
+  supportChatSystemPrompt,
+  type SupportChatRequest,
+} from './types';
 
-const SupportChatSchema = z.object({
-  history: z.array(z.object({
-    role: z.enum(['user', 'assistant']),
-    content: z.string(),
-  })).optional(),
-  message: z.string(),
-});
-
-export type SupportChatRequest = z.infer<typeof SupportChatSchema>;
-
-const systemPrompt = `You are ClickVid Support AI, a helpful customer support assistant for the ClickVid Pro video platform.
-You assist with technical issues, billing, features, and general questions.
-Be empathetic, clear, and solution-oriented. If you can't resolve, suggest contacting human support.
-Escalate complex issues (e.g., account suspension) by saying "I'll create a ticket for our team."
-Keep responses concise and use bullet points for steps.
-`;
+// Re-export types for consumers
+export type { SupportChatRequest } from './types';
 
 export async function supportChat(input: SupportChatRequest): Promise<ReadableStream<string>> {
   return supportChatFlow(input);
@@ -42,7 +34,7 @@ const supportChatFlow = ai.defineFlow(
 
     // Combine system prompt, history, and user message
     const messages = [
-      { role: 'system' as 'user' | 'model', content: [{ text: systemPrompt }] },
+      { role: 'system' as 'user' | 'model', content: [{ text: supportChatSystemPrompt }] },
       { role: 'user' as 'user' | 'model', content: [{ text: message }] },
       ...formattedHistory
     ];

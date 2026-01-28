@@ -1,39 +1,24 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that generates a video and a separate audio track from a single image.
- * This flow now uses the API service manager to rotate through available video and audio providers.
- * - generateVideoFromImage - A function that handles the video generation process.
- * - GenerateVideoFromImageInput - The input type for the generateVideoFromImage function.
- * - GenerateVideoFromImageOutput - The return type for the generateVideoFromImage function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 import wav from 'wav';
 import { getAvailableVideoGenerator, getAvailableTTSProvider, getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
+import {
+  GenerateVideoFromImageInputSchema,
+  GenerateVideoFromImageOutputSchema,
+  type GenerateVideoFromImageInput,
+  type GenerateVideoFromImageOutput,
+} from './types';
 
-
-const GenerateVideoFromImageInputSchema = z.object({
-  photoUrl: z
-    .string()
-    .url()
-    .describe(
-      "A public URL to a photo to create a video from."
-    ),
-  musicPrompt: z.string().describe('A prompt describing the type of music to add to the video.'),
-  videoDescription: z.string().describe('A description of the desired video content.'),
-});
-export type GenerateVideoFromImageInput = z.infer<typeof GenerateVideoFromImageInputSchema>;
-
-const GenerateVideoFromImageOutputSchema = z.object({
-  videoUrl: z.string().url().describe('The public URL of the generated video.'),
-  audioUrl: z.string().url().describe('The public URL of the generated audio.'),
-});
-export type GenerateVideoFromImageOutput = z.infer<typeof GenerateVideoFromImageOutputSchema>;
+// Re-export types for consumers
+export type { GenerateVideoFromImageInput, GenerateVideoFromImageOutput } from './types';
 
 export async function generateVideoFromImage(input: GenerateVideoFromImageInput): Promise<GenerateVideoFromImageOutput> {
   try {
@@ -46,8 +31,8 @@ export async function generateVideoFromImage(input: GenerateVideoFromImageInput)
 
 const generateVideoScriptPrompt = ai.definePrompt({
   name: 'generateVideoScriptPrompt',
-  input: {schema: z.object({ videoDescription: z.string() }) },
-  output: {schema: z.object({ voiceoverScript: z.string().describe("A concise voiceover script (1-2 sentences) that describes the scene or adds a call-to-action.") })},
+  input: { schema: z.object({ videoDescription: z.string() }) },
+  output: { schema: z.object({ voiceoverScript: z.string().describe("A concise voiceover script (1-2 sentences) that describes the scene or adds a call-to-action.") }) },
   prompt: `You are an expert video creator. Create a very short, compelling voiceover script (1-2 sentences) for a video based on the following description.
 
 Video Description: {{{videoDescription}}}
@@ -55,7 +40,6 @@ Video Description: {{{videoDescription}}}
 Respond ONLY with the JSON object containing the voiceoverScript.
 `,
 });
-
 
 async function toWav(
   pcmData: Buffer,
@@ -97,34 +81,34 @@ const generateVideoFromImageFlow = ai.defineFlow(
     const session = await auth();
 
     if (!session?.user) {
-        throw new Error("User must be authenticated to generate media.");
+      throw new Error("User must be authenticated to generate media.");
     }
 
     // Step 1: Generate the voiceover script from the video description
     const generateResponse = await ai.generate({
-        model: textGenerator.model,
-        prompt: `You are an expert video creator. Create a very short, compelling voiceover script (1-2 sentences) for a video based on the following description.
+      model: textGenerator.model,
+      prompt: `You are an expert video creator. Create a very short, compelling voiceover script (1-2 sentences) for a video based on the following description.
 
 Video Description: ${input.videoDescription}
 
 Respond ONLY with the JSON object containing the voiceoverScript.`,
-        output: {schema: z.object({ voiceoverScript: z.string().describe("A concise voiceover script (1-2 sentences) that describes the scene or adds a call-to-action.") })}
+      output: { schema: z.object({ voiceoverScript: z.string().describe("A concise voiceover script (1-2 sentences) that describes the scene or adds a call-to-action.") }) }
     });
-    
+
     // Type assertion to access the output property
     const scriptOutput = (generateResponse as any).output;
     const voiceoverScript = scriptOutput?.voiceoverScript;
     if (!voiceoverScript) {
-        throw new Error('Failed to generate voiceover script.');
+      throw new Error('Failed to generate voiceover script.');
     }
-    
+
     // Step 2: Generate Video and Audio in parallel
     const [videoGenPromise, audioGenPromise] = await Promise.all([
       ai.generate({
         model: videoGenerator.model,
         prompt: [
-            { text: input.videoDescription }, 
-            { media: { url: input.photoUrl } }
+          { text: input.videoDescription },
+          { media: { url: input.photoUrl } }
         ],
         config: {
           durationSeconds: 5,
@@ -135,8 +119,8 @@ Respond ONLY with the JSON object containing the voiceoverScript.`,
         model: audioGenerator.model,
         prompt: voiceoverScript,
         config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achernar' } } }
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achernar' } } }
         }
       })
     ]);
@@ -144,14 +128,14 @@ Respond ONLY with the JSON object containing the voiceoverScript.`,
     // Step 3: Poll for video completion
     let operation = (videoGenPromise as any).operation;
     if (!operation) {
-        throw new Error('Expected the video model to return an operation.');
+      throw new Error('Expected the video model to return an operation.');
     }
     while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-        operation = await (ai as any).checkOperation(operation);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      operation = await (ai as any).checkOperation(operation);
     }
     if (operation.error) {
-        throw new Error(`Video generation failed: ${operation.error.message}`);
+      throw new Error(`Video generation failed: ${operation.error.message}`);
     }
 
     const videoMediaPart = operation.output?.message?.content.find((p: any) => !!p.media);
@@ -163,18 +147,18 @@ Respond ONLY with the JSON object containing the voiceoverScript.`,
     if (!audioGenPromise.media) {
       throw new Error('Audio generation failed. No media was returned.');
     }
-    
+
     // Step 5: Upload assets sequentially to prevent orphaned files
     const { publicUrl: videoUrl, sizeMB: videoSize } = await uploadToWasabi(videoMediaPart.media.url, 'videos');
     await prisma.mediaAsset.create({
-        data: { name: `Video: ${input.videoDescription.substring(0,30)}...`, type: 'VIDEO', url: videoUrl, size: videoSize, userId: session.user.id }
+      data: { name: `Video: ${input.videoDescription.substring(0, 30)}...`, type: 'VIDEO', url: videoUrl, size: videoSize, userId: session.user.id }
     });
-    
+
     const audioPcmBuffer = Buffer.from(audioGenPromise.media.url.substring(audioGenPromise.media.url.indexOf(',') + 1), 'base64');
     const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
     const { publicUrl: audioUrl, sizeMB: audioSize } = await uploadToWasabi(audioDataUri, 'audio');
     await prisma.mediaAsset.create({
-        data: { name: `Audio: ${input.musicPrompt.substring(0,30)}...`, type: 'AUDIO', url: audioUrl, size: audioSize, userId: session.user.id }
+      data: { name: `Audio: ${input.musicPrompt.substring(0, 30)}...`, type: 'AUDIO', url: audioUrl, size: audioSize, userId: session.user.id }
     });
 
 

@@ -1,34 +1,23 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that generates a voice over from a script and uploads it to Wasabi.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
 import wav from 'wav';
 import { getAvailableTTSProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
+import {
+  GenerateVoiceOverInputSchema,
+  GenerateVoiceOverOutputSchema,
+  type GenerateVoiceOverInput,
+  type GenerateVoiceOverOutput,
+} from './types';
 
-const SpeakerSchema = z.object({
-  speakerId: z.string().describe('The identifier for the speaker, e.g., "Speaker1"'),
-  voice: z.string().describe('The pre-built voice to use for this speaker.'),
-});
-
-const GenerateVoiceOverInputSchema = z.object({
-  script: z
-    .string()
-    .describe('The text script to be converted into a voice over. For multi-speaker, use format like "Speaker1: text. Speaker2: more text."'),
-  speakers: z.array(SpeakerSchema).optional().describe('An array of speakers and their assigned voices for multi-speaker generation.'),
-});
-export type GenerateVoiceOverInput = z.infer<typeof GenerateVoiceOverInputSchema>;
-
-const GenerateVoiceOverOutputSchema = z.object({
-  audioUrl: z.string().url().describe('The public URL of the generated audio file.'),
-});
-export type GenerateVoiceOverOutput = z.infer<typeof GenerateVoiceOverOutputSchema>;
+// Re-export types for consumers
+export type { GenerateVoiceOverInput, GenerateVoiceOverOutput } from './types';
 
 export async function generateVoiceOver(
   input: GenerateVoiceOverInput
@@ -74,37 +63,37 @@ const generateVoiceOverFlow = ai.defineFlow(
     inputSchema: GenerateVoiceOverInputSchema,
     outputSchema: GenerateVoiceOverOutputSchema,
   },
-  async ({script, speakers}) => {
+  async ({ script, speakers }) => {
     const ttsProvider = await getAvailableTTSProvider();
     const session = await auth();
 
     if (!session?.user?.id) {
-        throw new Error("User must be authenticated to generate audio.");
+      throw new Error("User must be authenticated to generate audio.");
     }
 
     const isMultiSpeaker = speakers && speakers.length > 1;
     let speechConfig: any = {};
 
     if (isMultiSpeaker) {
-        speechConfig = {
-             multiSpeakerVoiceConfig: {
-                speakerVoiceConfigs: speakers.map(s => ({
-                    speaker: s.speakerId,
-                    voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: s.voice }
-                    }
-                }))
-            }
-        };
-    } else {
-        const singleVoice = speakers?.[0]?.voice || 'Algenib';
-        speechConfig = {
+      speechConfig = {
+        multiSpeakerVoiceConfig: {
+          speakerVoiceConfigs: speakers.map(s => ({
+            speaker: s.speakerId,
             voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: singleVoice },
-            },
-        };
+              prebuiltVoiceConfig: { voiceName: s.voice }
+            }
+          }))
+        }
+      };
+    } else {
+      const singleVoice = speakers?.[0]?.voice || 'Algenib';
+      speechConfig = {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: singleVoice },
+        },
+      };
     }
-    
+
     const generateResponse = await ai.generate({
       model: ttsProvider.model,
       prompt: script,
@@ -113,7 +102,7 @@ const generateVoiceOverFlow = ai.defineFlow(
         speechConfig: speechConfig
       }
     });
-    
+
     // Type assertion to access the media property
     const media = (generateResponse as any).media;
 
@@ -125,20 +114,20 @@ const generateVoiceOverFlow = ai.defineFlow(
       media.url.substring(media.url.indexOf(',') + 1),
       'base64'
     );
-    
+
     const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
 
     // Sequential upload and DB write to prevent orphaned files
     const { publicUrl, sizeMB } = await uploadToWasabi(audioDataUri, 'audio');
 
     await prisma.mediaAsset.create({
-        data: {
-            name: `Voice Over: ${script.substring(0, 30)}...`,
-            type: 'AUDIO',
-            url: publicUrl,
-            size: sizeMB,
-            userId: session.user.id,
-        }
+      data: {
+        name: `Voice Over: ${script.substring(0, 30)}...`,
+        type: 'AUDIO',
+        url: publicUrl,
+        size: sizeMB,
+        userId: session.user.id,
+      }
     });
 
     return {

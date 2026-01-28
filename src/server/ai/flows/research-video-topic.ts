@@ -1,27 +1,19 @@
-// This file was blank; implementing basic Genkit flow for video topic research (keywords, outline, trends).
-
 'use server';
+/**
+ * @fileOverview A Genkit flow for video topic research (keywords, outline, trends).
+ */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
 import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import {
+  ResearchVideoTopicInputSchema,
+  ResearchVideoTopicOutputSchema,
+  type ResearchVideoTopicInput,
+  type ResearchVideoTopicOutput,
+} from './types';
 
-const ResearchVideoTopicInputSchema = z.object({
-  topic: z.string().describe('The main topic to research for video ideas.'),
-  platform: z.string().default('YouTube').describe('Target platform (e.g., "YouTube", "TikTok").'),
-  audience: z.string().optional().describe('Target audience description.'),
-});
-
-export type ResearchVideoTopicInput = z.infer<typeof ResearchVideoTopicInputSchema>;
-
-const ResearchVideoTopicOutputSchema = z.object({
-  keywords: z.array(z.string()).describe('Relevant SEO keywords and search terms.'),
-  outline: z.array(z.string()).describe('Suggested video outline with sections.'),
-  trends: z.string().describe('Current trends or hooks for the topic.'),
-  titleIdeas: z.array(z.string()).describe('5 suggested video title ideas.'),
-});
-
-export type ResearchVideoTopicOutput = z.infer<typeof ResearchVideoTopicOutputSchema>;
+// Re-export types for consumers
+export type { ResearchVideoTopicInput, ResearchVideoTopicOutput } from './types';
 
 export async function researchVideoTopic(input: ResearchVideoTopicInput): Promise<ResearchVideoTopicOutput> {
   return researchVideoTopicFlow(input);
@@ -61,7 +53,7 @@ const researchVideoTopicFlow = ai.defineFlow(
       },
     ];
     const response = await generateWithProvider({ messages });
-    
+
     // Handle both possible response formats
     const output = 'output' in response ? response.output : response.result;
 

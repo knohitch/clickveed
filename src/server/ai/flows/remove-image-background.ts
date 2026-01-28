@@ -1,30 +1,22 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that removes the background from an image and uploads it.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
 import { getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
+import {
+  RemoveImageBackgroundInputSchema,
+  RemoveImageBackgroundOutputSchema,
+  type RemoveImageBackgroundInput,
+  type RemoveImageBackgroundOutput,
+} from './types';
 
-const RemoveImageBackgroundInputSchema = z.object({
-  imageUrl: z
-    .string()
-    .url()
-    .describe(
-      "The public URL of the image to process."
-    ),
-});
-export type RemoveImageBackgroundInput = z.infer<typeof RemoveImageBackgroundInputSchema>;
-
-const RemoveImageBackgroundOutputSchema = z.object({
-  imageUrl: z.string().url().describe('The public URL of the image with the background removed.'),
-});
-export type RemoveImageBackgroundOutput = z.infer<typeof RemoveImageBackgroundOutputSchema>;
+// Re-export types for consumers
+export type { RemoveImageBackgroundInput, RemoveImageBackgroundOutput } from './types';
 
 export async function removeImageBackground(
   input: RemoveImageBackgroundInput
@@ -42,13 +34,13 @@ const removeImageBackgroundFlow = ai.defineFlow(
     const session = await auth();
 
     if (!session?.user) {
-        throw new Error("User must be authenticated to process images.");
+      throw new Error("User must be authenticated to process images.");
     }
 
     // This is a simulation using a generative model. A real implementation would use
     // a more specialized image segmentation model for this task for better accuracy.
     const imageGenerator = await getAvailableImageGenerator();
-    
+
     // We need to fetch the image data first to pass it as a data URI to the model
     const imageResponse = await fetch(input.imageUrl);
     const imageBuffer = await imageResponse.arrayBuffer();
@@ -62,24 +54,24 @@ const removeImageBackgroundFlow = ai.defineFlow(
         responseModalities: ['TEXT', 'IMAGE'],
       },
     });
-    
+
     // Type assertion to access the media property
     const media = (generateResponse as any).media;
 
     if (!media || !media[0]?.url) {
       throw new Error('Image processing failed. No media was returned.');
     }
-    
+
     // Sequential upload and DB write to prevent orphaned files
     const { publicUrl, sizeMB } = await uploadToWasabi(media[0].url, 'images');
     await prisma.mediaAsset.create({
-        data: {
-            name: `Background Removed Image #${Math.floor(Math.random() * 1000)}`,
-            type: 'IMAGE',
-            url: publicUrl,
-            size: sizeMB,
-            userId: session.user.id,
-        }
+      data: {
+        name: `Background Removed Image #${Math.floor(Math.random() * 1000)}`,
+        type: 'IMAGE',
+        url: publicUrl,
+        size: sizeMB,
+        userId: session.user.id,
+      }
     });
 
     return {

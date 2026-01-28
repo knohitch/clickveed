@@ -6,20 +6,11 @@ import { auth } from '@/auth';
 import type { User, Plan, UserUsage, PlanFeature } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { getBaseUrl } from '@/lib/utils';
+import type { UserRole, UserStatus, UserWithRole, BrandKit } from './user-types';
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'USER';
-export type UserStatus = 'Active' | 'Pending';
+// Re-export types for consumers
+export type { UserRole, UserStatus, UserWithRole, BrandKit } from './user-types';
 
-export type UserWithRole = Partial<User> & {
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    emailVerified?: boolean | null;
-    role: UserRole;
-    status: UserStatus;
-    plan?: string;
-};
 
 /**
  * Retrieves a list of all users.
@@ -63,9 +54,9 @@ export async function getUserById(id: string): Promise<(User & { plan: Plan & { 
     // If user exists but has no plan, auto-assign the Free plan
     if (user && !user.planId) {
         console.log('[getUserById] User has no plan, attempting to assign Free plan:', id);
-        
+
         const freePlan = await prisma.plan.findFirst({
-            where: { 
+            where: {
                 OR: [
                     { name: 'Free' },
                     { featureTier: 'free' }
@@ -78,7 +69,7 @@ export async function getUserById(id: string): Promise<(User & { plan: Plan & { 
 
         if (freePlan) {
             console.log('[getUserById] Assigning Free plan to user:', id);
-            
+
             // Update user with Free plan
             user = await prisma.user.update({
                 where: { id },
@@ -92,7 +83,7 @@ export async function getUserById(id: string): Promise<(User & { plan: Plan & { 
                     usage: true
                 }
             });
-            
+
             console.log('[getUserById] Free plan assigned successfully');
         } else {
             console.warn('[getUserById] Free plan not found in database - seed may not have run properly');
@@ -129,7 +120,7 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     const existingUser = await prisma.user.findUnique({
         where: { email: userData.email },
     });
-    
+
     if (existingUser) {
         throw new Error("An account with this email already exists.");
     }
@@ -140,7 +131,7 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     if (!freePlan) {
         throw new Error("Default 'Free' plan not found. Please seed the database.");
     }
-    
+
     // In a real app, you would hash the password here before saving
     const newUser = await prisma.user.create({
         data: {
@@ -156,20 +147,20 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     const { sendEmail } = await import('@/server/services/email-service');
     // Use NEXT_PUBLIC_SITE_URL for production URLs, fallback to localhost for development
     const appUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    
+
     try {
-      await sendEmail({
-        templateKey: 'userInvitation',
-        to: userData.email,
-        data: {
-          name: userData.fullName,
-          invitationLink: `${appUrl}/auth/reset-password?email=${encodeURIComponent(userData.email)}`
-        }
-      });
-      console.log(`User invitation email sent to ${userData.email}`);
+        await sendEmail({
+            templateKey: 'userInvitation',
+            to: userData.email,
+            data: {
+                name: userData.fullName,
+                invitationLink: `${appUrl}/auth/reset-password?email=${encodeURIComponent(userData.email)}`
+            }
+        });
+        console.log(`User invitation email sent to ${userData.email}`);
     } catch (error) {
-      console.error('Failed to send invitation email:', error);
-      // Continue even if email fails - user can still login and set password
+        console.error('Failed to send invitation email:', error);
+        // Continue even if email fails - user can still login and set password
     }
 
     return {
@@ -195,10 +186,10 @@ export async function upsertUser(data: UpsertUserData) {
     if (!data.id && !data.email) {
         throw new Error("User ID or email is required to upsert user.");
     }
-    
+
     // Map name and image to the correct field names if provided
     const { onboardingData, name, image, ...userData } = data;
-    
+
     // Add the mapped fields back with correct names
     if (name !== undefined) userData.displayName = name;
     if (image !== undefined) userData.avatarUrl = image;
@@ -227,14 +218,6 @@ export async function upsertUser(data: UpsertUserData) {
 /**
  * Retrieves the BrandKit for the current user.
  */
-export interface BrandKit {
-    logoUrl?: string | null;
-    primaryColor?: string | null;
-    secondaryColor?: string | null;
-    accentColor?: string | null;
-    headlineFont?: string | null;
-    bodyFont?: string | null;
-}
 export async function getBrandKit(): Promise<BrandKit | null> {
     const session = await auth();
     if (!session?.user?.id) return null;
@@ -242,7 +225,7 @@ export async function getBrandKit(): Promise<BrandKit | null> {
     const brandKit = await prisma.brandKit.findUnique({
         where: { userId: session.user.id },
     });
-    
+
     return brandKit;
 }
 
@@ -254,7 +237,7 @@ export async function upsertBrandKit(data: BrandKit) {
     if (!session?.user?.id) {
         throw new Error("You must be logged in to update your brand kit.");
     }
-    
+
     await prisma.brandKit.upsert({
         where: { userId: session.user.id },
         update: data,

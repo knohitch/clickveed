@@ -1,89 +1,62 @@
-
 'use server';
 /**
- * @fileOverview An AI agent that analyzes and compares two video thumbnails.
- *
- * - analyzeThumbnails - A function that handles the thumbnail analysis process.
- * - AnalyzeThumbnailsInput - The input type for the function.
- * - AnalyzeThumbnailsOutput - The return type for the function.
+ * @fileOverview An AI agent that analyzes and ranks thumbnail images for videos.
  */
 
 import { z } from 'zod';
 import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
+import {
+  AnalyzeThumbnailsInputSchema,
+  AnalyzeThumbnailsOutputSchema,
+  type AnalyzeThumbnailsInput,
+  type AnalyzeThumbnailsOutput,
+} from './types';
 
-const AnalyzeThumbnailsInputSchema = z.object({
-  thumbnailA_DataUri: z
-    .string()
-    .describe(
-      "Thumbnail A, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-   thumbnailB_DataUri: z
-    .string()
-    .describe(
-      "Thumbnail B, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-  videoTitle: z.string().describe('The title of the video these thumbnails are for.'),
-  targetAudience: z.string().describe('A description of the target audience for the video.'),
-});
-export type AnalyzeThumbnailsInput = z.infer<typeof AnalyzeThumbnailsInputSchema>;
-
-const ThumbnailAnalysisSchema = z.object({
-    score: z.number().int().min(0).max(100).describe("An engagement score from 0-100 predicting how well this thumbnail will perform."),
-    pros: z.array(z.string()).describe("A list of 2-3 key strengths of the thumbnail."),
-    cons: z.array(z.string()).describe("A list of 2-3 key weaknesses or areas for improvement."),
-    summary: z.string().describe("A concise one-sentence summary of the analysis.")
-});
-
-const AnalyzeThumbnailsOutputSchema = z.object({
-  analysisA: ThumbnailAnalysisSchema.describe("The detailed analysis for Thumbnail A."),
-  analysisB: ThumbnailAnalysisSchema.describe("The detailed analysis for Thumbnail B."),
-  recommendation: z.enum(['A', 'B']).describe("The final recommendation of which thumbnail is better ('A' or 'B')."),
-  reasoning: z.string().describe("A brief explanation for the final recommendation.")
-});
-export type AnalyzeThumbnailsOutput = z.infer<typeof AnalyzeThumbnailsOutputSchema>;
+// Re-export types for consumers (this is allowed because we're re-exporting from a non-server file)
+export type { AnalyzeThumbnailsInput, AnalyzeThumbnailsOutput } from './types';
 
 export async function analyzeThumbnails(
   input: AnalyzeThumbnailsInput
 ): Promise<AnalyzeThumbnailsOutput> {
   console.log('[analyzeThumbnails] Starting thumbnail analysis...');
-  
-  const prompt = `You are a world-class YouTube strategy expert with a keen eye for what makes a thumbnail successful.
-    Your task is to analyze two competing thumbnails for a video and determine which is more likely to get a higher click-through rate (CTR).
 
-    **Video Context:**
-    - **Title:** "${input.videoTitle}"
-    - **Target Audience:** "${input.targetAudience}"
+  const prompt = `You are an expert YouTube thumbnail analyst. Analyze and rank the following thumbnails based on their potential to drive clicks and engagement.
 
-    **Thumbnails for Analysis:**
-    - **Thumbnail A:** (First image provided)
-    - **Thumbnail B:** (Second image provided)
+${input.videoTopic ? `Video Topic: ${input.videoTopic}` : ''}
 
-    **Your Analysis Criteria:**
-    Evaluate each thumbnail based on the following principles. For each, provide a score from 0-100, a list of 2-3 pros, and 2-3 cons.
+Thumbnails to analyze:
+${input.thumbnailUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}
 
-    1.  **Clarity & Readability:** Is the thumbnail easy to understand in milliseconds, even on a small screen? Is any text large and legible?
-    2.  **Emotional Impact & Intrigue:** Does it evoke a strong emotion (curiosity, excitement, surprise, etc.)? Does it tell a story or pose a question?
-    3.  **Composition & Aesthetics:** Is the visual layout clean and well-balanced? Does it use color and contrast effectively to draw the eye to the focal point? Is it visually appealing?
-    4.  **Relevance to Context:** How well does the thumbnail align with the video title and target audience? Does it accurately represent the video's content and promise?
+For each thumbnail, provide:
+1. A ranking (1 = best)
+2. A score from 0-100
+3. Strengths (what works well)
+4. Weaknesses (what could be improved)
+5. Suggestions for improvement
 
-    **Final Recommendation:**
-    After analyzing both, provide a final recommendation ('A' or 'B') and a brief, conclusive reasoning for your choice.
-    
-    Respond with a JSON object like:
+Also provide an overall recommendation.
+
+Respond with a JSON object like:
+{
+  "rankings": [
     {
-      "analysisA": {"score": 75, "pros": ["Pro 1", "Pro 2"], "cons": ["Con 1", "Con 2"], "summary": "Summary A"},
-      "analysisB": {"score": 85, "pros": ["Pro 1", "Pro 2"], "cons": ["Con 1", "Con 2"], "summary": "Summary B"},
-      "recommendation": "B",
-      "reasoning": "Explanation here"
-    }`;
+      "rank": 1,
+      "url": "...",
+      "score": 85,
+      "strengths": ["Good contrast", "Clear text"],
+      "weaknesses": ["Could use more emotion"],
+      "suggestions": ["Add a human face"]
+    }
+  ],
+  "overallRecommendation": "..."
+}`;
 
-  // Use the unified structured output function that handles all providers
   const result = await generateStructuredOutput(prompt, AnalyzeThumbnailsOutputSchema);
   console.log('[analyzeThumbnails] Using provider:', result.provider, 'model:', result.model);
-  
-  if (!result.output) {
-    throw new Error("The AI failed to generate a thumbnail analysis.");
+
+  if (!result.output?.rankings) {
+    throw new Error("The AI failed to analyze the thumbnails.");
   }
-  
+
   return result.output;
 }

@@ -1,29 +1,19 @@
-// This file was blank; implementing basic Genkit flow for content repurposing (e.g., video to social posts).
-
 'use server';
+/**
+ * @fileOverview A Genkit flow for content repurposing (e.g., video to social posts).
+ */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-import { getAvailableTextGenerator, generateWithProvider } from '@/lib/ai/api-service-manager';
+import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import {
+  RepurposeContentInputSchema,
+  RepurposeContentOutputSchema,
+  type RepurposeContentInput,
+  type RepurposeContentOutput,
+} from './types';
 
-const RepurposeContentInputSchema = z.object({
-  originalContent: z.string().describe('The original video script or description to repurpose.'),
-  targetPlatform: z.string().default('social media').describe('Target platform (e.g., "TikTok", "LinkedIn", "Twitter").'),
-  format: z.string().default('short clips').describe('Desired format (e.g., "short clips", "posts", "thumbnails").'),
-});
-
-export type RepurposeContentInput = z.infer<typeof RepurposeContentInputSchema>;
-
-const RepurposeContentOutputSchema = z.object({
-  repurposedItems: z.array(z.object({
-    type: z.string().describe('Type of repurposed content (e.g., "clip idea", "post caption").'),
-    content: z.string().describe('The repurposed content.'),
-    estimatedLength: z.string().optional().describe('Estimated length or details.'),
-  })).describe('Array of repurposed content ideas.'),
-  tips: z.string().describe('Tips for using the repurposed content.'),
-});
-
-export type RepurposeContentOutput = z.infer<typeof RepurposeContentOutputSchema>;
+// Re-export types for consumers
+export type { RepurposeContentInput, RepurposeContentOutput } from './types';
 
 export async function repurposeContent(input: RepurposeContentInput): Promise<RepurposeContentOutput> {
   return repurposeContentFlow(input);
@@ -56,7 +46,8 @@ const repurposeContentFlow = ai.defineFlow(
     const messages = [
       {
         role: 'system' as const,
-        content: [{ text: `You are a content repurposing expert. Take the original content and adapt it for ${input.targetPlatform} in ${input.format} format.
+        content: [{
+          text: `You are a content repurposing expert. Take the original content and adapt it for ${input.targetPlatform} in ${input.format} format.
 
 Original Content: ${input.originalContent}
 
@@ -71,7 +62,7 @@ Include 2-3 tips for optimization on the platform.` }],
 
     // Use generateWithProvider instead of model.generate
     const response = await generateWithProvider({ messages });
-    
+
     // Handle both possible response formats
     const output = 'output' in response ? response.output : response.result;
 

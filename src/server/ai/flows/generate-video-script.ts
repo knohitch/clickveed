@@ -1,27 +1,19 @@
-// This file was blank; implementing basic Genkit flow for video script generation.
-
 'use server';
+/**
+ * @fileOverview A Genkit flow for video script generation.
+ */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
 import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import {
+  GenerateVideoScriptInputSchema,
+  GenerateVideoScriptOutputSchema,
+  type GenerateVideoScriptInput,
+  type GenerateVideoScriptOutput,
+} from './types';
 
-const GenerateVideoScriptInputSchema = z.object({
-  topic: z.string().describe('The main topic or idea for the video.'),
-  style: z.string().optional().describe('The style of the video (e.g., "explainer", "tutorial", "vlog").'),
-  length: z.string().optional().default('2 minutes').describe('Target length of the video.'),
-  tone: z.string().optional().default('professional').describe('Tone of the script (e.g., "casual", "formal", "humorous").'),
-});
-
-export type GenerateVideoScriptInput = z.infer<typeof GenerateVideoScriptInputSchema>;
-
-const GenerateVideoScriptOutputSchema = z.object({
-  script: z.string().describe('The generated video script, including scenes, voiceover, and timing cues.'),
-  title: z.string().describe('A suggested title for the video.'),
-  durationEstimate: z.string().describe('Estimated duration based on the script.'),
-});
-
-export type GenerateVideoScriptOutput = z.infer<typeof GenerateVideoScriptOutputSchema>;
+// Re-export types for consumers
+export type { GenerateVideoScriptInput, GenerateVideoScriptOutput } from './types';
 
 export async function generateVideoScript(input: GenerateVideoScriptInput): Promise<GenerateVideoScriptOutput> {
   try {
