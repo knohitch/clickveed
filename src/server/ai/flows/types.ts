@@ -393,3 +393,26 @@ export const GeneratePipelineVideoOutputSchema = z.object({
     videoUrl: z.string().describe('The public URL of the generated video.'),
 });
 export type GeneratePipelineVideoOutput = z.infer<typeof GeneratePipelineVideoOutputSchema>;
+
+// ============================================================================
+// GENERATE AUTOMATION WORKFLOW
+// ============================================================================
+
+export const GenerateAutomationWorkflowInputSchema = z.object({
+    prompt: z
+        .string()
+        .describe('A natural language description of the desired automation workflow.'),
+    platform: z
+        .enum(['n8n', 'Make.com'])
+        .describe('The target automation platform.'),
+});
+export type GenerateAutomationWorkflowInput = z.infer<typeof GenerateAutomationWorkflowInputSchema>;
+
+export const GenerateAutomationWorkflowOutputSchema = z.object({
+    workflow: z
+        .any()
+        .describe(
+            'A JSON representation of the generated workflow, compatible with the specified platform.'
+        ),
+});
+export type GenerateAutomationWorkflowOutput = z.infer<typeof GenerateAutomationWorkflowOutputSchema>;

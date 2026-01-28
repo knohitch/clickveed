@@ -3,22 +3,22 @@
 
 import { generateVideoScript } from "@/server/ai/flows/generate-video-script";
 import { generateVideoFromImage } from "@/server/ai/flows/generate-video-from-image";
-import { generateAutomationWorkflow } from "@/lib/ai/flows/generate-automation-workflow";
+import { generateAutomationWorkflow } from "@/server/ai/flows/generate-automation-workflow";
 import { generatePersonaAvatar } from "@/server/ai/flows/generate-persona-avatar";
 import { generateVoiceOver } from "@/server/ai/flows/generate-voice-over";
 import { createVoiceClone } from "@/server/ai/flows/create-voice-clone";
-import { generateVideoFromUrl } from "@/lib/ai/flows/generate-video-from-url";
-import { generateStockMedia } from "@/lib/ai/flows/generate-stock-media";
-import { findViralClips } from "@/lib/ai/flows/find-viral-clips";
+import { generateStockMedia } from "@/server/ai/flows/generate-stock-media";
+import { findViralClips } from "@/server/ai/flows/find-viral-clips";
 import { generatePipelineScript, generatePipelineVoiceOver, generatePipelineVideo } from "@/server/ai/flows/video-pipeline";
-import { generateTimedTranscript } from "@/server/ai/flows/generate-timed-transcript"; // Handles transcription
-import { summarizeVideoContent } from "@/server/ai/flows/summarize-video-content"; // Corrected path
+import { generateTimedTranscript } from "@/server/ai/flows/generate-timed-transcript";
+import { summarizeVideoContent } from "@/server/ai/flows/summarize-video-content";
 import { removeImageBackground } from "@/server/ai/flows/remove-image-background";
-import { creativeAssistantChat } from "@/lib/ai/flows/creative-assistant-chat";
+import { creativeAssistantChat } from "@/server/ai/flows/creative-assistant-chat";
 import { supportChat } from "@/server/ai/flows/support-chat";
 import { repurposeContent } from "@/server/ai/flows/repurpose-content";
-import { analyzeThumbnails } from "@/lib/ai/flows/analyze-thumbnails";
+import { analyzeThumbnails } from "@/server/ai/flows/analyze-thumbnails";
 import { researchVideoTopic } from "@/server/ai/flows/research-video-topic";
+
 import { z } from "zod";
 import type { CreativeAssistantChatRequest, Message } from "@/lib/types";
 import { revalidatePath } from "next/cache";
@@ -39,9 +39,9 @@ export type { Message };
 
 const scriptSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters long." }),
-  videoType: z.string().min(1, { message: "Please select a video type."}),
-  tone: z.string().min(1, { message: "Please select a tone."}),
-  duration: z.string().min(1, { message: "Please specify a duration."}),
+  videoType: z.string().min(1, { message: "Please select a video type." }),
+  tone: z.string().min(1, { message: "Please select a tone." }),
+  duration: z.string().min(1, { message: "Please specify a duration." }),
 });
 
 export async function generateScriptAction(prevState: any, formData: FormData) {
@@ -79,76 +79,76 @@ export async function generateScriptAction(prevState: any, formData: FormData) {
 
 
 const videoSchema = z.object({
-    image: z.any().refine((file) => file?.size > 0, 'Image is required.'),
-    musicPrompt: z.string().min(3, 'Music prompt is required.'),
-    videoDescription: z.string().min(10, 'Video description is required.'),
+  image: z.any().refine((file) => file?.size > 0, 'Image is required.'),
+  musicPrompt: z.string().min(3, 'Music prompt is required.'),
+  videoDescription: z.string().min(10, 'Video description is required.'),
 });
 
 export async function generateVideoAction(prevState: any, formData: FormData) {
-    const validatedFields = videoSchema.safeParse({
-        image: formData.get('image'),
-        musicPrompt: formData.get('musicPrompt'),
-        videoDescription: formData.get('videoDescription'),
+  const validatedFields = videoSchema.safeParse({
+    image: formData.get('image'),
+    musicPrompt: formData.get('musicPrompt'),
+    videoDescription: formData.get('videoDescription'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      message: 'Validation failed',
+      errors: validatedFields.error.flatten().fieldErrors,
+    };
+  }
+
+  const { image, musicPrompt, videoDescription } = validatedFields.data;
+
+  try {
+    const buffer = Buffer.from(await image.arrayBuffer());
+    const photoUrl = `data:${image.type};base64,${buffer.toString("base64")}`;
+
+    const result = await generateVideoFromImage({
+      photoUrl,
+      musicPrompt,
+      videoDescription,
     });
-    
-    if (!validatedFields.success) {
-        return {
-            message: 'Validation failed',
-            errors: validatedFields.error.flatten().fieldErrors,
-        };
-    }
 
-    const { image, musicPrompt, videoDescription } = validatedFields.data;
-
-    try {
-        const buffer = Buffer.from(await image.arrayBuffer());
-        const photoUrl = `data:${image.type};base64,${buffer.toString("base64")}`;
-
-        const result = await generateVideoFromImage({
-            photoUrl,
-            musicPrompt,
-            videoDescription,
-        });
-        
-        return { message: "success", video: result.videoUrl, audio: result.audioUrl, errors: {} };
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { message: `An error occurred while generating the video: ${errorMessage}`, video: null, audio: null, errors: {} };
-    }
+    return { message: "success", video: result.videoUrl, audio: result.audioUrl, errors: {} };
+  } catch (error) {
+    console.error(error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { message: `An error occurred while generating the video: ${errorMessage}`, video: null, audio: null, errors: {} };
+  }
 }
 
 
 const automationWorkflowSchema = z.object({
-    prompt: z.string().min(10, { message: "Workflow description must be at least 10 characters long." }),
-    platform: z.enum(['n8n', 'Make.com']),
+  prompt: z.string().min(10, { message: "Workflow description must be at least 10 characters long." }),
+  platform: z.enum(['n8n', 'Make.com']),
 });
 
 export async function generateAutomationWorkflowAction(prevState: any, formData: FormData) {
-    const validatedFields = automationWorkflowSchema.safeParse({
-        prompt: formData.get('prompt'),
-        platform: formData.get('platform'),
-    });
+  const validatedFields = automationWorkflowSchema.safeParse({
+    prompt: formData.get('prompt'),
+    platform: formData.get('platform'),
+  });
 
-    if (!validatedFields.success) {
-        const state = {
-            message: 'Validation failed',
-            errors: validatedFields.error.flatten().fieldErrors,
-            workflow: null,
-        };
-        return state as typeof state & { errors: { prompt?: string[]; platform?: string[] } };
-    }
+  if (!validatedFields.success) {
+    const state = {
+      message: 'Validation failed',
+      errors: validatedFields.error.flatten().fieldErrors,
+      workflow: null,
+    };
+    return state as typeof state & { errors: { prompt?: string[]; platform?: string[] } };
+  }
 
-    try {
-        const result = await generateAutomationWorkflow(validatedFields.data);
-        const state = { message: "success", workflow: result.workflow, errors: {} };
-        return state as typeof state & { errors: { prompt?: string[]; platform?: string[] } };
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        const state = { message: `An error occurred while generating the workflow: ${errorMessage}`, workflow: null, errors: {} };
-        return state as typeof state & { errors: { prompt?: string[]; platform?: string[] } };
-    }
+  try {
+    const result = await generateAutomationWorkflow(validatedFields.data);
+    const state = { message: "success", workflow: result.workflow, errors: {} };
+    return state as typeof state & { errors: { prompt?: string[]; platform?: string[] } };
+  } catch (error) {
+    console.error(error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    const state = { message: `An error occurred while generating the workflow: ${errorMessage}`, workflow: null, errors: {} };
+    return state as typeof state & { errors: { prompt?: string[]; platform?: string[] } };
+  }
 }
 
 // const personaAvatarSchema = z.object({
@@ -207,7 +207,7 @@ export async function generateVoiceOverAction(prevState: any, formData: FormData
       audio: null,
     };
   }
-  
+
   let speakers: { speakerId: string; voice: string }[] = [];
 
   if (isMultiSpeaker) {
@@ -462,36 +462,36 @@ export async function generateVoiceOverAction(prevState: any, formData: FormData
 
 
 const generateTimedTranscriptSchema = z.object({
-    video: z.any().refine((file) => file?.size > 0, 'A video file is required.'),
+  video: z.any().refine((file) => file?.size > 0, 'A video file is required.'),
 });
 
 export async function generateTimedTranscriptAction(prevState: any, formData: FormData) {
-    const validatedFields = generateTimedTranscriptSchema.safeParse({
-        video: formData.get('video'),
-    });
+  const validatedFields = generateTimedTranscriptSchema.safeParse({
+    video: formData.get('video'),
+  });
 
-    if (!validatedFields.success) {
-        return {
-            message: 'Validation failed',
-            errors: validatedFields.error.flatten().fieldErrors,
-            transcript: null,
-        };
-    }
+  if (!validatedFields.success) {
+    return {
+      message: 'Validation failed',
+      errors: validatedFields.error.flatten().fieldErrors,
+      transcript: null,
+    };
+  }
 
-    const { video } = validatedFields.data;
+  const { video } = validatedFields.data;
 
-    try {
-        const buffer = Buffer.from(await video.arrayBuffer());
-        const videoUrl = `data:${video.type};base64,${buffer.toString("base64")}`;
+  try {
+    const buffer = Buffer.from(await video.arrayBuffer());
+    const videoUrl = `data:${video.type};base64,${buffer.toString("base64")}`;
 
-        const result = await generateTimedTranscript({ videoUrl }); // Pass the actual video URL
-        
-        return { message: "success", transcript: result.transcript, errors: {} }; // Output is an array of TimedWord objects
-    } catch (error) {
-        console.error("Timed Transcript Action Error:", error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during transcription.";
-        return { message: errorMessage, transcript: null, errors: {} };
-    }
+    const result = await generateTimedTranscript({ videoUrl }); // Pass the actual video URL
+
+    return { message: "success", transcript: result.transcript, errors: {} }; // Output is an array of TimedWord objects
+  } catch (error) {
+    console.error("Timed Transcript Action Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during transcription.";
+    return { message: errorMessage, transcript: null, errors: {} };
+  }
 }
 
 
@@ -519,7 +519,7 @@ export async function generateTimedTranscriptAction(prevState: any, formData: Fo
 //         const imageDataUri = `data:${image.type};base64,${buffer.toString("base64")}`;
 
 //         const result = await removeImageBackground({ imageDataUri });
-        
+
 //         return { message: "success", image: result.imageDataUri, errors: {} };
 //     } catch (error) {
 //         console.error("Remove Background Action Error:", error);
@@ -541,7 +541,7 @@ export async function generateTimedTranscriptAction(prevState: any, formData: Fo
 //             console.error("Failed to parse chat history:", e);
 //         }
 //     }
-    
+
 //     try {
 //         const stream = await creativeAssistantChat({ history, message });
 //         return { message: "", stream, errors: {} };
@@ -553,62 +553,62 @@ export async function generateTimedTranscriptAction(prevState: any, formData: Fo
 // }
 
 export async function supportChatAction(prevState: any, formData: FormData) {
-    const message = formData.get('message') as string;
-    const historyData = formData.get('history') as string | null;
+  const message = formData.get('message') as string;
+  const historyData = formData.get('history') as string | null;
 
-    let history: Message[] = [];
-    if (historyData) {
-        try {
-            history = JSON.parse(historyData);
-        } catch (e) {
-            console.error("Failed to parse chat history:", e);
-        }
-    }
-    
+  let history: Message[] = [];
+  if (historyData) {
     try {
-        // Transform history to match the flow's expected contract
-        const transformedHistory = history.map(msg => ({
-            content: msg.content,
-            role: (msg.role === 'model' ? 'assistant' : msg.role) as 'user' | 'assistant', // Map 'model' to 'assistant' and assert type
-        }));
-        const stream = await supportChat({ history: transformedHistory, message });
-        // In a real app, you would also save this interaction to a support ticket database here.
-        return { message: "", stream, errors: {} };
-    } catch (error) {
-        console.error("Support Chat Action Error:", error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during chat processing.";
-        return { message: errorMessage, stream: null, errors: {} };
+      history = JSON.parse(historyData);
+    } catch (e) {
+      console.error("Failed to parse chat history:", e);
     }
+  }
+
+  try {
+    // Transform history to match the flow's expected contract
+    const transformedHistory = history.map(msg => ({
+      content: msg.content,
+      role: (msg.role === 'model' ? 'assistant' : msg.role) as 'user' | 'assistant', // Map 'model' to 'assistant' and assert type
+    }));
+    const stream = await supportChat({ history: transformedHistory, message });
+    // In a real app, you would also save this interaction to a support ticket database here.
+    return { message: "", stream, errors: {} };
+  } catch (error) {
+    console.error("Support Chat Action Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during chat processing.";
+    return { message: errorMessage, stream: null, errors: {} };
+  }
 }
 
 
 const summarizeContentSchema = z.object({
   videoUrl: z.string().optional(),
-  transcript: z.string().min(1, { message: "Transcript cannot be empty."}),
+  transcript: z.string().min(1, { message: "Transcript cannot be empty." }),
 });
 
 export async function summarizeVideoContentAction(prevState: any, formData: FormData) {
-    const validatedFields = summarizeContentSchema.safeParse({
-        videoUrl: formData.get('videoUrl'),
-        transcript: formData.get('transcript'),
-    });
+  const validatedFields = summarizeContentSchema.safeParse({
+    videoUrl: formData.get('videoUrl'),
+    transcript: formData.get('transcript'),
+  });
 
-    if (!validatedFields.success) {
-        return {
-            message: 'Validation failed',
-            errors: validatedFields.error.flatten().fieldErrors,
-            summary: null,
-        };
-    }
+  if (!validatedFields.success) {
+    return {
+      message: 'Validation failed',
+      errors: validatedFields.error.flatten().fieldErrors,
+      summary: null,
+    };
+  }
 
-    try {
-        const result = await summarizeVideoContent(validatedFields.data);
-        return { message: "success", summary: result.summary, errors: {} };
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { message: `An error occurred while generating the summary: ${errorMessage}`, summary: null, errors: {} };
-    }
+  try {
+    const result = await summarizeVideoContent(validatedFields.data);
+    return { message: "success", summary: result.summary, errors: {} };
+  } catch (error) {
+    console.error(error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { message: `An error occurred while generating the summary: ${errorMessage}`, summary: null, errors: {} };
+  }
 }
 
 // const repurposeContentSchema = z.object({
@@ -652,7 +652,7 @@ export async function summarizeVideoContentAction(prevState: any, formData: Form
 //         videoTitle: formData.get('videoTitle'),
 //         targetAudience: formData.get('targetAudience'),
 //     });
-    
+
 //     if (!validatedFields.success) {
 //         return {
 //             message: 'Validation failed',
@@ -678,7 +678,7 @@ export async function summarizeVideoContentAction(prevState: any, formData: Form
 //             videoTitle,
 //             targetAudience,
 //         });
-        
+
 //         return { message: "success", analysis: result, errors: {} };
 //     } catch (error) {
 //         console.error(error);
@@ -753,7 +753,7 @@ export async function createProjectAction(prevState: any, formData: FormData) {
       errors: validatedFields.error.flatten().fieldErrors,
     };
   }
-  
+
   // This is where you would interact with your database.
   // For now, it will be handled by client-side state.
   revalidatePath('/dashboard/projects');
