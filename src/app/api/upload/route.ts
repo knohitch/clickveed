@@ -1,5 +1,3 @@
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
@@ -16,7 +14,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const formData = await request.formData();
+    // Wrap formData parsing in try-catch to handle malformed requests
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (formDataError) {
+      console.error('Failed to parse FormData:', formDataError);
+      return NextResponse.json(
+        { error: 'Invalid request format. Expected multipart/form-data.' },
+        { status: 400 }
+      );
+    }
+
     const file = formData.get('file') as File;
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -36,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Sanitize filename
     const sanitizedFilename = sanitizeFilename(file.name);
-    
+
     const dataUri = `data:${file.type};base64,${Buffer.from(bytes).toString('base64')}`;
     const { publicUrl } = await uploadToWasabi(dataUri, 'videos');
 

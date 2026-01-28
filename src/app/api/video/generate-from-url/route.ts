@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 
 // Rate limiting: 5 requests per minute for video generation
 const rateLimiter = createRateLimit({
   windowMs: 60 * 1000,
   maxRequests: 5,
   message: 'Too many video generation requests. Please try again in a minute.'
+});
+
+const ScriptOutputSchema = z.object({
+  script: z.string().describe('The generated video script')
 });
 
 export async function POST(request: Request) {
@@ -45,7 +50,7 @@ export async function POST(request: Request) {
       }
 
       const html = await urlResponse.text();
-      
+
       const textContent = html
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -54,8 +59,6 @@ export async function POST(request: Request) {
       if (!textContent.trim()) {
         return NextResponse.json({ error: 'No extractable content found at URL' }, { status: 400 });
       }
-
-      const { ai } = await import('../../../../ai/genkit');
 
       const prompt = `Generate a compelling video script (under 300 words) for content about:
       
@@ -70,12 +73,10 @@ export async function POST(request: Request) {
       
       Make it engaging and suitable for video format.`;
 
-      const scriptResponse = await ai.generate({
-        prompt,
-        output: { schema: z.object({ script: z.string() }) }
-      });
+      // Use generateStructuredOutput which properly handles model selection
+      const result = await generateStructuredOutput(prompt, ScriptOutputSchema);
 
-      const script = scriptResponse.output?.script;
+      const script = result.output?.script;
 
       if (!script) {
         return NextResponse.json({ error: 'Failed to generate script' }, { status: 500 });
@@ -84,7 +85,9 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         script,
-        wordCount: script.split(/\s+/).length
+        wordCount: script.split(/\s+/).length,
+        provider: result.provider,
+        model: result.model
       });
 
     } catch (error) {

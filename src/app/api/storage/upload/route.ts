@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToStorage } from '@/server/actions/storage-actions';
 import { auth } from '@/auth';
-import { 
-  createUnauthorizedError, 
-  createValidationError, 
+import {
+  createUnauthorizedError,
+  createValidationError,
   createInternalError,
-  createSuccessResponse 
+  createSuccessResponse
 } from '@/lib/error-response';
 
 export async function POST(request: NextRequest) {
@@ -16,7 +16,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(createUnauthorizedError(), { status: 401 });
     }
 
-    const formData = await request.formData();
+    // Wrap formData parsing in try-catch to handle malformed requests
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (formDataError) {
+      console.error('Failed to parse FormData:', formDataError);
+      return NextResponse.json(
+        createValidationError('Invalid request format. Expected multipart/form-data.'),
+        { status: 400 }
+      );
+    }
+
     const file = formData.get('file') as File;
 
     // Fix Bug #9: Add input validation

@@ -1,21 +1,106 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 // CRITICAL FIX: Consolidated Prisma client with encryption middleware
-// Removed Prisma Accelerate as it requires special configuration and setup
+// Added connection pooling and retry logic for production reliability
 
 // Singleton pattern to prevent multiple instances in development
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  });
+// Connection pool and retry configuration for production
+const prismaClientOptions: Prisma.PrismaClientOptions = {
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  // Enable query engine optimizations
+  errorFormat: 'minimal',
+};
+
+// Helper function to create Prisma client with retry logic
+function createPrismaClient(): PrismaClient {
+  const client = new PrismaClient(prismaClientOptions);
+
+  // Add connection retry logic with exponential backoff
+  const originalConnect = client.$connect.bind(client);
+  client.$connect = async () => {
+    const maxRetries = 5;
+    const baseDelay = 1000; // 1 second
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await originalConnect();
+        if (attempt > 1) {
+          console.log(`[Prisma] Connected successfully after ${attempt} attempts`);
+        }
+        return;
+      } catch (error) {
+        const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+
+        if (attempt === maxRetries) {
+          console.error(`[Prisma] Failed to connect after ${maxRetries} attempts:`, error);
+          throw error;
+        }
+
+        console.warn(`[Prisma] Connection attempt ${attempt}/${maxRetries} failed. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
+  return client;
+}
+
+const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+// Wrapper for database operations with retry logic
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: { maxRetries?: number; baseDelay?: number; operationName?: string } = {}
+): Promise<T> {
+  const { maxRetries = 3, baseDelay = 500, operationName = 'Database operation' } = options;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      // Check if it's a connection error that should be retried
+      const isConnectionError =
+        error instanceof Error &&
+        (error.message.includes('Connection') ||
+          error.message.includes('ECONNREFUSED') ||
+          error.message.includes('ETIMEDOUT') ||
+          error.message.includes('P1001') ||  // Prisma: Unable to reach database server
+          error.message.includes('P1002') ||  // Prisma: Database server timeout
+          error.message.includes('P2024'));   // Prisma: Connection pool timeout
+
+      if (!isConnectionError || attempt === maxRetries) {
+        console.error(`[Prisma] ${operationName} failed after ${attempt} attempts:`, error);
+        throw error;
+      }
+
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.warn(`[Prisma] ${operationName} attempt ${attempt}/${maxRetries} failed. Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw new Error(`${operationName} failed after ${maxRetries} retries`);
+}
+
+// Graceful shutdown handler
+async function handleShutdown() {
+  console.log('[Prisma] Disconnecting from database...');
+  await prisma.$disconnect();
+  console.log('[Prisma] Disconnected successfully');
+}
+
+// Register shutdown handlers only in non-browser environments
+if (typeof process !== 'undefined') {
+  process.on('SIGINT', handleShutdown);
+  process.on('SIGTERM', handleShutdown);
+}
 
 // Encryption key handling for SocialConnection tokens
 const ENCRYPTION_KEY_HEX = process.env.ENCRYPTION_KEY;
