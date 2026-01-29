@@ -13,23 +13,25 @@ import { z } from 'zod';
 // ============================================================================
 
 export const AnalyzeThumbnailsInputSchema = z.object({
-    thumbnailUrls: z.array(z.string().url()).describe('An array of public thumbnail URLs'),
-    videoTopic: z.string().optional().describe('Optional topic for better analysis'),
+    thumbnailA: z.any().describe('Thumbnail A file'),
+    thumbnailB: z.any().describe('Thumbnail B file'),
+    videoTitle: z.string().min(5).describe('The title of the video'),
+    targetAudience: z.string().min(10).describe('Description of the target audience'),
 });
 export type AnalyzeThumbnailsInput = z.infer<typeof AnalyzeThumbnailsInputSchema>;
 
 export const ThumbnailAnalysisSchema = z.object({
-    rank: z.number().int().min(1).describe('Ranking (1 = best)'),
-    url: z.string().url(),
-    score: z.number().int().min(0).max(100),
-    strengths: z.array(z.string()),
-    weaknesses: z.array(z.string()),
-    suggestions: z.array(z.string()),
+    summary: z.string().describe('A brief summary of the thumbnail analysis'),
+    score: z.number().int().min(0).max(100).describe('Engagement score from 0-100'),
+    pros: z.array(z.string()).describe('List of strengths'),
+    cons: z.array(z.string()).describe('List of weaknesses'),
 });
 
 export const AnalyzeThumbnailsOutputSchema = z.object({
-    rankings: z.array(ThumbnailAnalysisSchema),
-    overallRecommendation: z.string(),
+    analysisA: ThumbnailAnalysisSchema.describe('Analysis for Thumbnail A'),
+    analysisB: ThumbnailAnalysisSchema.describe('Analysis for Thumbnail B'),
+    recommendation: z.enum(['A', 'B']).describe('Which thumbnail is recommended'),
+    reasoning: z.string().describe('Explanation for the recommendation'),
 });
 export type AnalyzeThumbnailsOutput = z.infer<typeof AnalyzeThumbnailsOutputSchema>;
 

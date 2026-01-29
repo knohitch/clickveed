@@ -1,12 +1,10 @@
 'use server';
 /**
- * @fileOverview An AI agent that analyzes and ranks thumbnail images for videos.
+ * @fileOverview An AI agent that analyzes and compares two thumbnail images for videos.
  */
 
-import { z } from 'zod';
 import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 import {
-  AnalyzeThumbnailsInputSchema,
   AnalyzeThumbnailsOutputSchema,
   type AnalyzeThumbnailsInput,
   type AnalyzeThumbnailsOutput,
@@ -18,43 +16,43 @@ export type { AnalyzeThumbnailsInput, AnalyzeThumbnailsOutput } from './types';
 export async function analyzeThumbnails(
   input: AnalyzeThumbnailsInput
 ): Promise<AnalyzeThumbnailsOutput> {
-  console.log('[analyzeThumbnails] Starting thumbnail analysis...');
+  console.log('[analyzeThumbnails] Starting thumbnail comparison analysis...');
 
-  const prompt = `You are an expert YouTube thumbnail analyst. Analyze and rank the following thumbnails based on their potential to drive clicks and engagement.
+  const prompt = `You are an expert YouTube thumbnail analyst. Compare the following two thumbnails (A and B) and determine which one would drive more clicks and engagement.
 
-${input.videoTopic ? `Video Topic: ${input.videoTopic}` : ''}
-
-Thumbnails to analyze:
-${input.thumbnailUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}
+Video Title: ${input.videoTitle}
+Target Audience: ${input.targetAudience}
 
 For each thumbnail, provide:
-1. A ranking (1 = best)
-2. A score from 0-100
-3. Strengths (what works well)
-4. Weaknesses (what could be improved)
-5. Suggestions for improvement
+1. A brief summary of the thumbnail's effectiveness
+2. An engagement score from 0-100
+3. A list of pros (what works well)
+4. A list of cons (what could be improved)
 
-Also provide an overall recommendation.
+Then provide your recommendation (either "A" or "B") with reasoning.
 
 Respond with a JSON object like:
 {
-  "rankings": [
-    {
-      "rank": 1,
-      "url": "...",
-      "score": 85,
-      "strengths": ["Good contrast", "Clear text"],
-      "weaknesses": ["Could use more emotion"],
-      "suggestions": ["Add a human face"]
-    }
-  ],
-  "overallRecommendation": "..."
+  "analysisA": {
+    "summary": "Brief summary of thumbnail A...",
+    "score": 75,
+    "pros": ["Good contrast", "Clear text"],
+    "cons": ["Could use more emotion"]
+  },
+  "analysisB": {
+    "summary": "Brief summary of thumbnail B...",
+    "score": 82,
+    "pros": ["Eye-catching colors", "Human face visible"],
+    "cons": ["Text is small"]
+  },
+  "recommendation": "B",
+  "reasoning": "Thumbnail B is more likely to generate clicks because..."
 }`;
 
   const result = await generateStructuredOutput(prompt, AnalyzeThumbnailsOutputSchema);
   console.log('[analyzeThumbnails] Using provider:', result.provider, 'model:', result.model);
 
-  if (!result.output?.rankings) {
+  if (!result.output?.analysisA || !result.output?.analysisB) {
     throw new Error("The AI failed to analyze the thumbnails.");
   }
 
