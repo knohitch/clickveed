@@ -66,7 +66,7 @@ export async function generateAutomationWorkflowAction(prevState: any, formData:
     try {
         // Check feature access for AI agents
         await verifyFeatureAccess('ai-agents');
-        
+
         // Consume AI credits
         const creditResult = await consumeAICredits(2); // AI agents cost 2 credits
         if (!creditResult.success) {
@@ -164,10 +164,15 @@ export async function creativeAssistantChatAction(prevState: any, formData: Form
         return { message: 'Message is required', stream: null, errors: { message: ['Message is required'] } };
     }
 
-    let history: Message[] = [];
+    let history: { role: 'user' | 'assistant'; content: string }[] = [];
     try {
         if (historyJson) {
-            history = JSON.parse(historyJson);
+            const parsed: Message[] = JSON.parse(historyJson);
+            // Map 'model' role to 'assistant' for compatibility
+            history = parsed.map(msg => ({
+                role: msg.role === 'model' ? 'assistant' : msg.role,
+                content: msg.content
+            }));
         }
     } catch (e) {
         console.error("Failed to parse history", e);
@@ -245,7 +250,7 @@ export async function generateVideoAction(prevState: any, formData: FormData) {
     try {
         // Check feature access for image-to-video
         await verifyFeatureAccess('image-to-video');
-        
+
         // Consume AI credits (image-to-video costs 3 credits)
         const creditResult = await consumeAICredits(3);
         if (!creditResult.success) {
@@ -513,8 +518,8 @@ export async function analyzeThumbnailsAction(prevState: any, formData: FormData
         const uriB = await fileToDataUri(fileB);
 
         const result = await analyzeThumbnails({
-            thumbnailA_DataUri: uriA,
-            thumbnailB_DataUri: uriB,
+            thumbnailA: uriA,
+            thumbnailB: uriB,
             videoTitle,
             targetAudience
         });
