@@ -48,7 +48,8 @@ RUN npx prisma generate
 
 # Build the application with increased memory limit
 # Increased from 6GB to 12GB to prevent TypeScript compiler from running out of memory
-ENV NODE_OPTIONS="--max-old-space-size=12288"
+# Increased further to 16GB to handle TypeScript type checking in production
+ENV NODE_OPTIONS="--max-old-space-size=16384"
 RUN npm run build
 
 # BUILD ASSERTION: Verify public directory exists after build
