@@ -5,12 +5,16 @@ import prisma from '@lib/prisma';
 
 /**
  * Bug #12 FIX: Edge Runtime bcryptjs issue
- * 
+ *
  * This server action handles credential verification in Node.js runtime
  * (not Edge Runtime), which is required for bcryptjs to work properly.
- * 
+ *
  * It's called by the credentials provider in src/auth.ts which runs in Edge Runtime.
  */
+
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from bcryptjs not supported in Edge Runtime
+export const runtime = 'nodejs';
 
 // Fix Bug #12: Edge Runtime bcryptjs compatibility issue
 export interface VerifyCredentialsResult {

@@ -6,6 +6,10 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { randomUUID } from 'crypto';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from crypto not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 interface WasabiCredentials {
     endpoint: string;
     region: string;

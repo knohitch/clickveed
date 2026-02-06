@@ -1,5 +1,9 @@
 import { createHash } from 'crypto';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from crypto not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 export enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',

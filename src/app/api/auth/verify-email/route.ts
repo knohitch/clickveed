@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
 import { createHash } from 'crypto';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from crypto not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 // Get base URL for redirects - ALWAYS use production URL, never request.url
 function getProductionBaseUrl(request: Request): string {
   // Priority: AUTH_URL > NEXT_PUBLIC_SITE_URL > NEXTAUTH_URL

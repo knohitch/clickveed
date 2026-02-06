@@ -1,6 +1,10 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from crypto and process APIs not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 // CRITICAL FIX: Consolidated Prisma client with encryption middleware
 // Added connection pooling, retry logic, and heartbeat for production reliability
 

@@ -11,6 +11,10 @@ import { sendEmail } from '@/server/services/email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { getBaseUrl } from '@/lib/utils';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from bcryptjs and crypto not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 // Simple in-memory rate limiter for login attempts
 const loginAttemptsStore = new Map<string, { count: number; resetTime: number }>();
 

@@ -2,6 +2,10 @@ import { compare } from 'bcryptjs';
 import { findUserForAuth } from '@/lib/db-utils';
 import prisma from './prisma'; // Import Prisma client directly
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from bcryptjs not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 export async function authorizeCredentials(
   credentials: { email?: string; password?: string } | undefined
 ) {

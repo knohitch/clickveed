@@ -3,6 +3,10 @@ import prisma from '@/server/prisma';
 import { hash } from 'bcryptjs';
 import { createRateLimit } from '@/lib/rate-limit';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from bcryptjs not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 // Rate limiter: 5 signup attempts per hour per IP
 const signupRateLimit = createRateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour

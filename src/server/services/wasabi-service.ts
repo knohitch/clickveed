@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview Enhanced Wasabi S3 storage service with robust error handling
- * 
+ *
  * FIXES IMPLEMENTED:
  * 1. Added retry logic with exponential backoff for transient failures
  * 2. Added file size validation (max 500MB)
@@ -16,6 +16,10 @@
 import { S3Client, PutObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { randomUUID } from 'crypto';
+
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from crypto not supported in Edge Runtime
+export const runtime = 'nodejs';
 
 interface WasabiCredentials {
     endpoint: string;

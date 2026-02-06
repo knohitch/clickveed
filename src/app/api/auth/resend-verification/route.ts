@@ -6,6 +6,10 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { getBaseUrl } from '@/lib/utils';
 import { createRateLimit } from '@/lib/rate-limit';
 
+// CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
+// This fixes build errors from crypto not supported in Edge Runtime
+export const runtime = 'nodejs';
+
 // Rate limiter: 3 resend attempts per hour per IP
 const resendRateLimit = createRateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
