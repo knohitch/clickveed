@@ -1,0 +1,83 @@
+# 🚀 SSH COMMANDS - READY TO COPY & EXECUTE
+# Repository: https://github.com/knohitch/clickveed.git
+# Status: PUSHED TO GITHUB - READY FOR INITIALIZATION
+
+# ============================================================================
+# COOLYIFY SSH COMMANDS (4 Lines to Copy & Paste)
+# ============================================================================
+
+echo "=== FOR COOLIFY USERS ==="
+ssh your-user@your-server.com
+cd /path/to/your/clickveed
+
+# Find your container
+CONTAINER=$(docker ps | grep coolify | grep clickvidev | awk '{print $NF}')
+
+echo "Container found: $CONTAINER"
+
+# Copy initialization script
+docker cp initialize-system.js $CONTAINER:/app/
+echo "✅ Copied initialization script"
+
+# Run initialization (creates all database records)
+docker exec -it $CONTAINER node /app/initialize-system.js
+echo "✅ Initialization complete"
+
+# Restart application
+docker restart $CONTAINER
+echo "✅ Application restarted"
+
+echo ""
+echo "⏰ Wait 30 seconds before testing..."
+sleep 30
+
+# Verification commands (run these to check):
+echo ""
+echo "🔍 VERIFICATION:"
+docker exec -it $CONTAINER sh -c "npx prisma@latest setting count"
+docker exec -it $CONTAINER sh -c "npx prisma@latest apikey count"
+docker exec -it $CONTAINER sh -c "npx prisma@latest plan count"
+docker exec -it $CONTAINER sh -c "npx prisma@latest emailSettings count"
+
+# Expected: All counts > 0 = ✅ SUCCESS!
+
+# ============================================================================
+# CAPROVER SSH COMMANDS (1 Command to Run)
+# ============================================================================
+
+echo ""
+echo "=== FOR CAPROVER USERS ==="
+ssh your-user@your-server.com
+cd /path/to/your/clickveed
+
+# One command does everything:
+./FIX_COMMANDS.sh
+
+# Alternative: Manual commands (4 lines):
+# docker cp initialize-system.js CONTAINER:/app/
+# docker exec -it CONTAINER node /app/initialize-system.js
+# docker restart CONTAINER
+
+# Verification (run these to check):
+echo ""
+echo "🔍 VERIFICATION:"
+CONTAINER=$(docker ps | grep "srv-captain--" | grep clickvidev | awk '{print $NF}')
+docker exec -it $CONTAINER sh -c "npx prisma@latest setting count"
+docker exec -it $CONTAINER sh -c "npx prisma@latest apikey count"
+docker exec -it $CONTAINER sh -c "npx prisma@latest plan count"
+docker exec -it $CONTAINER sh -c "npx prisma@latest emailSettings count"
+
+# Expected: All counts > 0 = ✅ SUCCESS!
+
+# ============================================================================
+# TEST THESE 5 THINGS (After 30 seconds):
+# ============================================================================
+
+# 1. Email: Settings → Email → Send test → Check inbox
+# 2. Stripe: Plans → Upgrade → Should see Stripe checkout  
+# 3. Features: Create video (Free: 3 videos/month)
+# 4. Verification: Sign up new account → Check email → Verify link
+# 5. Admin: Super Admin → Users → Can approve/delete
+
+echo ""
+echo "✅ All 9 issues will be resolved after successful initialization!"
