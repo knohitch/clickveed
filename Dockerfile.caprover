@@ -35,7 +35,8 @@ RUN apt-get update && apt-get install -y \
 RUN npx prisma generate
 
 # Build the application with increased memory limit
-ENV NODE_OPTIONS="--max-old-space-size=6144"
+# Increased from 6GB to 12GB to prevent TypeScript compiler from running out of memory
+ENV NODE_OPTIONS="--max-old-space-size=12288"
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -57,7 +58,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy public directory from builder stage
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public/ 2>/dev/null || mkdir -p ./public
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
