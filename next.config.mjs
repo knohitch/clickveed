@@ -1,19 +1,26 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // This is the crucial change to prevent bcryptjs, a server-side only package,
-    // from being bundled into Edge-runtime middleware and client-side code.
+    // Properly configure webpack for Node.js-only modules
     webpack: (config, { isServer }) => {
         if (!isServer) {
             // Exclude bcrypt and crypto from client-side bundle
-            config.externals.push('bcryptjs', 'crypto');
+            // These are Node.js-only modules
+            config.externals.push({
+                'bcryptjs': 'bcryptjs',
+                'crypto': 'crypto'
+            });
         }
-        // Exclude auth-credentials from analysis
-        config.externals.push('@/lib/auth-credentials');
+        // Remove incorrect externals for import paths - they should be package names
+        // The runtime = 'nodejs' in auth files handles this correctly
+        
         // Suppress critical dependency warnings for @opentelemetry instrumentation
         config.ignoreWarnings = [
             { module: /@opentelemetry\/instrumentation/ },
             { module: /require-in-the-middle/ },
             { module: /handlebars/ },
+            // Suppress Edge Runtime warnings for modules we explicitly use with runtime = 'nodejs'
+            { module: /bcryptjs/ },
+            { module: /prisma/ },
         ];
         return config;
     },
