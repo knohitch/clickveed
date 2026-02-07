@@ -46,10 +46,9 @@ ENV LD_LIBRARY_PATH=/usr/lib:/lib
 # Generate Prisma client with Alpine-specific binary target
 RUN npx prisma generate
 
-# Build the application with increased memory limit
-# Increased from 6GB to 12GB to prevent TypeScript compiler from running out of memory
-# Increased further to 16GB to handle TypeScript type checking in production
-ENV NODE_OPTIONS="--max-old-space-size=16384"
+# Build the application with memory limit suitable for VPS (4GB)
+# Reduced from 16GB to 4GB to avoid OOM on low-memory VPS
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # BUILD ASSERTION: Verify public directory exists after build
