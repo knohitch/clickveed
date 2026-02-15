@@ -1,0 +1,258 @@
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  name                     String?
+  email                    String?   @unique
+  emailVerified            DateTime?
+  image                    String?
+  passwordHash             String?
+  passwordResetToken       String?   @unique
+  passwordResetExpires     DateTime?
+  role                     String    @default("USER")
+  status                   String    @default("Active")
+  accounts                 Account[]
+  sessions                 Session[]
+  onboardingComplete       Boolean   @default(false)
+  onboardingData           Json?
+  stripeCustomerId         String?   @unique
+  stripeSubscriptionId     String?   @unique
+  stripeSubscriptionStatus String?
+  stripePriceId            String?
+  stripeCurrentPeriodEnd   DateTime?
+  planId                   String?
+  plan                     Plan?     @relation(fields: [planId], references: [id])
+  usage                    Usage?
+  projects                 Project[]
+  mediaAssets              MediaAsset[]
+  brandKit                 BrandKit?
+  socialConnections        SocialConnection[]
+  agents                   Agent[]
+  videos                   Video[]
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+}
+
+model Plan {
+  id                   String              @id @default(cuid())
+  name                 String              @unique
+  description          String
+  priceMonthly         Float
+  priceQuarterly       Float
+  priceYearly          Float
+  aiCredits            Int?
+  videoExports         Int?
+  storageGB            Int?
+  featureTier          String              @default("free")
+  stripePriceIdMonthly   String?
+  stripePriceIdQuarterly String?
+  stripePriceIdYearly    String?
+  features             PlanFeature[]
+  users                User[]
+  promotions           PromotionOnPlan[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model PlanFeature {
+  id     String @id @default(cuid())
+  text   String
+  plan   Plan   @relation(fields: [planId], references: [id])
+  planId String
+}
+
+model Promotion {
+  id                 String            @id @default(cuid())
+  name               String            @unique
+  discountPercentage Int
+  isActive           Boolean           @default(true)
+  applicablePlans    PromotionOnPlan[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model PromotionOnPlan {
+  plan        Plan      @relation(fields: [planId], references: [id])
+  planId      String
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  promotionId String
+
+  @@id([planId, promotionId])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model ApiKey {
+  name  String @id
+  value String
+}
+
+model EmailSettings {
+  id               Int    @id @default(1)
+  smtpHost         String
+  smtpPort         String
+  smtpUser         String
+  smtpPass         String
+  fromAdminEmail   String
+  fromSupportEmail String
+}
+
+model EmailTemplate {
+  key     String @id
+  subject String
+  body    String
+}
+
+model Usage {
+  id           String @id @default(cuid())
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String @unique
+  aiCredits    Int    @default(0)
+  videoExports Int    @default(0)
+  storageGB    Float  @default(0)
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  title       String
+  status      String
+  thumbnail   String
+  hint        String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MediaAsset {
+  id        Int      @id @default(autoincrement())
+  name      String
+  type      String // "IMAGE", "VIDEO", "AUDIO"
+  url       String
+  size      Float // in MB
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+}
+
+model BrandKit {
+  id             String  @id @default(cuid())
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String  @unique
+  name           String
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  headlineFont   String?
+  bodyFont       String?
+}
+
+model SocialConnection {
+  id           Int      @id @default(autoincrement())
+  platform     String
+  name         String
+  accessToken  String   @db.Text
+  refreshToken String?  @db.Text
+  expiresAt    DateTime?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, platform])
+}
+
+model Agent {
+  id           Int      @id @default(autoincrement())
+  name         String
+  platform     String
+  trigger      String
+  workflowJson Json
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  createdAt    DateTime @default(now())
+}
+
+model Video {
+  id              String      @id @default(cuid())
+  name            String
+  url             String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  transcript      Transcript?
+  watchProgress   Float       @default(0)
+  watchDuration   Float       @default(0)
+  lastWatchedAt   DateTime?
+  createdAt       DateTime    @default(now())
+}
+
+model Transcript {
+  id        String   @id @default(cuid())
+  content   Json
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String   @unique
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id           String   @id @default(cuid())
+  userName     String
+  userEmail    String
+  userAvatar   String?
+  subject      String
+  preview      String
+  status       String   @default("Open")
+  conversation Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

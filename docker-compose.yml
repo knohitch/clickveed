@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.caprover
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@db:5432/clickvid
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=test-secret-change-in-production
+      - AUTH_SECRET=test-secret-change-in-production
+<<<<<<< HEAD
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_PROVIDER_PRIORITY=gemini,openai,anthropic
+    depends_on:
+      - db
+    restart: unless-stopped
+    env_file:
+      - .env.production
+=======
+    depends_on:
+      - db
+    restart: unless-stopped
+>>>>>>> d1dae2eb28f3001f8677ec6e56290f0e4af2c514
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: clickvid
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
