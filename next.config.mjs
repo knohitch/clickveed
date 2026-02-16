@@ -8,44 +8,34 @@ const nextConfig = {
             });
         }
 
+        config.externals.push({
+            '@prisma/client': '@prisma/client',
+        });
+
         config.ignoreWarnings = [
             { module: /@opentelemetry\/instrumentation/ },
             { module: /require-in-the-middle/ },
             { module: /handlebars/ },
             { module: /bcryptjs/ },
             { module: /prisma/ },
+            { module: /@prisma\/client/ },
         ];
-
-        config.optimization = {
-            ...config.optimization,
-            minimize: true,
-            splitChunks: {
-                chunks: 'all',
-                cacheGroups: {
-                    default: false,
-                    vendors: false,
-                    commons: {
-                        name: 'commons',
-                        chunks: 'all',
-                        minChunks: 2,
-                    },
-                },
-            },
-        };
 
         return config;
     },
     experimental: {
-        serverComponentsExternalPackages: ['@prisma/client'],
-        optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+        serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
+        optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', '@radix-ui/react-dialog'],
+        typedRoutes: false,
     },
     output: 'standalone',
     reactStrictMode: true,
     images: {
         domains: ['cdn.sanity.io', 'res.cloudinary.com', 'images.unsplash.com'],
-        formats: ['image/avif', 'image/webp'],
-        deviceSizes: [640, 750, 828, 1080, 1200],
-        imageSizes: [16, 32, 48, 64, 96],
+        formats: ['image/webp'],
+        deviceSizes: [640, 828],
+        imageSizes: [16, 32, 48],
+        minimumCacheTTL: 60,
     },
     typescript: {
         ignoreBuildErrors: true
@@ -58,6 +48,7 @@ const nextConfig = {
     compress: true,
     poweredByHeader: false,
     generateEtags: false,
+    trailingSlash: false,
 };
 
 export default nextConfig;

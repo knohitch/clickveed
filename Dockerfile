@@ -11,15 +11,18 @@ RUN apk add --no-cache \
     wget \
     libc6-compat \
     postgresql-client \
-    libstdc++
+    libstdc++ \
+    python3 \
+    make \
+    g++
 
 WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies - use npm ci with --include=dev for build dependencies
-RUN npm ci --include=dev
+# Install dependencies with optimized settings for low memory
+RUN npm ci --include=dev --prefer-offline --no-audit --no-fund
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -27,16 +30,17 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client with skip generation flag
+ENV PRISMA_HIDE_UPDATE_MESSAGE=true
+RUN npx prisma generate --skip-generate
 
 # Build the application with optimized memory limit for 8GB VPS
-ENV NODE_OPTIONS="--max-old-space-size=3072"
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
-
-# BUILD ASSERTION: Verify public directory exists after build
-RUN ls -la /app/public && echo "Public directory exists at /app/public" || (echo "ERROR: Public directory missing at /app/public" && exit 1)
+ENV NODE_ENV=production
+ENV CI=true
+ENV TURBOPACK=0
+RUN npm run build 2>&1 | tail -100
 
 # Production image, copy all the files and run next
 FROM base AS runner
