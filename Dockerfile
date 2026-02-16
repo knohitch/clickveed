@@ -30,9 +30,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client with skip generation flag
+# Generate Prisma client
 ENV PRISMA_HIDE_UPDATE_MESSAGE=true
-RUN npx prisma generate --skip-generate
+RUN npx prisma generate
 
 # Build the application with optimized memory limit for 8GB VPS
 ENV NODE_OPTIONS="--max-old-space-size=2048"
