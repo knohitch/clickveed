@@ -30,8 +30,9 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application with increased memory limit
-ENV NODE_OPTIONS="--max-old-space-size=6144"
+# Build the application with optimized memory limit for 8GB VPS
+ENV NODE_OPTIONS="--max-old-space-size=3072"
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # BUILD ASSERTION: Verify public directory exists after build
