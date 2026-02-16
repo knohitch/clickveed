@@ -1,0 +1,44 @@
+# Lightweight Docker image - skips build, assumes build is done separately
+# Use this if you build on the VPS or GitHub Actions
+
+FROM node:18-alpine
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    openssl \
+    ca-certificates \
+    postgresql-client \
+    libc6-compat
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install only production dependencies
+RUN npm ci --only=production --prefer-offline
+
+# Copy built application files
+# Assumes you've run `npm run build` locally or on VPS
+COPY .next/standalone ./
+COPY .next/static ./.next/static
+COPY public ./public
+COPY prisma ./prisma
+
+# Copy Prisma client
+COPY node_modules/.prisma ./node_modules/.prisma
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "server.js"]
