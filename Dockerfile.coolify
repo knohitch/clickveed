@@ -1,5 +1,5 @@
-# Optimized Dockerfile for CapRover deployment
-# CapRover builds Docker images from GitHub automatically
+# Optimized Dockerfile for Coolify deployment
+# Coolify builds Docker images from GitHub automatically
 
 FROM node:18-alpine AS base
 
@@ -69,13 +69,12 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Copy startup files
 COPY --from=builder /app/startup.sh ./startup.sh
-COPY --from=builder /app/seed-fallback.sql ./seed-fallback.sql
 RUN chmod +x ./startup.sh
 
 # Switch to non-root user
 USER nextjs
 
-# Expose port (CapRover uses this)
+# Expose port
 EXPOSE 3000
 
 # Environment variables
