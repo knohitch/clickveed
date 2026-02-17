@@ -54,8 +54,8 @@ export async function updateStorageSettings(settings: StorageSettings): Promise<
       wasabiSecretKey: settings.wasabiSecretKey,
     });
 
-    // Update storage manager configuration
-    storageManager.updateConfig({
+    // Update storage manager configuration and reinitialize S3 client
+    await storageManager.updateConfig({
       wasabi: {
         endpoint: settings.wasabiEndpoint,
         region: settings.wasabiRegion,

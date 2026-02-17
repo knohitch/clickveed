@@ -347,7 +347,7 @@ export async function updateApiKeys(keys: ApiKeys) {
     // This ensures stale failure data from old/missing keys doesn't block new keys
     try {
         const { resetProviderStates } = await import('@/lib/ai/api-service-manager');
-        resetProviderStates();
+        await resetProviderStates();
         console.log('[updateApiKeys] API service manager provider states reset');
     } catch (error) {
         console.error('[updateApiKeys] Failed to reset API service manager states:', error);

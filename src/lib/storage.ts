@@ -90,7 +90,9 @@ class StorageManager {
   }
 
   /**
-   * Ensure storage is initialized before performing operations
+   * Ensure storage is initialized before performing operations.
+   * Always reloads from database if not currently initialized,
+   * so that credentials added after startup are picked up.
    */
   async ensureInitialized(): Promise<boolean> {
     if (this.initialized && this.s3Client) {
@@ -103,12 +105,17 @@ class StorageManager {
       return this.initialized;
     }
 
-    // Try to initialize from database
+    // Try to initialize from database (always reload - credentials may have been added)
+    console.log('[Storage] Not initialized, attempting to load credentials from database...');
     this.initializationPromise = initializeStorageFromDB();
     try {
       await this.initializationPromise;
     } finally {
       this.initializationPromise = null;
+    }
+
+    if (!this.initialized) {
+      console.warn('[Storage] Still not initialized after DB reload. Check that Wasabi credentials are configured in admin settings.');
     }
 
     return this.initialized;
@@ -226,13 +233,15 @@ class StorageManager {
   /**
    * Update configuration
    */
-  updateConfig(newConfig: Partial<StorageConfig>): void {
+  async updateConfig(newConfig: Partial<StorageConfig>): Promise<void> {
     this.config = { ...this.config, ...newConfig };
 
     // Reinitialize if Wasabi config changed
     if (newConfig.wasabi) {
       this.initialized = false;
-      this.initialize();
+      this.s3Client = null;
+      await this.initialize();
+      console.log('[Storage] Config updated and reinitialized, status:', this.initialized);
     }
   }
 }
