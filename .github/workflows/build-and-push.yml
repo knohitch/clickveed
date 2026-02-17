@@ -17,7 +17,7 @@ jobs:
       contents: read
       packages: write
     env:
-      NODE_OPTIONS: --max-old-space-size=1536
+      NODE_OPTIONS: --max-old-space-size=4096
       NEXT_TELEMETRY_DISABLED: 1
       NODE_ENV: production
       CI: true
