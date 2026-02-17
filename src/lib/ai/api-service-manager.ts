@@ -112,7 +112,7 @@ const providerHealth = new Map<string, ProviderHealth>();
  * Called when API keys are updated to ensure fresh providers aren't blocked
  * by stale failure data from previous keys.
  */
-export function resetProviderStates(): void {
+export async function resetProviderStates(): Promise<void> {
   providerHealth.clear();
   circuitBreaker.reset();
   console.log('[APIServiceManager] All provider states and circuit breakers reset');
