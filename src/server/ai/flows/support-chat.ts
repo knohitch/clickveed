@@ -48,8 +48,16 @@ const supportChatFlow = ai.defineFlow(
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            if (chunk.content) {
-              controller.enqueue(encoder.encode(chunk.content[0].text));
+            // Handle both Genkit format ({ content: [{ text }] }) and
+            // custom provider client format ({ text, model, provider })
+            let text = '';
+            if (chunk.text) {
+              text = chunk.text;
+            } else if (chunk.content && Array.isArray(chunk.content)) {
+              text = chunk.content[0]?.text || '';
+            }
+            if (text) {
+              controller.enqueue(encoder.encode(text));
             }
           }
           await response;

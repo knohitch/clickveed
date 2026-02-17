@@ -433,7 +433,20 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
   // Priority order for streaming: Gemini first (DEFAULT), then OpenAI (FALLBACK), then Claude
   const providerPriority = ['gemini', 'openai', 'azureOpenai', 'claude'];
 
-  const { apiKeys } = await getAdminSettings();
+  const settings = await getAdminSettings();
+  const apiKeys = settings.apiKeys;
+
+  // Debug: Log which keys are available (names only, not values)
+  const configuredProviders = providerPriority.filter(p => !!apiKeys[p as keyof typeof apiKeys]);
+  console.log(`[generateStreamWithProvider] Configured streaming providers: [${configuredProviders.join(', ')}]`);
+  console.log(`[generateStreamWithProvider] Total API keys in settings: ${Object.keys(apiKeys).filter(k => !!apiKeys[k]).length}`);
+
+  if (configuredProviders.length === 0) {
+    // Log all key names that DO have values to help debug
+    const allConfiguredKeys = Object.entries(apiKeys).filter(([_, v]) => !!v).map(([k]) => k);
+    console.error(`[generateStreamWithProvider] No streaming provider keys found! All configured keys: [${allConfiguredKeys.join(', ')}]`);
+    console.error(`[generateStreamWithProvider] DATABASE_URL available: ${!!process.env.DATABASE_URL}`);
+  }
 
   for (const providerName of providerPriority) {
     const apiKey = apiKeys[providerName as keyof typeof apiKeys];

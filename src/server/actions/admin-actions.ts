@@ -39,7 +39,9 @@ export async function getAdminSettings() {
 
         const settings = await prisma.setting.findMany();
         const apiKeys = await prisma.apiKey.findMany();
-        
+
+        console.log(`[getAdminSettings] Found ${apiKeys.length} API keys in database: [${apiKeys.map(k => k.name).join(', ')}]`);
+
         // Build API keys from database
         const mergedApiKeys: Record<string, string> = { ...apiKeys.reduce((acc, key) => {
           acc[key.name] = key.value;
@@ -114,7 +116,7 @@ export async function getAdminSettings() {
             storageSettings,
         };
     } catch (error) {
-        console.warn('Failed to fetch admin settings from database, using defaults:', error);
+        console.error('[getAdminSettings] CRITICAL: Failed to fetch admin settings from database, using defaults. AI features will NOT work!', error);
         return getDefaultSettings();
     }
 }

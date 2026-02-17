@@ -92,13 +92,35 @@ Provide a suggested video title and estimated duration. Keep it concise and enga
 
     const generateResponse = await generateWithProvider({ messages });
 
-    // Type assertion to access the output property
-    const output = (generateResponse as any).output;
+    // Extract text from the response (handles both Genkit and custom provider formats)
+    const responseText = generateResponse.result?.content?.[0]?.text || '';
 
-    if (!output?.script) {
-      throw new Error('Failed to generate video script.');
+    if (!responseText) {
+      throw new Error('Failed to generate video script - empty response from AI provider.');
     }
 
-    return output;
+    // Parse the response text to extract script, title, and duration
+    // The AI returns formatted text, try to parse JSON first, then fall back to text extraction
+    let script = responseText;
+    let title = `${input.topic} - ${input.style || 'Guide'}`;
+    let durationEstimate = input.length || '2 minutes';
+
+    try {
+      // Try parsing as JSON in case the AI returns structured output
+      const parsed = JSON.parse(responseText);
+      if (parsed.script) script = parsed.script;
+      if (parsed.title) title = parsed.title;
+      if (parsed.durationEstimate) durationEstimate = parsed.durationEstimate;
+    } catch {
+      // Not JSON - use the raw text as the script
+      // Try to extract title from the response
+      const titleMatch = responseText.match(/(?:Title|VIDEO TITLE)[:\s]*([^\n]+)/i);
+      if (titleMatch) title = titleMatch[1].trim();
+
+      const durationMatch = responseText.match(/(?:Duration|Estimated Duration)[:\s]*([^\n]+)/i);
+      if (durationMatch) durationEstimate = durationMatch[1].trim();
+    }
+
+    return { script, title, durationEstimate };
   }
 );
