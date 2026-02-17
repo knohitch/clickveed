@@ -84,6 +84,13 @@ class CircuitBreaker {
       isOpen: this.openCircuits.has(provider)
     };
   }
+
+  reset(): void {
+    this.failures.clear();
+    this.lastFailureTime.clear();
+    this.openCircuits.clear();
+    console.log('[ProviderManager CircuitBreaker] All circuits reset');
+  }
 }
 
 // Global circuit breaker instance
@@ -495,6 +502,7 @@ class AIProviderManager {
   async reinitialize() {
     this.initialized = false;
     this.providers.clear();
+    circuitBreaker.reset();
     await this.initialize();
   }
 }

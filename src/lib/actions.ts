@@ -335,8 +335,18 @@ export async function generateScriptAction(prevState: any, formData: FormData) {
             errors: {}
         };
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to generate script';
+
+        // Provide actionable error messages for common issues
+        let userMessage = errorMessage;
+        if (errorMessage.includes('No AI provider') || errorMessage.includes('No healthy') || errorMessage.includes('No streaming provider')) {
+            userMessage = 'AI service is not available. Please contact your administrator to configure AI API keys in the admin panel.';
+        } else if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+            userMessage = 'AI service rate limit reached. Please try again in a few minutes.';
+        }
+
         return {
-            message: error instanceof Error ? error.message : 'Failed to generate script',
+            message: userMessage,
             script: null,
             errors: {}
         };

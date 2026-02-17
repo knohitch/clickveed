@@ -84,6 +84,13 @@ class CircuitBreaker {
       isOpen: this.openCircuits.has(provider)
     };
   }
+
+  reset(): void {
+    this.failures.clear();
+    this.lastFailureTime.clear();
+    this.openCircuits.clear();
+    console.log('[CircuitBreaker] All circuits reset');
+  }
 }
 
 // Global circuit breaker instance
@@ -99,6 +106,17 @@ interface ProviderHealth {
 }
 
 const providerHealth = new Map<string, ProviderHealth>();
+
+/**
+ * Reset all provider health and circuit breaker state.
+ * Called when API keys are updated to ensure fresh providers aren't blocked
+ * by stale failure data from previous keys.
+ */
+export function resetProviderStates(): void {
+  providerHealth.clear();
+  circuitBreaker.reset();
+  console.log('[APIServiceManager] All provider states and circuit breakers reset');
+}
 
 function markProviderHealthy(provider: string): void {
   providerHealth.set(provider, {

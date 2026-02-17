@@ -80,7 +80,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      return NextResponse.json(createInternalError(result.error || 'Upload failed'), { status: 500 });
+      const isConfigError = result.error?.includes('not configured');
+      const status = isConfigError ? 503 : 500;
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error || 'Upload failed',
+          code: isConfigError ? 'STORAGE_NOT_CONFIGURED' : 'UPLOAD_FAILED',
+          message: isConfigError
+            ? 'File storage is not configured. Please contact your administrator to set up storage credentials in the admin panel.'
+            : (result.error || 'Upload failed'),
+        },
+        { status }
+      );
     }
 
     // Fix Bug #10: Use standardized success response

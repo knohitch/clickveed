@@ -102,6 +102,14 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { plan: Pl
 
                 <Separator/>
 
+                <div className="text-xs text-muted-foreground space-y-1 pt-1">
+                    <p>Video Exports: <span className="font-medium text-foreground">{plan.videoExports ?? 'Unlimited'}</span></p>
+                    <p>AI Credits: <span className="font-medium text-foreground">{plan.aiCredits ?? 'Unlimited'}</span></p>
+                    <p>Storage: <span className="font-medium text-foreground">{plan.storageGB ? `${plan.storageGB} GB` : 'Unlimited'}</span></p>
+                </div>
+
+                <Separator/>
+
                 <ul className="space-y-3 pt-2">
                     {plan.features.map((feature, index) => (
                         <li key={`${plan.id}-feature-${index}`} className="flex items-start gap-3">
@@ -134,6 +142,9 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
     const [stripePriceIdQuarterly, setStripePriceIdQuarterly] = React.useState(plan?.stripePriceIdQuarterly || '');
     const [stripePriceIdYearly, setStripePriceIdYearly] = React.useState(plan?.stripePriceIdYearly || '');
     const [featureItems, setFeatureItems] = React.useState<string[]>(plan?.features?.map(f => f.text) || []);
+    const [videoExports, setVideoExports] = React.useState(plan?.videoExports != null ? String(plan.videoExports) : '');
+    const [aiCredits, setAiCredits] = React.useState(plan?.aiCredits != null ? String(plan.aiCredits) : '');
+    const [storageGB, setStorageGB] = React.useState(plan?.storageGB != null ? String(plan.storageGB) : '');
 
     const addFeature = () => {
         setFeatureItems([...featureItems, '']);
@@ -209,9 +220,9 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             features: finalFeatures,
             createdAt: plan?.createdAt || new Date(),
             updatedAt: new Date(),
-            videoExports: plan?.videoExports ?? null,
-            aiCredits: plan?.aiCredits ?? null,
-            storageGB: plan?.storageGB ?? null,
+            videoExports: videoExports.trim() !== '' ? Number(videoExports) : null,
+            aiCredits: aiCredits.trim() !== '' ? Number(aiCredits) : null,
+            storageGB: storageGB.trim() !== '' ? Number(storageGB) : null,
             stripeProductId: plan?.stripeProductId ?? null,
             stripePriceIdMonthly: stripePriceIdMonthly || null,
             stripePriceIdQuarterly: stripePriceIdQuarterly || null,
@@ -258,6 +269,25 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                 <div className="space-y-2">
                     <Label htmlFor="priceYearly">Yearly Price ($)</Label>
                     <Input id="priceYearly" type="number" step="0.01" min="0" value={priceYearly} onChange={e => setPriceYearly(e.target.value)} required />
+                </div>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+                <Label className="text-sm font-semibold">Usage Limits</Label>
+                <p className="text-xs text-muted-foreground mb-2">Leave empty for unlimited. These limits control how much users on this plan can use.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="videoExports">Video Exports</Label>
+                        <Input id="videoExports" type="number" min="0" step="1" value={videoExports} onChange={e => setVideoExports(e.target.value)} placeholder="Unlimited" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="aiCredits">AI Credits</Label>
+                        <Input id="aiCredits" type="number" min="0" step="1" value={aiCredits} onChange={e => setAiCredits(e.target.value)} placeholder="Unlimited" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="storageGB">Storage (GB)</Label>
+                        <Input id="storageGB" type="number" min="0" step="1" value={storageGB} onChange={e => setStorageGB(e.target.value)} placeholder="Unlimited" />
+                    </div>
                 </div>
             </div>
             <Separator />

@@ -371,8 +371,15 @@ export async function updateUser(userId: string, updates: { role?: UserRole; sta
 /**
  * Updates a user's plan (for admin/super admin use).
  * This allows admins to manually upgrade or change a user's plan.
+ * Options:
+ *   resetUsage - reset AI credits counter (default: true for upgrades)
+ *   notifyUser - send in-app notification (default: true)
  */
-export async function updateUserPlan(userId: string, planId: string) {
+export async function updateUserPlan(
+    userId: string,
+    planId: string,
+    options?: { resetUsage?: boolean; notifyUser?: boolean }
+) {
     const session = await auth();
     if (!session?.user?.role || !['SUPER_ADMIN', 'ADMIN'].includes(session.user.role)) {
         throw new Error('Unauthorized: Only admins can update user plans');
@@ -387,17 +394,59 @@ export async function updateUserPlan(userId: string, planId: string) {
         throw new Error('Plan not found');
     }
 
+    // Get user's current plan for comparison
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { plan: true }
+    });
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const oldPlanName = user.plan?.name || 'None';
+    const isUpgrade = (plan.priceMonthly ?? 0) > (user.plan?.priceMonthly ?? 0);
+
     // Update the user's plan
     await prisma.user.update({
         where: { id: userId },
         data: { planId }
     });
 
+    // Reset usage counters if requested (default: true for upgrades)
+    const shouldResetUsage = options?.resetUsage ?? isUpgrade;
+    if (shouldResetUsage) {
+        await prisma.userUsage.upsert({
+            where: { userId },
+            update: { aiCreditsUsed: 0 },
+            create: { userId, aiCreditsUsed: 0, projects: 0, mediaAssets: 0, storageUsedGB: 0 }
+        });
+    }
+
+    // Create in-app notification for user (default: true)
+    const shouldNotify = options?.notifyUser ?? true;
+    if (shouldNotify) {
+        try {
+            const { createNotification } = await import('@/server/services/notification-service');
+            await createNotification({
+                userId,
+                type: 'plan_upgraded',
+                title: isUpgrade ? 'Plan Upgraded!' : 'Plan Changed',
+                message: `Your plan has been ${isUpgrade ? 'upgraded' : 'changed'} from ${oldPlanName} to ${plan.name} by an administrator.${shouldResetUsage ? ' Your usage counters have been reset.' : ''}`,
+            });
+        } catch (notifError) {
+            console.error('[updateUserPlan] Failed to create notification:', notifError);
+        }
+    }
+
     revalidatePath('/chin/dashboard/users');
     revalidatePath('/kanri/dashboard/users');
     revalidatePath('/dashboard');
 
-    return { success: true, message: `User plan updated to ${plan.name} successfully` };
+    return {
+        success: true,
+        message: `User plan ${isUpgrade ? 'upgraded' : 'changed'} from ${oldPlanName} to ${plan.name} successfully.${shouldResetUsage ? ' Usage reset.' : ''}`
+    };
 }
 
 /**

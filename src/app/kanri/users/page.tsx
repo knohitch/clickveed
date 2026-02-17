@@ -3,12 +3,16 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreHorizontal, Search, UserSearch } from "lucide-react";
+import { ArrowUpCircle, MoreHorizontal, Search, UserSearch } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
 import type { UserWithRole } from "@/server/actions/user-actions";
 import { getUsers, updateUserPlan } from "@/server/actions/user-actions";
@@ -27,7 +31,13 @@ export default function AdminUsersPage() {
     const [filter, setFilter] = useState<FilterStatus>('All');
     const { plans } = useAdminSettings();
     const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
-    
+
+    // Plan change dialog state
+    const [planChangeDialog, setPlanChangeDialog] = useState<{ userId: string; userName: string; currentPlan: string } | null>(null);
+    const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+    const [resetUsage, setResetUsage] = useState(true);
+    const [notifyUser, setNotifyUser] = useState(true);
+
     useEffect(() => {
         const fetchUsers = async () => {
             setLoading(true);
@@ -41,7 +51,7 @@ export default function AdminUsersPage() {
     const handlePlanChange = async (userId: string, planId: string) => {
         setUpdatingUserId(userId);
         try {
-            const result = await updateUserPlan(userId, planId);
+            const result = await updateUserPlan(userId, planId, { resetUsage, notifyUser });
             if (result.success) {
                 toast.success(result.message);
                 const fetchedUsers = await getUsers();
@@ -51,7 +61,18 @@ export default function AdminUsersPage() {
             toast.error(error instanceof Error ? error.message : 'Failed to update user plan');
         } finally {
             setUpdatingUserId(null);
+            setPlanChangeDialog(null);
+            setResetUsage(true);
+            setNotifyUser(true);
         }
+    };
+
+    const openPlanChangeDialog = (user: UserWithRole) => {
+        const currentPlanName = user.plan || 'Free';
+        setPlanChangeDialog({ userId: user.id, userName: user.name || user.email || 'User', currentPlan: currentPlanName });
+        setSelectedPlanId(plans.find(p => p.name === currentPlanName)?.id || '');
+        setResetUsage(true);
+        setNotifyUser(true);
     };
 
     const getUserPlanName = (planName: string | undefined) => {
@@ -76,7 +97,7 @@ export default function AdminUsersPage() {
             <div>
                 <h1 className="text-3xl font-bold font-headline">View Users</h1>
                 <p className="text-muted-foreground">
-                    Look up user information to assist with support tickets.
+                    Look up user information and manage user plans.
                 </p>
             </div>
             <Card>
@@ -88,9 +109,9 @@ export default function AdminUsersPage() {
                     <div className="flex flex-col md:flex-row gap-4 mb-4 justify-between">
                         <div className="relative w-full md:max-w-sm">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="Search by name or email" 
-                                className="pl-10" 
+                            <Input
+                                placeholder="Search by name or email"
+                                className="pl-10"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -134,9 +155,20 @@ export default function AdminUsersPage() {
                                          </TableCell>
                                          <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                                          <TableCell className="hidden sm:table-cell">
-                                             <Badge variant="outline">
-                                                 {getUserPlanName(user.plan)}
-                                             </Badge>
+                                             <div className="flex items-center gap-2">
+                                                 <Badge variant="outline">
+                                                     {getUserPlanName(user.plan)}
+                                                 </Badge>
+                                                 <Button
+                                                     variant="ghost"
+                                                     size="sm"
+                                                     className="h-6 px-2 text-xs"
+                                                     onClick={() => openPlanChangeDialog(user)}
+                                                 >
+                                                     <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                                     Change
+                                                 </Button>
+                                             </div>
                                          </TableCell>
                                          <TableCell className="hidden sm:table-cell">
                                              <Badge variant={user.emailVerified ? 'default' : 'destructive'}>
@@ -156,18 +188,22 @@ export default function AdminUsersPage() {
                                                      <DropdownMenuSeparator />
                                                      <DropdownMenuItem>View Details</DropdownMenuItem>
                                                      <DropdownMenuSeparator />
+                                                     <DropdownMenuItem onClick={() => openPlanChangeDialog(user)}>
+                                                         <ArrowUpCircle className="h-4 w-4 mr-2" />
+                                                         Change Plan
+                                                     </DropdownMenuItem>
                                                      <DropdownMenuSub>
                                                          <DropdownMenuSubTrigger>
-                                                             <span>Change Plan</span>
+                                                             <span>Quick Plan Change</span>
                                                          </DropdownMenuSubTrigger>
                                                          <DropdownMenuSubContent>
                                                              {plans.map(plan => (
-                                                                 <DropdownMenuItem 
+                                                                 <DropdownMenuItem
                                                                      key={plan.id}
                                                                      onClick={() => handlePlanChange(user.id, plan.id)}
                                                                      disabled={updatingUserId === user.id || user.plan === plan.name}
                                                                  >
-                                                                     {plan.name} {user.plan === plan.name && '✓'}
+                                                                     {plan.name} {user.plan === plan.name && '\u2713'}
                                                                  </DropdownMenuItem>
                                                              ))}
                                                          </DropdownMenuSubContent>
@@ -190,6 +226,59 @@ export default function AdminUsersPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            {/* Plan Change Dialog */}
+            <Dialog open={!!planChangeDialog} onOpenChange={(open) => !open && setPlanChangeDialog(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Change User Plan</DialogTitle>
+                        <DialogDescription>
+                            Change the plan for <strong>{planChangeDialog?.userName}</strong>. Currently on: <strong>{planChangeDialog?.currentPlan}</strong>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>New Plan</Label>
+                            <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a plan" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {plans.map(plan => (
+                                        <SelectItem key={plan.id} value={plan.id}>
+                                            {plan.name} - ${Number(plan.priceMonthly).toFixed(2)}/mo
+                                            {plan.name === planChangeDialog?.currentPlan ? ' (current)' : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label htmlFor="resetUsage" className="text-sm font-medium">Reset Usage Counters</Label>
+                                <p className="text-xs text-muted-foreground">Reset AI credits used to zero</p>
+                            </div>
+                            <Switch id="resetUsage" checked={resetUsage} onCheckedChange={setResetUsage} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label htmlFor="notifyUser" className="text-sm font-medium">Notify User</Label>
+                                <p className="text-xs text-muted-foreground">Send in-app notification about plan change</p>
+                            </div>
+                            <Switch id="notifyUser" checked={notifyUser} onCheckedChange={setNotifyUser} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setPlanChangeDialog(null)}>Cancel</Button>
+                        <Button
+                            onClick={() => planChangeDialog && handlePlanChange(planChangeDialog.userId, selectedPlanId)}
+                            disabled={!selectedPlanId || updatingUserId === planChangeDialog?.userId}
+                        >
+                            {updatingUserId === planChangeDialog?.userId ? 'Updating...' : 'Confirm Plan Change'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
