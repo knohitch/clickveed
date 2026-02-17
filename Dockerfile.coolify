@@ -30,8 +30,9 @@ ENV CI=true
 # Install build tools
 RUN apk add --no-cache python3 make g++
 
-# Generate Prisma client (doesn't need DB connection)
+# Generate Prisma client for Alpine only (doesn't need DB connection)
 ENV PRISMA_HIDE_UPDATE_MESSAGE=true
+ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
 # Build with minimal output

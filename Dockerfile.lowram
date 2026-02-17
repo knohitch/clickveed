@@ -1,32 +1,46 @@
-# Minimal multi-stage build for low-memory environments
+# Ultra-low memory Dockerfile for 8GB systems
+# Builds with < 2GB RAM usage
+
 FROM node:18-alpine AS base
 
-# Install dependencies
+# Install dependencies with minimal memory footprint
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --prefer-offline --no-audit
 
-# Build stage
+# Install with minimal memory usage
+RUN npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps
+
+# Build stage with memory constraints
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 
-ENV NODE_OPTIONS="--max-old-space-size=2048 --gc-interval=100"
+# Copy only needed files first
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json prisma tsconfig.json next.config.* ./
+COPY prisma ./prisma
+
+# Environment for low-memory builds
+ENV NODE_OPTIONS="--max-old-space-size=1536 --optimize-for-size"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Generate Prisma client for Alpine only (linux-musl)
+# Generate Prisma client for Alpine only
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
-# Build with minimal output
+# Copy source files after Prisma generation
+COPY src ./src
+COPY public ./public
+COPY components ./components
+COPY lib ./lib
+
+# Build with memory constraints
 RUN npm run build -- --no-lint
 
 # Production stage
-FROM base AS runner
+FROM node:18-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

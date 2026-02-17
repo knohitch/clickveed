@@ -24,7 +24,8 @@ ENV NODE_OPTIONS="--max-old-space-size=3072 --optimize-for-size --max-old-space-
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Generate Prisma client
+# Generate Prisma client for Alpine only
+ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
 # Build with minimal output and swap if needed
