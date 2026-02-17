@@ -188,26 +188,30 @@ export default function AdminUsersPage() {
                                                      <DropdownMenuSeparator />
                                                      <DropdownMenuItem>View Details</DropdownMenuItem>
                                                      <DropdownMenuSeparator />
-                                                     <DropdownMenuItem onClick={() => openPlanChangeDialog(user)}>
-                                                         <ArrowUpCircle className="h-4 w-4 mr-2" />
-                                                         Change Plan
-                                                     </DropdownMenuItem>
-                                                     <DropdownMenuSub>
-                                                         <DropdownMenuSubTrigger>
-                                                             <span>Quick Plan Change</span>
-                                                         </DropdownMenuSubTrigger>
-                                                         <DropdownMenuSubContent>
-                                                             {plans.map(plan => (
-                                                                 <DropdownMenuItem
-                                                                     key={plan.id}
-                                                                     onClick={() => handlePlanChange(user.id, plan.id)}
-                                                                     disabled={updatingUserId === user.id || user.plan === plan.name}
-                                                                 >
-                                                                     {plan.name} {user.plan === plan.name && '\u2713'}
-                                                                 </DropdownMenuItem>
-                                                             ))}
-                                                         </DropdownMenuSubContent>
-                                                     </DropdownMenuSub>
+                                                     {plans.length > 0 ? (
+                                                         <DropdownMenuSub>
+                                                             <DropdownMenuSubTrigger>
+                                                                 <ArrowUpCircle className="h-4 w-4 mr-2" />
+                                                                 <span>Change Plan</span>
+                                                             </DropdownMenuSubTrigger>
+                                                             <DropdownMenuSubContent>
+                                                                 {plans.map(plan => (
+                                                                     <DropdownMenuItem
+                                                                         key={plan.id}
+                                                                         onClick={() => handlePlanChange(user.id, plan.id)}
+                                                                         disabled={updatingUserId === user.id || user.plan === plan.name}
+                                                                     >
+                                                                         {plan.name} {user.plan === plan.name && ' ✓'}
+                                                                     </DropdownMenuItem>
+                                                                 ))}
+                                                             </DropdownMenuSubContent>
+                                                         </DropdownMenuSub>
+                                                     ) : (
+                                                         <DropdownMenuItem onClick={() => openPlanChangeDialog(user)}>
+                                                             <ArrowUpCircle className="h-4 w-4 mr-2" />
+                                                             Change Plan
+                                                         </DropdownMenuItem>
+                                                     )}
                                                  </DropdownMenuContent>
                                              </DropdownMenu>
                                          </TableCell>
@@ -236,43 +240,50 @@ export default function AdminUsersPage() {
                             Change the plan for <strong>{planChangeDialog?.userName}</strong>. Currently on: <strong>{planChangeDialog?.currentPlan}</strong>
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>New Plan</Label>
-                            <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a plan" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {plans.map(plan => (
-                                        <SelectItem key={plan.id} value={plan.id}>
-                                            {plan.name} - ${Number(plan.priceMonthly).toFixed(2)}/mo
-                                            {plan.name === planChangeDialog?.currentPlan ? ' (current)' : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                    {plans.length === 0 ? (
+                        <div className="py-6 text-center space-y-2">
+                            <p className="text-sm text-muted-foreground">No plans have been created yet.</p>
+                            <p className="text-sm text-muted-foreground">Go to <strong>Super Admin → Plans</strong> to create plans first.</p>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <Label htmlFor="resetUsage" className="text-sm font-medium">Reset Usage Counters</Label>
-                                <p className="text-xs text-muted-foreground">Reset AI credits used to zero</p>
+                    ) : (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label>New Plan</Label>
+                                <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a plan" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {plans.map(plan => (
+                                            <SelectItem key={plan.id} value={plan.id}>
+                                                {plan.name} - ${Number(plan.priceMonthly).toFixed(2)}/mo
+                                                {plan.name === planChangeDialog?.currentPlan ? ' (current)' : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <Switch id="resetUsage" checked={resetUsage} onCheckedChange={setResetUsage} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <Label htmlFor="notifyUser" className="text-sm font-medium">Notify User</Label>
-                                <p className="text-xs text-muted-foreground">Send in-app notification about plan change</p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label htmlFor="resetUsage" className="text-sm font-medium">Reset Usage Counters</Label>
+                                    <p className="text-xs text-muted-foreground">Reset AI credits used to zero</p>
+                                </div>
+                                <Switch id="resetUsage" checked={resetUsage} onCheckedChange={setResetUsage} />
                             </div>
-                            <Switch id="notifyUser" checked={notifyUser} onCheckedChange={setNotifyUser} />
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label htmlFor="notifyUser" className="text-sm font-medium">Notify User</Label>
+                                    <p className="text-xs text-muted-foreground">Send in-app notification about plan change</p>
+                                </div>
+                                <Switch id="notifyUser" checked={notifyUser} onCheckedChange={setNotifyUser} />
+                            </div>
                         </div>
-                    </div>
+                    )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setPlanChangeDialog(null)}>Cancel</Button>
                         <Button
                             onClick={() => planChangeDialog && handlePlanChange(planChangeDialog.userId, selectedPlanId)}
-                            disabled={!selectedPlanId || updatingUserId === planChangeDialog?.userId}
+                            disabled={!selectedPlanId || updatingUserId === planChangeDialog?.userId || plans.length === 0}
                         >
                             {updatingUserId === planChangeDialog?.userId ? 'Updating...' : 'Confirm Plan Change'}
                         </Button>
