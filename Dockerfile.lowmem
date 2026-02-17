@@ -1,0 +1,59 @@
+# Ultra-minimal build for very low-memory environments
+# Uses Node 18 Alpine and aggressive optimization
+
+FROM node:18-alpine AS base
+
+# Install dependencies with minimal cache
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+COPY package.json package-lock.json* ./
+
+# Install with minimal memory footprint
+RUN npm ci --prefer-offline --no-audit --omit=dev --legacy-peer-deps || \
+    npm ci --prefer-offline --no-audit --legacy-peer-deps
+
+# Build stage with extreme memory constraints
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set aggressive memory limits and optimizations
+ENV NODE_OPTIONS="--max-old-space-size=3072 --optimize-for-size --max-old-space-size=3072 --gc-interval=100 --expose-gc"
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build with minimal output and swap if needed
+RUN npm run build -- --no-lint || \
+    (echo "Build failed, retrying with even lower memory..." && \
+     NODE_OPTIONS="--max-old-space-size=2560" npm run build -- --no-lint)
+
+# Production runtime stage
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    mkdir -p .next && chown nextjs:nodejs .next
+
+# Copy built application
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/startup.sh ./startup.sh
+RUN chmod +x ./startup.sh
+
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+CMD ["./startup.sh"]

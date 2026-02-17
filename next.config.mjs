@@ -19,6 +19,40 @@ const nextConfig = {
             { module: /prisma/ },
         ];
 
+        // Optimize for low-memory builds
+        config.optimization = {
+            ...config.optimization,
+            moduleIds: 'deterministic',
+            minimize: true,
+            splitChunks: {
+                chunks: 'all',
+                cacheGroups: {
+                    default: false,
+                    vendors: false,
+                    commons: {
+                        name: 'commons',
+                        chunks: 'all',
+                        minChunks: 2,
+                        priority: 10,
+                    },
+                    lib: {
+                        test: /[\\/]node_modules[\\/]/,
+                        name: 'lib',
+                        chunks: 'all',
+                        priority: 5,
+                    },
+                },
+                maxSize: 244000, // Split chunks larger than 244kb
+            },
+        };
+
+        // Reduce memory usage
+        config.performance = {
+            hints: false,
+            maxEntrypointSize: 512000,
+            maxAssetSize: 512000,
+        };
+
         return config;
     },
     // Optimize for production builds
