@@ -20,7 +20,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Set aggressive memory limits and optimizations
-ENV NODE_OPTIONS="--max-old-space-size=3072 --optimize-for-size --max-old-space-size=3072 --gc-interval=100 --expose-gc"
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
