@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { deleteConnection } from "@/server/actions/social-actions";
 import { useAdminSettings } from "@/contexts/admin-settings-context";
 
-export type PlatformId = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'whatsapp' | 'snapchat' | 'threads';
+export type PlatformId = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'whatsapp' | 'snapchat' | 'threads' | 'linkedin' | 'x';
 
 interface SocialConnectionCardProps {
     platform: { id: PlatformId; name: string; icon: React.ElementType };
@@ -33,6 +33,8 @@ export function SocialConnectionCard({ platform, isConnected, onConnectionChange
             case 'snapchat': return apiKeys.snapchatClientId;
             case 'whatsapp': return apiKeys.whatsappClientId;
             case 'threads': return apiKeys.threadsClientId;
+            case 'linkedin': return apiKeys.linkedinClientId;
+            case 'x': return apiKeys.xClientId;
             default: return null;
         }
     }
@@ -55,6 +57,10 @@ export function SocialConnectionCard({ platform, isConnected, onConnectionChange
                 return `https://facebook.com/v20.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=whatsapp_business_management,whatsapp_business_messaging`;
             case 'threads':
                 return `https://www.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=threads_basic,threads_content_publish&response_type=code`;
+            case 'linkedin':
+                return `https://www.linkedin.com/oauth/v2/authorization?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=r_liteprofile%20r_emailaddress%20w_member_social&response_type=code`;
+            case 'x':
+                return `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&response_type=code&code_challenge=challenge&code_challenge_method=plain`;
             default:
                 return '#'; // Fallback for platforms not fully configured
         }

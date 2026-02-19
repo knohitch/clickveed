@@ -166,64 +166,74 @@ interface ProviderInfo {
   apiKey: string;
 }
 
+// ============================================================================
+// AI MODEL CONSTANTS
+// Update only these constants when Google (or others) phases out a model version.
+// All priority lists below reference these — no other string hunts needed.
+// ============================================================================
+const GEMINI_TEXT_MODEL  = 'googleai/gemini-2.0-flash';         // Gemini primary for text
+const IMAGEN_IMAGE_MODEL = 'googleai/imagen-3.0-generate-001';  // Google Imagen primary for images
+const GEMINI_VIDEO_MODEL = 'googleai/veo-2.0-generate-001';     // Google VEO primary for video
+const CLAUDE_TEXT_MODEL  = 'anthropic/claude-3-5-sonnet';       // Claude fallback for text
+
 // LLM Providers Priority List (Gemini is PRIMARY)
 const llmProviderPriority: ProviderConfig[] = [
-  // Google AI providers (PRIMARY)
-  { name: 'gemini', model: 'googleai/gemini-2.0-flash' },
+  // Google AI (PRIMARY)
+  { name: 'gemini',      model: GEMINI_TEXT_MODEL },
 
-  // OpenAI providers (FALLBACK)
-  { name: 'openai', model: 'openai/gpt-4o' },
+  // OpenAI (FALLBACK)
+  { name: 'openai',      model: 'openai/gpt-4o' },
   { name: 'azureOpenai', model: 'openai/gpt-4o' },
 
-  // Anthropic providers (FALLBACK)
-  { name: 'claude', model: 'anthropic/claude-3-5-sonnet' },
+  // Anthropic (FALLBACK)
+  { name: 'claude',      model: CLAUDE_TEXT_MODEL },
 
   // Other LLM providers
-  { name: 'deepseek', model: 'openai/gpt-4o' },
-  { name: 'grok', model: 'openai/gpt-4o' },
-  { name: 'qwen', model: 'openai/gpt-4o' },
-  { name: 'perplexity', model: 'openai/gpt-4o' },
-  { name: 'openrouter', model: 'openai/gpt-4o' },
+  { name: 'deepseek',    model: 'openai/gpt-4o' },
+  { name: 'grok',        model: 'openai/gpt-4o' },
+  { name: 'qwen',        model: 'openai/gpt-4o' },
+  { name: 'perplexity',  model: 'openai/gpt-4o' },
+  { name: 'openrouter',  model: 'openai/gpt-4o' },
   { name: 'huggingface', model: 'openai/gpt-4o' },
 ];
 
 // Image Generation Providers Priority List
+// Google Imagen is PRIMARY; Gemini multimodal is fallback 3 (requires gemini key)
 const imageProviderPriority: ProviderConfig[] = [
-  // Google AI providers
-  { name: 'gemini', model: 'googleai/gemini-1.5-flash' },
-
-  // Other image generation providers
-  { name: 'stableDiffusion', model: 'openai/gpt-4o' },
-  { name: 'midjourney', model: 'openai/gpt-4o' },
-  { name: 'imagen', model: 'openai/gpt-4o' },
-  { name: 'dreamstudio', model: 'openai/gpt-4o' },
-  { name: 'replicate', model: 'openai/gpt-4o' },
-  { name: 'modelslab', model: 'openai/gpt-4o' },
+  { name: 'imagen',          model: IMAGEN_IMAGE_MODEL }, // PRIMARY (Google Imagen via Vertex AI)
+  { name: 'stableDiffusion', model: 'openai/gpt-4o' },   // FALLBACK 1
+  { name: 'replicate',       model: 'openai/gpt-4o' },   // FALLBACK 2
+  { name: 'gemini',          model: GEMINI_TEXT_MODEL },  // FALLBACK 3 (Gemini multimodal)
+  { name: 'dreamstudio',     model: 'openai/gpt-4o' },
+  { name: 'midjourney',      model: 'openai/gpt-4o' },
+  { name: 'modelslab',       model: 'openai/gpt-4o' },
 ];
 
 // Video Generation Providers Priority List
+// Google VEO is PRIMARY; Seedance → Kling → HeyGen → others as fallbacks
 const videoProviderPriority: ProviderConfig[] = [
-  // Google VEO
-  { name: 'googleVeo', model: 'googleai/veo-2.0-generate-001' },
-
-  // Other video generation providers
-  { name: 'heygen', model: 'openai/gpt-4o' },
-  { name: 'kling', model: 'openai/gpt-4o' },
-  { name: 'seedance', model: 'openai/gpt-4o' },
-  { name: 'wan', model: 'openai/gpt-4o' },
-  { name: 'modelscope', model: 'openai/gpt-4o' },
+  { name: 'googleVeo',   model: GEMINI_VIDEO_MODEL },     // PRIMARY (Google VEO)
+  { name: 'seedance',    model: 'openai/gpt-4o' },        // FALLBACK 1
+  { name: 'kling',       model: 'openai/gpt-4o' },        // FALLBACK 2
+  { name: 'heygen',      model: 'openai/gpt-4o' },        // FALLBACK 3
+  { name: 'wan',         model: 'openai/gpt-4o' },
+  { name: 'modelscope',  model: 'openai/gpt-4o' },
   { name: 'stableVideo', model: 'openai/gpt-4o' },
   { name: 'animateDiff', model: 'openai/gpt-4o' },
   { name: 'videoFusion', model: 'openai/gpt-4o' },
 ];
 
 // TTS Providers Priority List
+// ElevenLabs is primary since 'googleai/gemini-1.5-flash-tts' is not a valid Genkit model.
+// Gemini text model is listed as fallback for providers that synthesize speech via text.
 const ttsProviderPriority: ProviderConfig[] = [
-  // Google AI providers
-  { name: 'gemini', model: 'googleai/gemini-1.5-flash-tts' as any },
+  // ElevenLabs (PRIMARY - reliable TTS with real audio output)
+  { name: 'elevenlabs', model: 'elevenlabs' as any },
+
+  // Google AI text model as fallback (used by custom TTS provider clients)
+  { name: 'gemini', model: GEMINI_TEXT_MODEL as any },
 
   // Other TTS providers
-  { name: 'elevenlabs', model: 'openai/gpt-4o' },
   { name: 'azureTts', model: 'openai/gpt-4o' },
   { name: 'myshell', model: 'openai/gpt-4o' },
   { name: 'coqui', model: 'openai/gpt-4o' },
@@ -365,8 +375,8 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 
       // Return in Genkit-compatible format
       const modelMap: Record<string, string> = {
-        'gemini': 'googleai/gemini-2.0-flash',
-        'claude': 'anthropic/claude-3-5-sonnet',
+        'gemini': GEMINI_TEXT_MODEL,
+        'claude': CLAUDE_TEXT_MODEL,
       };
       return {
         model: modelMap[providerName] || 'openai/gpt-4o',

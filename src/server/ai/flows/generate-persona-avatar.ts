@@ -4,7 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { getAvailableVideoGenerator, getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
+import { getAvailableVideoGenerator, generateImageWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -87,7 +87,6 @@ const generatePersonaAvatarFlow = ai.defineFlow(
     outputSchema: GeneratePersonaAvatarOutputSchema,
   },
   async (input) => {
-    const imageGenerator = await getAvailableImageGenerator();
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -95,18 +94,21 @@ const generatePersonaAvatarFlow = ai.defineFlow(
     }
 
     // Step 1: Generate the static avatar image first and return it immediately.
-    const generateResponse = await ai.generate({
-      model: imageGenerator.model,
-      prompt: input.avatarDescription,
-      config: { responseModalities: ['TEXT', 'IMAGE'] }
-    });
+    // Use generateImageWithProvider() which creates a properly configured Genkit
+    // instance with API keys loaded from the database, avoiding the plugin-less
+    // default ai instance which causes "Model not found" errors.
+    const imageMessages = [{ role: 'user' as const, content: [{ text: input.avatarDescription }] }];
+    const imageResponse = await generateImageWithProvider({ messages: imageMessages });
 
-    // Type assertion to access the media property
-    const imageMedia = (generateResponse as any).media;
-    if (!imageMedia || !imageMedia[0]?.url) {
+    // Extract image data URI from response - custom providers return "Image generated: <url>"
+    // while Genkit Gemini providers return media directly
+    const avatarImageDataUri =
+      (imageResponse as any).media?.[0]?.url ||
+      (imageResponse as any).result?.content?.[0]?.text?.replace('Image generated: ', '');
+
+    if (!avatarImageDataUri) {
       throw new Error("Failed to generate the initial avatar image.");
     }
-    const avatarImageDataUri = imageMedia[0].url;
 
     // Sequential upload and DB write to prevent orphaned files
     const { publicUrl: avatarImageUrl, sizeMB: avatarImageSize } = await uploadToWasabi(avatarImageDataUri, 'images');

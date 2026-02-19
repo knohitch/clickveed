@@ -4,7 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import { generateStructuredOutput } from '@/lib/ai/api-service-manager';
 import {
   ResearchVideoTopicInputSchema,
   ResearchVideoTopicOutputSchema,
@@ -24,14 +24,14 @@ export async function researchVideoTopic(input: ResearchVideoTopicInput): Promis
     return {
       keywords: [`${input.topic} video`, 'trending content', 'viral videos'],
       outline: [
-        { section: 'Introduction', description: `Hook viewers about ${input.topic}` },
-        { section: 'Main Point 1', description: 'Key insight or value' },
-        { section: 'Main Point 2', description: 'Additional information' },
-        { section: 'Main Point 3', description: 'Expert tips or tricks' },
-        { section: 'Conclusion', description: 'Call to action' },
+        'Introduction: Hook viewers about the topic',
+        'Main Point 1: Key insight or value',
+        'Main Point 2: Additional information',
+        'Main Point 3: Expert tips or tricks',
+        'Conclusion: Call to action',
       ],
-      trends: ['Tutorial format', 'Listicle', 'Behind the scenes'],
-      titles: [
+      trends: 'Tutorial format, listicles, and behind-the-scenes content are trending.',
+      titleIdeas: [
         `Everything About ${input.topic}`,
         `${input.topic} - Complete Guide`,
         `How to Master ${input.topic}`,
@@ -42,22 +42,6 @@ export async function researchVideoTopic(input: ResearchVideoTopicInput): Promis
   }
 }
 
-const researchVideoTopicPrompt = ai.definePrompt({
-  name: 'researchVideoTopicPrompt',
-  input: { schema: ResearchVideoTopicInputSchema },
-  output: { schema: ResearchVideoTopicOutputSchema },
-  prompt: `You are a video content researcher. Research the topic "{{{topic}}}" for {{{platform}}} videos targeting {{{audience}}}.
-
-Provide:
-- 10-15 SEO keywords
-- A 5-section video outline
-- Current trends/hooks for the topic
-- 5 engaging title ideas
-
-Make it actionable for video creation.
-`,
-});
-
 const researchVideoTopicFlow = ai.defineFlow(
   {
     name: 'researchVideoTopicFlow',
@@ -65,25 +49,37 @@ const researchVideoTopicFlow = ai.defineFlow(
     outputSchema: ResearchVideoTopicOutputSchema,
   },
   async (input): Promise<ResearchVideoTopicOutput> => {
-    const messages = [
-      {
-        role: 'system' as const,
-        content: [{ text: 'You are a video content researcher. Provide SEO keywords, a 5-section video outline, current trends/hooks, and 5 engaging title ideas for the given topic, platform, and audience. Make it actionable for video creation.' }],
-      },
-      {
-        role: 'user' as const,
-        content: [{ text: `Topic: ${input.topic}\nPlatform: ${input.platform}\nAudience: ${input.audience || 'general'}` }],
-      },
-    ];
-    const response = await generateWithProvider({ messages });
+    // Use generateStructuredOutput() which properly handles provider selection,
+    // JSON schema enforcement, and response parsing — identical to find-viral-clips.ts.
+    // The old generateWithProvider() returned raw text that couldn't be parsed as structured data.
+    const prompt = `Research the topic "${input.topic}" for ${input.platform} videos targeting ${input.audience || 'a general audience'}.
 
-    // Handle both possible response formats
-    const output = ('output' in response ? response.output : response.result) as ResearchVideoTopicOutput;
+Provide:
+- 10-15 relevant SEO keywords and search terms
+- A 5-section video outline (each section as a single descriptive string)
+- Current trends or hooks for this topic (as a single string)
+- 5 engaging video title ideas
 
-    if (!output) {
+Respond with ONLY a valid JSON object matching this exact structure:
+{
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "outline": [
+    "Introduction: Hook viewers with an interesting fact or question about the topic",
+    "Section 1: Cover the first key point with examples",
+    "Section 2: Dive deeper into a related subtopic",
+    "Section 3: Share expert tips or common mistakes to avoid",
+    "Conclusion: Summarize key takeaways and call to action"
+  ],
+  "trends": "Describe the current trending formats and hooks for this topic in one paragraph.",
+  "titleIdeas": ["Title 1", "Title 2", "Title 3", "Title 4", "Title 5"]
+}`;
+
+    const result = await generateStructuredOutput(prompt, ResearchVideoTopicOutputSchema);
+
+    if (!result.output) {
       throw new Error('Failed to research video topic.');
     }
 
-    return output;
+    return result.output;
   }
 );

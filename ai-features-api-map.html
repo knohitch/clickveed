@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClickVeed — AI Features & API Map</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #7c3aed, #2563eb, #059669);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+    header p {
+      color: #475569;
+      font-size: 1rem;
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 4px 14px;
+      background: #e2e8f0;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      color: #64748b;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── LEGEND ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 44px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #64748b;
+      margin-bottom: 16px;
+      padding-left: 4px;
+    }
+
+    /* ── GRID ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto 48px;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 22px 22px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    }
+    .card:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .card-icon {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .card-title-block { flex: 1; }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.3;
+      margin-bottom: 3px;
+    }
+    .card-file {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* ── PROVIDERS ── */
+    .providers { display: flex; flex-direction: column; gap: 6px; }
+
+    .provider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .provider-rank {
+      font-size: 0.65rem;
+      font-weight: 800;
+      width: 64px;
+      flex-shrink: 0;
+      text-align: center;
+      padding: 2px 6px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .rank-primary   { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .rank-secondary { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .rank-tertiary  { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
+    .rank-fallback  { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+
+    .provider-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #1e293b;
+      flex: 1;
+    }
+    .provider-model {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      text-align: right;
+    }
+
+    /* ── OTHERS pill ── */
+    .others-pill {
+      font-size: 0.7rem;
+      color: #64748b;
+      padding: 5px 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px dashed #cbd5e1;
+      text-align: center;
+    }
+
+    /* ── CATEGORY COLORS ── */
+    /* Text */
+    .cat-text .card-icon  { background: #dbeafe; color: #1d4ed8; }
+    .cat-text .card       { border-top: 3px solid #3b82f6; }
+    /* Image */
+    .cat-image .card-icon { background: #ede9fe; color: #6d28d9; }
+    .cat-image .card      { border-top: 3px solid #8b5cf6; }
+    /* Video */
+    .cat-video .card-icon { background: #dcfce7; color: #15803d; }
+    .cat-video .card      { border-top: 3px solid #22c55e; }
+    /* Audio */
+    .cat-audio .card-icon { background: #ffedd5; color: #c2410c; }
+    .cat-audio .card      { border-top: 3px solid #f97316; }
+    /* Chat */
+    .cat-chat .card-icon  { background: #e0f2fe; color: #0369a1; }
+    .cat-chat .card       { border-top: 3px solid #0ea5e9; }
+
+    /* ── CONSTANTS TABLE ── */
+    .constants-section {
+      max-width: 1400px;
+      margin: 0 auto 48px;
+    }
+    .constants-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    .constant-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .constant-name {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .constant-value {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #7c3aed;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      margin-top: 40px;
+    }
+    footer code {
+      background: #e2e8f0;
+      color: #475569;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>ClickVeed — AI Features &amp; API Map</h1>
+  <p>Every AI-powered feature, its primary provider, and full fallback chain</p>
+  <span class="badge">Auto-generated · 2025 · api-service-manager.ts</span>
+</header>
+
+<!-- ── LEGEND ── -->
+<div class="legend">
+  <div class="legend-item" style="background:#dcfce7;border-color:#86efac;color:#15803d;">
+    <span class="legend-dot" style="background:#22c55e;"></span>Primary
+  </div>
+  <div class="legend-item" style="background:#dbeafe;border-color:#93c5fd;color:#1d4ed8;">
+    <span class="legend-dot" style="background:#3b82f6;"></span>Secondary
+  </div>
+  <div class="legend-item" style="background:#ede9fe;border-color:#c4b5fd;color:#6d28d9;">
+    <span class="legend-dot" style="background:#8b5cf6;"></span>Tertiary
+  </div>
+  <div class="legend-item" style="background:#f1f5f9;border-color:#cbd5e1;color:#64748b;">
+    <span class="legend-dot" style="background:#94a3b8;"></span>Fallback
+  </div>
+</div>
+
+<!-- ── MODEL CONSTANTS ── -->
+<div class="constants-section">
+  <div class="section-title">⚙️ Model Version Constants (api-service-manager.ts)</div>
+  <div class="constants-grid">
+    <div class="constant-card">
+      <span class="constant-name">GEMINI_TEXT_MODEL</span>
+      <span class="constant-value">googleai/gemini-2.0-flash</span>
+    </div>
+    <div class="constant-card">
+      <span class="constant-name">IMAGEN_IMAGE_MODEL</span>
+      <span class="constant-value">googleai/imagen-3.0-generate-001</span>
+    </div>
+    <div class="constant-card">
+      <span class="constant-name">GEMINI_VIDEO_MODEL</span>
+      <span class="constant-value">googleai/veo-2.0-generate-001</span>
+    </div>
+    <div class="constant-card">
+      <span class="constant-name">CLAUDE_TEXT_MODEL</span>
+      <span class="constant-value">anthropic/claude-3-5-sonnet</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════ -->
+<!-- TEXT / LLM FEATURES                   -->
+<!-- ══════════════════════════════════════ -->
+<div class="constants-section">
+  <div class="section-title">📝 Text &amp; LLM Features</div>
+</div>
+<div class="grid">
+
+  <!-- 1 Research Video Topic -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🔬</div>
+        <div class="card-title-block">
+          <div class="card-title">Topic Researcher</div>
+          <div class="card-file">flows/research-video-topic.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+        <div class="others-pill">+ DeepSeek · Grok · Qwen · Perplexity · OpenRouter · HuggingFace</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 Generate Video Script -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📄</div>
+        <div class="card-title-block">
+          <div class="card-title">Video Script Generator</div>
+          <div class="card-file">flows/generate-video-script.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+        <div class="others-pill">+ DeepSeek · Grok · Qwen · Perplexity · OpenRouter · HuggingFace</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 Analyze Thumbnails -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🖼️</div>
+        <div class="card-title-block">
+          <div class="card-title">Thumbnail Analyzer</div>
+          <div class="card-file">flows/analyze-thumbnails.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 Summarize Video Content -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📋</div>
+        <div class="card-title-block">
+          <div class="card-title">Video Content Summarizer</div>
+          <div class="card-file">flows/summarize-video-content.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 Find Viral Clips -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">✂️</div>
+        <div class="card-title-block">
+          <div class="card-title">Magic Clips (Viral Clip Finder)</div>
+          <div class="card-file">flows/find-viral-clips.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 Generate Timed Transcript -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">⏱️</div>
+        <div class="card-title-block">
+          <div class="card-title">Timed Transcript Generator</div>
+          <div class="card-file">flows/generate-timed-transcript.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 Suggest B-Roll -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🎬</div>
+        <div class="card-title-block">
+          <div class="card-title">B-Roll Suggester</div>
+          <div class="card-file">flows/suggest-b-roll.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">Stock</span>
+          <span class="provider-name">Pexels API</span>
+          <span class="provider-model">video search</span>
+        </div>
+        <div class="others-pill">Stock fallback: Pixabay · Unsplash</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 Repurpose Content -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">♻️</div>
+        <div class="card-title-block">
+          <div class="card-title">Content Repurposer</div>
+          <div class="card-file">flows/repurpose-content.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9 Automation Workflow -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">⚡</div>
+        <div class="card-title-block">
+          <div class="card-title">Automation Workflow Generator</div>
+          <div class="card-file">flows/generate-automation-workflow.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+        <div class="others-pill">Targets: n8n · Make.com</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10 Script from URL -->
+  <div class="cat-text">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🔗</div>
+        <div class="card-title-block">
+          <div class="card-title">Video Script from URL</div>
+          <div class="card-file">api/video/generate-from-url/route.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet</span>
+        </div>
+        <div class="others-pill">Rate limited: 5 requests/min</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid text -->
+
+
+<!-- ══════════════════════════════════════ -->
+<!-- IMAGE FEATURES                        -->
+<!-- ══════════════════════════════════════ -->
+<div class="constants-section">
+  <div class="section-title">🎨 Image Generation Features</div>
+</div>
+<div class="grid">
+
+  <!-- 11 Stock Media Generator -->
+  <div class="cat-image">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🖼️</div>
+        <div class="card-title-block">
+          <div class="card-title">Stock Media Generator</div>
+          <div class="card-file">flows/generate-stock-media.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Imagen</span>
+          <span class="provider-model">imagen-3.0-generate-001</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">Stable Diffusion</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Replicate</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Google Gemini (multimodal)</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="others-pill">+ DreamStudio · Midjourney · ModelLab</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12 Remove Image Background -->
+  <div class="cat-image">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">✂️</div>
+        <div class="card-title-block">
+          <div class="card-title">Background Remover</div>
+          <div class="card-file">flows/remove-image-background.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Imagen</span>
+          <span class="provider-model">imagen-3.0-generate-001</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">Stable Diffusion</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Replicate</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Google Gemini (multimodal)</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="others-pill">+ DreamStudio · Midjourney · ModelLab</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid image -->
+
+
+<!-- ══════════════════════════════════════ -->
+<!-- VIDEO FEATURES                        -->
+<!-- ══════════════════════════════════════ -->
+<div class="constants-section">
+  <div class="section-title">🎥 Video Generation Features</div>
+</div>
+<div class="grid">
+
+  <!-- 13 Persona Avatar -->
+  <div class="cat-video">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🧑‍🎨</div>
+        <div class="card-title-block">
+          <div class="card-title">AI Persona Avatar Generator</div>
+          <div class="card-file">flows/generate-persona-avatar.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Image</span>
+          <span class="provider-name">Google Imagen (avatar image)</span>
+          <span class="provider-model">imagen-3.0-generate-001</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google VEO (talking video)</span>
+          <span class="provider-model">veo-2.0-generate-001</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">Seedance</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Kling</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">HeyGen</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="others-pill">+ Wan · ModelScope · Stable Video · AnimateDiff · VideoFusion</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 14 Video from Image -->
+  <div class="cat-video">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📸</div>
+        <div class="card-title-block">
+          <div class="card-title">Video from Image Generator</div>
+          <div class="card-file">flows/generate-video-from-image.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Script</span>
+          <span class="provider-name">Google Gemini (script writing)</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google VEO (video)</span>
+          <span class="provider-model">veo-2.0-generate-001</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">Seedance</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Kling</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">HeyGen</span>
+          <span class="provider-model">—</span>
+        </div>
+        <div class="others-pill">+ Wan · ModelScope · Stable Video · AnimateDiff · VideoFusion</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid video -->
+
+
+<!-- ══════════════════════════════════════ -->
+<!-- AUDIO / TTS FEATURES                  -->
+<!-- ══════════════════════════════════════ -->
+<div class="constants-section">
+  <div class="section-title">🎙️ Audio &amp; Voice Features</div>
+</div>
+<div class="grid">
+
+  <!-- 15 Voice Over -->
+  <div class="cat-audio">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🎙️</div>
+        <div class="card-title-block">
+          <div class="card-title">AI Voice-Over Generator</div>
+          <div class="card-file">flows/generate-voice-over.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">ElevenLabs</span>
+          <span class="provider-model">TTS · MP3</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">Google Gemini (text fallback)</span>
+          <span class="provider-model">gemini-2.0-flash</span>
+        </div>
+        <div class="others-pill">+ Azure TTS · MyShell · Coqui</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 16 Voice Cloning -->
+  <div class="cat-audio">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🔊</div>
+        <div class="card-title-block">
+          <div class="card-title">AI Voice Cloning Studio</div>
+          <div class="card-file">flows/create-voice-clone.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">ElevenLabs</span>
+          <span class="provider-model">addVoice API</span>
+        </div>
+        <div class="others-pill" style="color:#b91c1c;border-color:#fca5a5;background:#fef2f2;">⚠️ No fallback — ElevenLabs required</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid audio -->
+
+
+<!-- ══════════════════════════════════════ -->
+<!-- CHAT / STREAMING FEATURES             -->
+<!-- ══════════════════════════════════════ -->
+<div class="constants-section">
+  <div class="section-title">💬 Streaming Chat Features</div>
+</div>
+<div class="grid">
+
+  <!-- 17 Creative Assistant Chat -->
+  <div class="cat-chat">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🤖</div>
+        <div class="card-title-block">
+          <div class="card-title">Creative Assistant (AI Chat)</div>
+          <div class="card-file">flows/creative-assistant-chat.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash · streaming</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o · streaming</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o · streaming</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet · streaming</span>
+        </div>
+        <div class="others-pill">Circuit breaker: auto-skips unhealthy providers</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 18 Support Chat -->
+  <div class="cat-chat">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🎧</div>
+        <div class="card-title-block">
+          <div class="card-title">Support Chat Assistant</div>
+          <div class="card-file">flows/support-chat.ts</div>
+        </div>
+      </div>
+      <div class="providers">
+        <div class="provider-row">
+          <span class="provider-rank rank-primary">Primary</span>
+          <span class="provider-name">Google Gemini</span>
+          <span class="provider-model">gemini-2.0-flash · streaming</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-secondary">2nd</span>
+          <span class="provider-name">OpenAI</span>
+          <span class="provider-model">gpt-4o · streaming</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-tertiary">3rd</span>
+          <span class="provider-name">Azure OpenAI</span>
+          <span class="provider-model">gpt-4o · streaming</span>
+        </div>
+        <div class="provider-row">
+          <span class="provider-rank rank-fallback">4th</span>
+          <span class="provider-name">Claude (Anthropic)</span>
+          <span class="provider-model">claude-3-5-sonnet · streaming</span>
+        </div>
+        <div class="others-pill">Circuit breaker: auto-skips unhealthy providers</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid chat -->
+
+<footer>
+  <p>ClickVeed · AI API Map · Generated from <code>src/lib/ai/api-service-manager.ts</code> &amp; <code>src/server/ai/flows/</code></p>
+  <p style="margin-top:6px;">Circuit breaker: opens after 5 failures · 60s cooldown · 5min health re-check</p>
+</footer>
+
+</body>
+</html>

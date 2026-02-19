@@ -4,9 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import wav from 'wav';
-import { getAvailableTTSProvider } from '@/lib/ai/api-service-manager';
-import { uploadToWasabi } from '@/server/services/wasabi-service';
+import { generateTtsWithProvider } from '@/lib/ai/api-service-manager';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
 import {
@@ -30,32 +28,6 @@ export async function generateVoiceOver(
   }
 }
 
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    let bufs = [] as any[];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
 
 const generateVoiceOverFlow = ai.defineFlow(
   {
@@ -64,74 +36,45 @@ const generateVoiceOverFlow = ai.defineFlow(
     outputSchema: GenerateVoiceOverOutputSchema,
   },
   async ({ script, speakers }) => {
-    const ttsProvider = await getAvailableTTSProvider();
     const session = await auth();
 
     if (!session?.user?.id) {
       throw new Error("User must be authenticated to generate audio.");
     }
 
-    const isMultiSpeaker = speakers && speakers.length > 1;
-    let speechConfig: any = {};
+    // generateTtsWithProvider() routes to ElevenLabs (primary) or other configured providers.
+    // This avoids using the plugin-less default ai instance and the non-existent
+    // 'googleai/gemini-1.5-flash-tts' model that caused NOT_FOUND errors.
+    const ttsMessages = [{ role: 'user' as const, content: [{ text: script }] }];
 
-    if (isMultiSpeaker) {
-      speechConfig = {
-        multiSpeakerVoiceConfig: {
-          speakerVoiceConfigs: speakers.map(s => ({
-            speaker: s.speakerId,
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: s.voice }
-            }
-          }))
-        }
-      };
-    } else {
-      const singleVoice = speakers?.[0]?.voice || 'Algenib';
-      speechConfig = {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: singleVoice },
-        },
-      };
+    const ttsResponse = await generateTtsWithProvider({ messages: ttsMessages });
+
+    // ElevenLabs and other custom providers return { result: { content: [{ text: "Speech generated: <url>" }] } }
+    // The audioUrl is embedded in the response text from ElevenLabs client
+    const responseText = (ttsResponse as any).result?.content?.[0]?.text || '';
+    let audioUrl = responseText.replace('Speech generated: ', '').trim();
+
+    if (!audioUrl || !audioUrl.startsWith('http')) {
+      // Fallback: check if result contains a direct audioUrl property
+      audioUrl = (ttsResponse as any).audioUrl || '';
     }
 
-    const generateResponse = await ai.generate({
-      model: ttsProvider.model,
-      prompt: script,
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: speechConfig
-      }
-    });
-
-    // Type assertion to access the media property
-    const media = (generateResponse as any).media;
-
-    if (!media) {
-      throw new Error('Audio generation failed. No media was returned.');
+    if (!audioUrl) {
+      throw new Error('Audio generation failed. No audio URL was returned from the TTS provider.');
     }
-
-    const audioPcmBuffer = Buffer.from(
-      media.url.substring(media.url.indexOf(',') + 1),
-      'base64'
-    );
-
-    const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
-
-    // Sequential upload and DB write to prevent orphaned files
-    const { publicUrl, sizeMB } = await uploadToWasabi(audioDataUri, 'audio');
 
     await prisma.mediaAsset.create({
       data: {
         name: `Voice Over: ${script.substring(0, 30)}...`,
         type: 'AUDIO',
-        url: publicUrl,
-        size: sizeMB,
+        url: audioUrl,
+        size: 0, // Size not available from URL-based response
         userId: session.user.id,
       }
     });
 
     return {
-      audioUrl: publicUrl,
+      audioUrl,
     };
   }
 );

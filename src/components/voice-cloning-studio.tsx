@@ -45,22 +45,29 @@ export function VoiceCloningStudio() {
 
     const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        
+
         const formData = new FormData(event.currentTarget);
+
+        // Upload audio files as multipart FormData to /api/upload
+        // (The old presigned-URL pattern was incompatible with the actual endpoint)
         const uploadPromises = files.map(async file => {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', file);
             const uploadResponse = await fetch('/api/upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: file.name, contentType: file.type }),
+                body: uploadFormData, // multipart - browser sets Content-Type with boundary
             });
-            const { uploadUrl, publicUrl } = await uploadResponse.json();
-            await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-            return publicUrl;
+            if (!uploadResponse.ok) {
+                const errData = await uploadResponse.json().catch(() => ({}));
+                throw new Error(errData.error || `Upload failed: ${uploadResponse.statusText}`);
+            }
+            const { url } = await uploadResponse.json();
+            return url as string;
         });
 
         const fileUrls = await Promise.all(uploadPromises);
         fileUrls.forEach(url => formData.append('fileUrls', url));
-        
+
         formAction(formData);
     };
 

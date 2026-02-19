@@ -138,6 +138,8 @@ export const initialApiKeysObject: ApiKeys = {
   snapchatClientId: '', snapchatClientSecret: '',
   whatsappClientId: '', whatsappClientSecret: '',
   threadsClientId: '', threadsClientSecret: '',
+  linkedinClientId: '', linkedinClientSecret: '',
+  xClientId: '', xClientSecret: '',
 };
 
 const initialSettings: AllSettings = {

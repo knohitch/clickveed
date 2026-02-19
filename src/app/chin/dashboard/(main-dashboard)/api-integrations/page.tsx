@@ -106,6 +106,10 @@ export default function ApiIntegrationsPage() {
                         <ApiKeyInput name="tiktokClientSecret" label="TikTok Client Secret" value={localApiKeys.tiktokClientSecret} onChange={handleKeyChange}/>
                          <ApiKeyInput name="snapchatClientId" label="Snapchat Client ID" value={localApiKeys.snapchatClientId} onChange={handleKeyChange}/>
                         <ApiKeyInput name="snapchatClientSecret" label="Snapchat Client Secret" value={localApiKeys.snapchatClientSecret} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="linkedinClientId" label="LinkedIn Client ID" value={localApiKeys.linkedinClientId} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="linkedinClientSecret" label="LinkedIn Client Secret" value={localApiKeys.linkedinClientSecret} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="xClientId" label="X (Twitter) Client ID" value={localApiKeys.xClientId} onChange={handleKeyChange}/>
+                        <ApiKeyInput name="xClientSecret" label="X (Twitter) Client Secret" value={localApiKeys.xClientSecret} onChange={handleKeyChange}/>
                     </ApiCategoryCard>
 
                      <ApiCategoryCard title="Video & Image Stock" icon={Video}>
