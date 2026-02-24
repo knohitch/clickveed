@@ -7,6 +7,7 @@
 
 import { validateAIEnvironment } from './ai/validate-env';
 import { aiProviderManager } from './ai/provider-manager';
+import { getUnsupportedConfiguredProviders } from './ai/provider-registry';
 import prisma from '@/server/prisma';
 
 export interface HealthCheckResult {
@@ -44,6 +45,15 @@ export async function startupHealthCheck(): Promise<HealthCheckResult> {
 
   // 1. Check AI Providers
   try {
+    let adminApiKeys: Record<string, string> = {};
+    try {
+      const { getAdminSettings } = await import('@/server/actions/admin-actions');
+      const settings = await getAdminSettings();
+      adminApiKeys = settings?.apiKeys || {};
+    } catch {
+      adminApiKeys = {};
+    }
+
     const envValidation = validateAIEnvironment();
     const status = await aiProviderManager.getStatus();
     const healthyProviders = status.filter(
@@ -62,6 +72,16 @@ export async function startupHealthCheck(): Promise<HealthCheckResult> {
     
     if (envValidation.warnings.length > 0) {
       results.details.warnings.push(...envValidation.warnings);
+    }
+
+    const unsupportedConfigured = getUnsupportedConfiguredProviders(adminApiKeys);
+    if (unsupportedConfigured.length > 0) {
+      results.details.warnings.push(
+        `Configured providers without runtime adapters: ${unsupportedConfigured.join(', ')}`
+      );
+      console.warn(
+        `⚠️ Configured providers without runtime adapters: ${unsupportedConfigured.join(', ')}`
+      );
     }
   } catch (error) {
     console.error('❌ AI validation failed:', error);

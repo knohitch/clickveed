@@ -68,6 +68,10 @@ export default function AdminUsersPage() {
     };
 
     const openPlanChangeDialog = (user: UserWithRole) => {
+        if (!user.id) {
+            toast.error('This user record is missing an ID and cannot be updated.');
+            return;
+        }
         const currentPlanName = user.plan || 'Free';
         setPlanChangeDialog({ userId: user.id, userName: user.name || user.email || 'User', currentPlan: currentPlanName });
         setSelectedPlanId(plans.find(p => p.name === currentPlanName)?.id || '');
@@ -196,11 +200,11 @@ export default function AdminUsersPage() {
                                                              </DropdownMenuSubTrigger>
                                                              <DropdownMenuSubContent>
                                                                  {plans.map(plan => (
-                                                                     <DropdownMenuItem
-                                                                         key={plan.id}
-                                                                         onClick={() => handlePlanChange(user.id, plan.id)}
-                                                                         disabled={updatingUserId === user.id || user.plan === plan.name}
-                                                                     >
+                                                                      <DropdownMenuItem
+                                                                          key={plan.id}
+                                                                          onClick={() => user.id && handlePlanChange(user.id, plan.id)}
+                                                                          disabled={!user.id || updatingUserId === user.id || user.plan === plan.name}
+                                                                      >
                                                                          {plan.name} {user.plan === plan.name && ' ✓'}
                                                                      </DropdownMenuItem>
                                                                  ))}

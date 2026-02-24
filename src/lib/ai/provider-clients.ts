@@ -40,6 +40,7 @@ interface ProviderMetadata {
 
 // Import database config service
 import { getProviderMetadata } from '@/lib/database-config-service';
+import type { AICapability, ProviderName } from './provider-registry';
 
 // Helper function to check provider setup status (now uses database)
 async function checkProviderSetup(provider: string): Promise<ProviderMetadata> {
@@ -55,6 +56,77 @@ async function checkProviderSetup(provider: string): Promise<ProviderMetadata> {
   return metadata;
 }
 
+const PROVIDER_CAPABILITY_SUPPORT: Record<string, AICapability[]> = {
+  gemini: ['text', 'text_stream', 'image', 'image_edit', 'tts'],
+  openai: ['text', 'text_stream'],
+  azureOpenai: ['text', 'text_stream'],
+  claude: ['text'],
+  huggingface: ['text'],
+  imagen: ['image'],
+  replicate: ['image'],
+  googleVeo: ['video'],
+  seedance: ['video'],
+  heygen: ['video'],
+  wan: ['video'],
+  elevenlabs: ['tts'],
+};
+
+export function providerSupportsCapability(provider: string, capability: AICapability): boolean {
+  return (PROVIDER_CAPABILITY_SUPPORT[provider] || []).includes(capability);
+}
+
+export function implementedProviders(): ProviderName[] {
+  return Object.keys(PROVIDER_CAPABILITY_SUPPORT) as ProviderName[];
+}
+
+function normalizeMessageRole(role: string): 'system' | 'user' | 'assistant' | 'tool' {
+  if (role === 'model') return 'assistant';
+  if (role === 'assistant' || role === 'system' || role === 'tool') return role;
+  return 'user';
+}
+
+function extractTextFromContent(content: any): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part: any) => {
+        if (typeof part === 'string') return part;
+        if (part?.type === 'text' && typeof part?.text === 'string') return part.text;
+        if (typeof part?.text === 'string') return part.text;
+        return '';
+      })
+      .join('\n')
+      .trim();
+  }
+  if (content && typeof content === 'object' && typeof content.text === 'string') {
+    return content.text;
+  }
+  return String(content ?? '');
+}
+
+function normalizeForOpenAI(messages: any[]) {
+  return (messages || []).map((msg: any) => {
+    const role = normalizeMessageRole(msg?.role || 'user');
+    const text = extractTextFromContent(msg?.content);
+    return {
+      role,
+      content: text,
+    };
+  });
+}
+
+function normalizeForAnthropic(messages: any[]) {
+  return (messages || []).map((msg: any) => ({
+    role: normalizeMessageRole(msg?.role || 'user') === 'assistant' ? 'assistant' : 'user',
+    content: [
+      {
+        type: 'text',
+        text: extractTextFromContent(msg?.content),
+      },
+    ],
+  }));
+}
+
 // OpenAI Client
 export class OpenAIClient {
   private client: OpenAI;
@@ -65,9 +137,10 @@ export class OpenAIClient {
 
   async generateText(messages: any[], model: string = 'gpt-4o'): Promise<TextGenerationResponse> {
     try {
+      const normalizedMessages = normalizeForOpenAI(messages);
       const response = await this.client.chat.completions.create({
         model,
-        messages,
+        messages: normalizedMessages as any,
       });
 
       return {
@@ -83,9 +156,10 @@ export class OpenAIClient {
 
   async generateTextStream(messages: any[], model: string = 'gpt-4o'): Promise<AsyncIterableIterator<TextGenerationResponse>> {
     try {
+      const normalizedMessages = normalizeForOpenAI(messages);
       const stream = await this.client.chat.completions.create({
         model,
-        messages,
+        messages: normalizedMessages as any,
         stream: true,
       });
 
@@ -123,14 +197,14 @@ export class ClaudeClient {
     try {
       // Convert messages to Claude format
       const systemMessage = messages.find(msg => msg.role === 'system');
-      const conversationMessages = messages.filter(msg => msg.role !== 'system');
+      const conversationMessages = normalizeForAnthropic(messages.filter(msg => msg.role !== 'system'));
 
       const response = await axios.post(
         `${this.baseUrl}/messages`,
         {
           model,
           messages: conversationMessages,
-          system: systemMessage ? systemMessage.content : undefined,
+          system: systemMessage ? extractTextFromContent(systemMessage.content) : undefined,
           max_tokens: 1024,
         },
         {
@@ -314,8 +388,12 @@ export class ImagenClient {
         throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
       }
 
+      // Accept either Genkit-style model id or Vertex publisher model id.
+      const vertexModel =
+        model === 'googleai/imagen-3.0-generate-001' ? 'imagegeneration@006' : model;
+
       // Using the correct Google Cloud Vertex AI endpoint with actual project ID
-      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${model}:predict`;
+      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predict`;
 
       const response = await axios.post(
         endpoint,
@@ -351,7 +429,7 @@ export class ImagenClient {
 
       return {
         imageUrl: publicUrl,
-        model,
+        model: vertexModel,
         provider: 'imagen'
       };
     } catch (error) {
@@ -388,9 +466,12 @@ export class GoogleVeoClient {
         throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
       }
 
+      const vertexModel =
+        model === 'googleai/veo-2.0-generate-001' ? 'veo-2.0-generate-001' : model;
+
       // Using the correct Google Cloud Vertex AI endpoint with actual project ID
       // Video generation is async, so we use predictLongRunning
-      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
+      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predictLongRunning`;
 
       const startResponse = await axios.post(
         endpoint,
@@ -466,7 +547,7 @@ export class GoogleVeoClient {
 
       return {
         videoUrl: publicUrl,
-        model,
+        model: vertexModel,
         provider: 'googleVeo'
       };
     } catch (error) {

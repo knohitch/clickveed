@@ -21,6 +21,7 @@ import type {
   GeminiModel
 } from './types';
 import { validateAIEnvironment } from './validate-env';
+import { getUnsupportedConfiguredProviders } from './provider-registry';
 
 // Circuit Breaker Implementation
 class CircuitBreaker {
@@ -106,13 +107,6 @@ class AIProviderManager {
   private async initialize() {
     if (this.initialized) return;
 
-    // Try to validate environment (non-blocking)
-    try {
-      validateAIEnvironment();
-    } catch (error) {
-      console.warn('[ProviderManager] Environment validation warning:', error);
-    }
-
     const priority = (
       process.env.AI_PROVIDER_PRIORITY || 'gemini,openai,anthropic'
     )
@@ -127,6 +121,19 @@ class AIProviderManager {
       apiKeys = settings?.apiKeys || {};
     } catch (error) {
       console.log('[ProviderManager] Could not load admin settings, using env vars');
+    }
+
+    // Validate environment and admin-configured keys (non-blocking)
+    try {
+      validateAIEnvironment({ apiKeys });
+      const unsupportedConfigured = getUnsupportedConfiguredProviders(apiKeys);
+      if (unsupportedConfigured.length > 0) {
+        console.warn(
+          `[ProviderManager] Configured providers without runtime adapters: ${unsupportedConfigured.join(', ')}`
+        );
+      }
+    } catch (error) {
+      console.warn('[ProviderManager] Environment validation warning:', error);
     }
 
     // OpenAI

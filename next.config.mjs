@@ -26,6 +26,8 @@ const nextConfig = {
         serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
         optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
         typedRoutes: false,
+        cpus: 1,
+        webpackBuildWorker: false,
     },
     output: 'standalone',
     reactStrictMode: true,

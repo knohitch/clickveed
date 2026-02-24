@@ -4,7 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { getAvailableVideoGenerator, generateImageWithProvider } from '@/lib/ai/api-service-manager';
+import { generateImageWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -26,44 +26,16 @@ export async function generatePersonaAvatar(
 
 async function generateVideoInBackground(userId: string, personaName: string, avatarImageDataUri: string, script: string) {
   try {
-    const videoGeneratorInfo = await getAvailableVideoGenerator();
-    const videoPrompt = [
-      { text: `Animate this avatar to speak the following script in a natural way. Script: "${script}"` },
-      { media: { url: avatarImageDataUri } }
-    ];
-
-    let generateResponse = await ai.generate({
-      model: videoGeneratorInfo.model,
-      prompt: videoPrompt,
-      config: {
-        durationSeconds: 8,
-        aspectRatio: '16:9',
-        personGeneration: 'allow_adult',
-      }
+    const response: any = await generateVideoWithProvider({
+      messages: [{ role: 'user', content: [{ text: `Animate this avatar to speak naturally. Script: "${script}". Avatar: ${avatarImageDataUri}` }] }],
     });
-
-    // Type assertion to access the operation property
-    let operation = (generateResponse as any).operation;
-    if (!operation) {
-      throw new Error('Expected the video model to return an operation.');
+    const responseText = response?.result?.content?.[0]?.text || '';
+    const generatedVideoUrl = responseText.replace('Video generated: ', '').trim();
+    if (!generatedVideoUrl) {
+      throw new Error('Video generation failed. No video URL returned by provider.');
     }
 
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      // Type assertion to access the checkOperation method
-      operation = await (ai as any).checkOperation(operation);
-    }
-
-    if (operation.error) {
-      throw new Error(`Video generation failed: ${operation.error.message}`);
-    }
-
-    const videoMediaPart = operation.output?.message?.content.find((p: any) => !!p.media);
-    if (!videoMediaPart?.media) {
-      throw new Error('Video generation failed. No media was returned in the final operation.');
-    }
-
-    const { publicUrl, sizeMB } = await uploadToWasabi(videoMediaPart.media.url, 'videos');
+    const { publicUrl, sizeMB } = await uploadToWasabi(generatedVideoUrl, 'videos');
 
     await prisma.mediaAsset.create({
       data: {

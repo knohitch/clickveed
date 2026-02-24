@@ -5,9 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import wav from 'wav';
-import { getAvailableVideoGenerator, getAvailableTTSProvider, getAvailableTextGenerator } from '@/lib/ai/api-service-manager';
-import { uploadToWasabi } from '@/server/services/wasabi-service';
+import { generateStructuredOutput, generateTtsWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
 import {
@@ -41,33 +39,6 @@ Respond ONLY with the JSON object containing the voiceoverScript.
 `,
 });
 
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    let bufs = [] as any[];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
-
 const generateVideoFromImageFlow = ai.defineFlow(
   {
     name: 'generateVideoFromImageFlow',
@@ -75,90 +46,51 @@ const generateVideoFromImageFlow = ai.defineFlow(
     outputSchema: GenerateVideoFromImageOutputSchema,
   },
   async input => {
-    const videoGenerator = await getAvailableVideoGenerator();
-    const audioGenerator = await getAvailableTTSProvider();
-    const textGenerator = await getAvailableTextGenerator();
     const session = await auth();
 
     if (!session?.user) {
       throw new Error("User must be authenticated to generate media.");
     }
 
-    // Step 1: Generate the voiceover script from the video description
-    const generateResponse = await ai.generate({
-      model: textGenerator.model,
-      prompt: `You are an expert video creator. Create a very short, compelling voiceover script (1-2 sentences) for a video based on the following description.
-
-Video Description: ${input.videoDescription}
-
-Respond ONLY with the JSON object containing the voiceoverScript.`,
-      output: { schema: z.object({ voiceoverScript: z.string().describe("A concise voiceover script (1-2 sentences) that describes the scene or adds a call-to-action.") }) }
-    });
-
-    // Type assertion to access the output property
-    const scriptOutput = (generateResponse as any).output;
-    const voiceoverScript = scriptOutput?.voiceoverScript;
+    // Step 1: Generate voiceover script using text provider router
+    const scriptResult = await generateStructuredOutput(
+      `You are an expert video creator. Create a very short, compelling voiceover script (1-2 sentences) for a video based on this description.
+Video Description: ${input.videoDescription}`,
+      z.object({ voiceoverScript: z.string() })
+    );
+    const voiceoverScript = scriptResult.output?.voiceoverScript;
     if (!voiceoverScript) {
       throw new Error('Failed to generate voiceover script.');
     }
 
-    // Step 2: Generate Video and Audio in parallel
-    const [videoGenPromise, audioGenPromise] = await Promise.all([
-      ai.generate({
-        model: videoGenerator.model,
-        prompt: [
-          { text: input.videoDescription },
-          { media: { url: input.photoUrl } }
-        ],
-        config: {
-          durationSeconds: 5,
-          aspectRatio: '16:9',
-        }
+    // Step 2: Generate Video and Audio in parallel via capability router
+    const [videoResponse, ttsResponse] = await Promise.all([
+      generateVideoWithProvider({
+        messages: [{ role: 'user', content: [{ text: `${input.videoDescription}\nImage: ${input.photoUrl}` }] }],
       }),
-      ai.generate({
-        model: audioGenerator.model,
-        prompt: voiceoverScript,
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achernar' } } }
-        }
-      })
+      generateTtsWithProvider({
+        messages: [{ role: 'user', content: [{ text: voiceoverScript }] }],
+      }),
     ]);
 
-    // Step 3: Poll for video completion
-    let operation = (videoGenPromise as any).operation;
-    if (!operation) {
-      throw new Error('Expected the video model to return an operation.');
-    }
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      operation = await (ai as any).checkOperation(operation);
-    }
-    if (operation.error) {
-      throw new Error(`Video generation failed: ${operation.error.message}`);
+    const videoText = (videoResponse as any)?.result?.content?.[0]?.text || '';
+    const videoUrl = videoText.replace('Video generated: ', '').trim();
+    if (!videoUrl) {
+      throw new Error('Video generation failed. No video URL was returned.');
     }
 
-    const videoMediaPart = operation.output?.message?.content.find((p: any) => !!p.media);
-    if (!videoMediaPart?.media) {
-      throw new Error('Video generation failed. No media was returned in the final operation.');
-    }
-
-    // Step 4: Process Audio
-    if (!audioGenPromise.media) {
-      throw new Error('Audio generation failed. No media was returned.');
-    }
-
-    // Step 5: Upload assets sequentially to prevent orphaned files
-    const { publicUrl: videoUrl, sizeMB: videoSize } = await uploadToWasabi(videoMediaPart.media.url, 'videos');
     await prisma.mediaAsset.create({
-      data: { name: `Video: ${input.videoDescription.substring(0, 30)}...`, type: 'VIDEO', url: videoUrl, size: videoSize, userId: session.user.id }
+      data: { name: `Video: ${input.videoDescription.substring(0, 30)}...`, type: 'VIDEO', url: videoUrl, size: 0, userId: session.user.id }
     });
 
-    const audioPcmBuffer = Buffer.from(audioGenPromise.media.url.substring(audioGenPromise.media.url.indexOf(',') + 1), 'base64');
-    const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
-    const { publicUrl: audioUrl, sizeMB: audioSize } = await uploadToWasabi(audioDataUri, 'audio');
+    const audioText = (ttsResponse as any)?.result?.content?.[0]?.text || '';
+    const audioUrl = audioText.replace('Speech generated: ', '').trim() || (ttsResponse as any)?.audioUrl || '';
+    if (!audioUrl) {
+      throw new Error('Audio generation failed. No audio URL was returned.');
+    }
+
     await prisma.mediaAsset.create({
-      data: { name: `Audio: ${input.musicPrompt.substring(0, 30)}...`, type: 'AUDIO', url: audioUrl, size: audioSize, userId: session.user.id }
+      data: { name: `Audio: ${input.musicPrompt.substring(0, 30)}...`, type: 'AUDIO', url: audioUrl, size: 0, userId: session.user.id }
     });
 
 

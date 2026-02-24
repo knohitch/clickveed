@@ -4,7 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
+import { generateImageEditWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -37,22 +37,15 @@ const removeImageBackgroundFlow = ai.defineFlow(
       throw new Error("User must be authenticated to process images.");
     }
 
-    // This is a simulation using a generative model. A real implementation would use
-    // a more specialized image segmentation model for this task for better accuracy.
-    const imageGenerator = await getAvailableImageGenerator();
-
     // We need to fetch the image data first to pass it as a data URI to the model
     const imageResponse = await fetch(input.imageUrl);
     const imageBuffer = await imageResponse.arrayBuffer();
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
     const dataUri = `data:${contentType};base64,${Buffer.from(imageBuffer).toString('base64')}`;
 
-    const generateResponse = await ai.generate({
-      model: imageGenerator.model,
-      prompt: `Please remove the background from this image. The subject should be perfectly isolated with a transparent background. Image: {{media url=dataUri}}`,
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-      },
+    const generateResponse = await generateImageEditWithProvider({
+      prompt: 'Please remove the background from this image. The subject should be perfectly isolated with a transparent background.',
+      imageDataUri: dataUri,
     });
 
     // Type assertion to access the media property

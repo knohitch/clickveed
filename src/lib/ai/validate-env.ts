@@ -10,15 +10,20 @@ export interface ValidationResult {
   configuredProviders: string[];
 }
 
-export function validateAIEnvironment(): ValidationResult {
+interface ValidateOptions {
+  apiKeys?: Record<string, string>;
+}
+
+export function validateAIEnvironment(options: ValidateOptions = {}): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const configuredProviders: string[] = [];
+  const apiKeys = options.apiKeys || {};
   
   console.log('🔍 Validating AI Environment Variables...\n');
   
   // Check OpenAI
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = apiKeys.openai || process.env.OPENAI_API_KEY;
   if (!openaiKey) {
     warnings.push('⚠️  OPENAI_API_KEY is not set');
   } else if (!openaiKey.startsWith('sk-')) {
@@ -30,7 +35,7 @@ export function validateAIEnvironment(): ValidationResult {
   }
   
   // Check Google AI (Gemini)
-  const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+  const geminiKey = apiKeys.gemini || process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     warnings.push('⚠️  GOOGLE_AI_API_KEY/GEMINI_API_KEY is not set');
   } else {
@@ -39,7 +44,7 @@ export function validateAIEnvironment(): ValidationResult {
   }
   
   // Check Anthropic
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const anthropicKey = apiKeys.claude || apiKeys.anthropic || process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     warnings.push('⚠️  ANTHROPIC_API_KEY is not set');
   } else if (!anthropicKey.startsWith('sk-ant-')) {
@@ -55,10 +60,10 @@ export function validateAIEnvironment(): ValidationResult {
   
   if (!hasAtLeastOne) {
     errors.push('❌ CRITICAL: No AI provider API keys configured!');
-    errors.push('Please add at least one API key to your .env file:');
-    errors.push('  OPENAI_API_KEY=sk-...');
-    errors.push('  GOOGLE_AI_API_KEY=AIza...');
-    errors.push('  ANTHROPIC_API_KEY=sk-ant-...');
+    errors.push('Please add at least one API key to your .env file or admin settings:');
+    errors.push('  OPENAI_API_KEY=sk-... (or admin key: openai)');
+    errors.push('  GOOGLE_AI_API_KEY=AIza... (or admin key: gemini)');
+    errors.push('  ANTHROPIC_API_KEY=sk-ant-... (or admin key: claude)');
   }
   
   // Print warnings

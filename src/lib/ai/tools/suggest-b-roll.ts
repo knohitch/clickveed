@@ -5,9 +5,8 @@
  * and fetches stock video clips based on those suggestions using custom tools.
  */
 
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getAvailableTextGenerator, getAvailableStockPhotoTool } from '../api-service-manager';
+import { generateStructuredOutput } from '../api-service-manager';
 
 // ========= Suggest B-Roll Flow =========
 
@@ -31,12 +30,7 @@ export async function suggestBroll(input: SuggestBrollInput): Promise<SuggestBro
 
   The search terms should be specific and actionable.`;
 
-    // Use a simplified approach with direct generation
-    const result = await ai.generate({
-        prompt,
-        output: { schema: SuggestBrollOutputSchema }
-    });
-
+    const result = await generateStructuredOutput(prompt, SuggestBrollOutputSchema);
     if (!result.output?.suggestions || result.output.suggestions.length === 0) {
         throw new Error("Failed to generate B-roll suggestions.");
     }

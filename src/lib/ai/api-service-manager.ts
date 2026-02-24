@@ -10,18 +10,16 @@
  * - Provider validation to check API keys on startup
  * - Health tracking for all providers
  */
-import { ai, createGenkitInstance, getOpenAIClient } from '@/ai/genkit';
+import { createGenkitInstance } from '@/ai/genkit';
 import { type Tool } from 'genkit';
-import { googleAI, type GoogleAIPlugin } from '@genkit-ai/googleai';
 import { z } from 'zod';
 import { searchPexelsTool } from '@/server/ai/tools/pexels-tool';
 import { searchPixabayTool } from '@/server/ai/tools/pixabay-tool';
 import { getUnsplashRandomPhoto } from '@/server/ai/tools/unsplash-tool';
 import { searchPexelsVideosTool } from '@/server/ai/tools/pexels-video-tool';
 import { getAdminSettings } from '@/server/actions/admin-actions';
-import { initialApiKeysObject } from '@/contexts/admin-settings-context';
-import OpenAI from 'openai';
-import { createProviderClient } from './provider-clients';
+import { createProviderClient, providerSupportsCapability } from './provider-clients';
+import { MODEL_CONSTANTS, getProvidersForCapability, type AICapability } from './provider-registry';
 
 /**
  * Circuit Breaker Implementation
@@ -153,148 +151,91 @@ interface GenerateRequest {
 
 interface GenerateStreamRequest extends GenerateRequest {}
 
-type ProviderName = keyof typeof initialApiKeysObject;
-
-interface ProviderConfig {
-  name: ProviderName;
-  model: string; // Changed from ModelReference<any> to string
-}
-
 interface ProviderInfo {
   model: string;
   provider: string;
   apiKey: string;
 }
 
-// ============================================================================
-// AI MODEL CONSTANTS
-// Update only these constants when Google (or others) phases out a model version.
-// All priority lists below reference these — no other string hunts needed.
-// ============================================================================
-const GEMINI_TEXT_MODEL  = 'googleai/gemini-2.0-flash';         // Gemini primary for text
-const IMAGEN_IMAGE_MODEL = 'googleai/imagen-3.0-generate-001';  // Google Imagen primary for images
-const GEMINI_VIDEO_MODEL = 'googleai/veo-2.0-generate-001';     // Google VEO primary for video
-const CLAUDE_TEXT_MODEL  = 'anthropic/claude-3-5-sonnet';       // Claude fallback for text
+type ProviderSkipReason = 'missing_key' | 'not_implemented' | 'unsupported_capability' | 'circuit_open' | 'recently_unhealthy';
 
-// LLM Providers Priority List (Gemini is PRIMARY)
-const llmProviderPriority: ProviderConfig[] = [
-  // Google AI (PRIMARY)
-  { name: 'gemini',      model: GEMINI_TEXT_MODEL },
+function logProviderSkip(feature: AICapability, provider: string, reason: ProviderSkipReason): void {
+  console.log(JSON.stringify({ event: 'provider_skip', feature, provider, reason, at: new Date().toISOString() }));
+}
 
-  // OpenAI (FALLBACK)
-  { name: 'openai',      model: 'openai/gpt-4o' },
-  { name: 'azureOpenai', model: 'openai/gpt-4o' },
+function logProviderSelection(feature: AICapability, provider: string): void {
+  console.log(JSON.stringify({ event: 'provider_selected', feature, provider, at: new Date().toISOString() }));
+}
 
-  // Anthropic (FALLBACK)
-  { name: 'claude',      model: CLAUDE_TEXT_MODEL },
+function logFallback(feature: AICapability, provider: string, reason: string): void {
+  console.warn(JSON.stringify({ event: 'provider_fallback', feature, provider, reason, at: new Date().toISOString() }));
+}
 
-  // Other LLM providers
-  { name: 'deepseek',    model: 'openai/gpt-4o' },
-  { name: 'grok',        model: 'openai/gpt-4o' },
-  { name: 'qwen',        model: 'openai/gpt-4o' },
-  { name: 'perplexity',  model: 'openai/gpt-4o' },
-  { name: 'openrouter',  model: 'openai/gpt-4o' },
-  { name: 'huggingface', model: 'openai/gpt-4o' },
-];
-
-// Image Generation Providers Priority List
-// Google Imagen is PRIMARY; Gemini multimodal is fallback 3 (requires gemini key)
-const imageProviderPriority: ProviderConfig[] = [
-  { name: 'imagen',          model: IMAGEN_IMAGE_MODEL }, // PRIMARY (Google Imagen via Vertex AI)
-  { name: 'stableDiffusion', model: 'openai/gpt-4o' },   // FALLBACK 1
-  { name: 'replicate',       model: 'openai/gpt-4o' },   // FALLBACK 2
-  { name: 'gemini',          model: GEMINI_TEXT_MODEL },  // FALLBACK 3 (Gemini multimodal)
-  { name: 'dreamstudio',     model: 'openai/gpt-4o' },
-  { name: 'midjourney',      model: 'openai/gpt-4o' },
-  { name: 'modelslab',       model: 'openai/gpt-4o' },
-];
-
-// Video Generation Providers Priority List
-// Google VEO is PRIMARY; Seedance → Kling → HeyGen → others as fallbacks
-const videoProviderPriority: ProviderConfig[] = [
-  { name: 'googleVeo',   model: GEMINI_VIDEO_MODEL },     // PRIMARY (Google VEO)
-  { name: 'seedance',    model: 'openai/gpt-4o' },        // FALLBACK 1
-  { name: 'kling',       model: 'openai/gpt-4o' },        // FALLBACK 2
-  { name: 'heygen',      model: 'openai/gpt-4o' },        // FALLBACK 3
-  { name: 'wan',         model: 'openai/gpt-4o' },
-  { name: 'modelscope',  model: 'openai/gpt-4o' },
-  { name: 'stableVideo', model: 'openai/gpt-4o' },
-  { name: 'animateDiff', model: 'openai/gpt-4o' },
-  { name: 'videoFusion', model: 'openai/gpt-4o' },
-];
-
-// TTS Providers Priority List
-// ElevenLabs is primary since 'googleai/gemini-1.5-flash-tts' is not a valid Genkit model.
-// Gemini text model is listed as fallback for providers that synthesize speech via text.
-const ttsProviderPriority: ProviderConfig[] = [
-  // ElevenLabs (PRIMARY - reliable TTS with real audio output)
-  { name: 'elevenlabs', model: 'elevenlabs' as any },
-
-  // Google AI text model as fallback (used by custom TTS provider clients)
-  { name: 'gemini', model: GEMINI_TEXT_MODEL as any },
-
-  // Other TTS providers
-  { name: 'azureTts', model: 'openai/gpt-4o' },
-  { name: 'myshell', model: 'openai/gpt-4o' },
-  { name: 'coqui', model: 'openai/gpt-4o' },
-];
-
-// This function returns information about the available provider
-// based on API keys configured in the admin settings
-// NOW WITH CIRCUIT BREAKER SUPPORT
-async function getAvailableProvider(priorityList: ProviderConfig[], type: string): Promise<ProviderInfo> {
+async function selectProviderForCapability(capability: AICapability): Promise<ProviderInfo> {
   const { apiKeys } = await getAdminSettings();
+  const candidates = getProvidersForCapability(capability);
 
-  for (const provider of priorityList) {
-    const apiKey = apiKeys[provider.name as keyof typeof apiKeys];
+  for (const candidate of candidates) {
+    const provider = candidate.name;
+    const apiKey = apiKeys[provider as keyof typeof apiKeys];
 
-    // Skip if no API key
     if (!apiKey) {
+      logProviderSkip(capability, provider, 'missing_key');
       continue;
     }
 
-    // Skip if circuit breaker is open for this provider
-    if (!circuitBreaker.shouldAttempt(provider.name)) {
-      console.log(`[ProviderManager] Skipping ${provider.name} due to circuit breaker`);
+    if (!candidate.implemented) {
+      logProviderSkip(capability, provider, 'not_implemented');
       continue;
     }
 
-    // Check health status
-    const health = getProviderHealth(provider.name);
+    if (!providerSupportsCapability(provider, capability)) {
+      logProviderSkip(capability, provider, 'unsupported_capability');
+      continue;
+    }
+
+    if (!circuitBreaker.shouldAttempt(provider)) {
+      logProviderSkip(capability, provider, 'circuit_open');
+      continue;
+    }
+
+    const health = getProviderHealth(provider);
     if (health && !health.isHealthy) {
       const timeSinceCheck = Date.now() - health.lastChecked;
-      // Re-check after 5 minutes
       if (timeSinceCheck < 300000) {
-        console.log(`[ProviderManager] Skipping ${provider.name} due to unhealthy status`);
+        logProviderSkip(capability, provider, 'recently_unhealthy');
         continue;
       }
     }
 
-    // Return both the model string and the provider config
-    console.log(`[ProviderManager] Selected ${provider.name} for ${type} generation`);
+    logProviderSelection(capability, provider);
     return {
-      model: provider.model,
-      provider: provider.name,
-      apiKey
+      model: candidate.model,
+      provider,
+      apiKey,
     };
   }
-  throw new Error(`No healthy ${type} provider available. Please configure at least one API key and ensure providers are accessible.`);
+  throw new Error(`No healthy ${capability} provider available. Please configure at least one supported API key.`);
 }
 
 export async function getAvailableTextGenerator() {
-  return getAvailableProvider(llmProviderPriority, 'text');
+  return selectProviderForCapability('text');
 }
 
 export async function getAvailableImageGenerator() {
-  return getAvailableProvider(imageProviderPriority, 'image');
+  return selectProviderForCapability('image');
+}
+
+export async function getAvailableImageEditor() {
+  return selectProviderForCapability('image_edit');
 }
 
 export async function getAvailableVideoGenerator() {
-  return getAvailableProvider(videoProviderPriority, 'video');
+  return selectProviderForCapability('video');
 }
 
 export async function getAvailableTTSProvider() {
-  return getAvailableProvider(ttsProviderPriority, 'TTS');
+  return selectProviderForCapability('tts');
 }
 
 export async function getAvailableStockPhotoTool() {
@@ -347,10 +288,11 @@ function isQuotaError(error: unknown): boolean {
 // for each request, ensuring the correct provider is used
 // NOW WITH CIRCUIT BREAKER TRACKING AND QUOTA FALLBACK
 export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) {
-  // Priority order: try Gemini first (DEFAULT), then OpenAI (FALLBACK), then others
-  const providerPriority = ['gemini', 'openai', 'azureOpenai', 'claude', 'deepseek', 'grok', 'qwen', 'perplexity', 'openrouter', 'huggingface'];
-
   const { apiKeys } = await getAdminSettings();
+  const providerPriority = getProvidersForCapability('text')
+    .filter((p) => p.implemented && providerSupportsCapability(p.name, 'text'))
+    .map((p) => p.name);
+
   let lastError: Error | null = null;
 
   for (const providerName of providerPriority) {
@@ -375,8 +317,8 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 
       // Return in Genkit-compatible format
       const modelMap: Record<string, string> = {
-        'gemini': GEMINI_TEXT_MODEL,
-        'claude': CLAUDE_TEXT_MODEL,
+        'gemini': MODEL_CONSTANTS.GEMINI_TEXT_MODEL,
+        'claude': MODEL_CONSTANTS.CLAUDE_TEXT_MODEL,
       };
       return {
         model: modelMap[providerName] || 'openai/gpt-4o',
@@ -391,7 +333,7 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 
       // Check if it's a quota error
       if (isQuotaError(error)) {
-        console.warn(`[ProviderManager] Quota/Rate limit error with ${providerName}, trying next provider...`);
+        logFallback('text', providerName, 'quota_or_rate_limit');
         lastError = error instanceof Error ? error : new Error(String(error));
         continue; // Try next provider
       }
@@ -407,6 +349,7 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
       }
 
       markProviderUnhealthy(providerName, error instanceof Error ? error.message : 'Unknown error');
+      logFallback('text', providerName, 'provider_error');
       console.error(`Error generating text with ${providerName}:`, error);
 
       // If this is the last provider, throw the error
@@ -440,11 +383,11 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 }
 
 export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest, 'model'>) {
-  // Priority order for streaming: Gemini first (DEFAULT), then OpenAI (FALLBACK), then Claude
-  const providerPriority = ['gemini', 'openai', 'azureOpenai', 'claude'];
-
   const settings = await getAdminSettings();
   const apiKeys = settings.apiKeys;
+  const providerPriority = getProvidersForCapability('text_stream')
+    .filter((p) => p.implemented && providerSupportsCapability(p.name, 'text_stream'))
+    .map((p) => p.name);
 
   // Debug: Log which keys are available (names only, not values)
   const configuredProviders = providerPriority.filter(p => !!apiKeys[p as keyof typeof apiKeys]);
@@ -487,11 +430,12 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
 
       // Check if it's a quota error
       if (isQuotaError(error)) {
-        console.warn(`[ProviderManager] Quota/Rate limit with ${providerName} streaming, trying next provider...`);
+        logFallback('text_stream', providerName, 'quota_or_rate_limit');
         continue;
       }
 
       markProviderUnhealthy(providerName, error instanceof Error ? error.message : 'Unknown error');
+      logFallback('text_stream', providerName, 'provider_error');
       console.error(`Error streaming text with ${providerName}:`, error);
 
       // Try next provider
@@ -528,7 +472,7 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
         }
         return typeof msg.content === 'string' ? msg.content : '';
       }).join(' ');
-      const response = await client.generateImage(prompt);
+      const response = await client.generateImage(prompt, providerInfo.model);
 
       // Record success
       circuitBreaker.recordSuccess(providerInfo.provider);
@@ -562,6 +506,24 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
   }
 }
 
+export async function generateImageEditWithProvider(input: { prompt: string; imageDataUri: string }) {
+  const providerInfo = await getAvailableImageEditor();
+  const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
+
+  const result = await genkitInstance.generate({
+    model: providerInfo.model,
+    prompt: [
+      { text: input.prompt },
+      { media: { url: input.imageDataUri } },
+    ],
+    config: {
+      responseModalities: ['TEXT', 'IMAGE'],
+    },
+  });
+
+  return result;
+}
+
 export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'model'>) {
   const providerInfo = await getAvailableVideoGenerator();
 
@@ -577,7 +539,7 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
         }
         return typeof msg.content === 'string' ? msg.content : '';
       }).join(' ');
-      const response = await client.generateVideo(prompt);
+      const response = await client.generateVideo(prompt, providerInfo.model);
 
       // Record success
       circuitBreaker.recordSuccess(providerInfo.provider);
@@ -628,7 +590,7 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
         }
         return typeof msg.content === 'string' ? msg.content : '';
       }).join(' ');
-      const response = await client.generateSpeech(text);
+      const response = await client.generateSpeech(text, undefined, providerInfo.model);
 
       // Return in Genkit-compatible format
       return {

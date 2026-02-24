@@ -4,7 +4,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { getAvailableImageGenerator } from '@/lib/ai/api-service-manager';
+import { generateImageWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -25,10 +25,7 @@ export async function generateStockMedia(
     return await generateStockMediaFlow(input);
   } catch (error) {
     console.error('Generate stock media failed:', error);
-    return {
-      images: [],
-      error: error instanceof Error ? error.message : 'Failed to generate stock media',
-    };
+    return { images: [] };
   }
 }
 
@@ -39,64 +36,55 @@ const generateStockMediaFlow = ai.defineFlow(
     outputSchema: GenerateStockMediaOutputSchema,
   },
   async (input: GenerateStockMediaInput) => {
-    const generator = await getAvailableImageGenerator();
     const session = await auth();
 
     if (!session?.user?.id) {
       throw new Error("User must be authenticated to generate media.");
     }
 
-    let promptText = input.prompt;
-    let modelToUse = generator.model;
-    
-    if (generator.provider === 'gemini') {
-      promptText = `Photorealistic stock photo: ${input.prompt}. High quality, professional, clean, for commercial use.`
-      // Use the correct model name for Gemini image generation
-      // The model should be 'gemini-1.5-flash' without the 'googleai/' prefix for image generation
-      modelToUse = 'gemini-1.5-flash';
-      console.log(`[StockMedia] Using Gemini model: ${modelToUse}`);
-    }
+    const promptText = `Photorealistic stock photo: ${input.prompt}. High quality, professional, clean, for commercial use.`;
 
-    const generateResponse = await ai.generate({
-      model: modelToUse,
-      prompt: promptText,
-      config: {
-        count: 4,
-        responseModalities: ['TEXT', 'IMAGE'], // Required for Gemini Image Gen
-      }
-    });
+    const generationResults = await Promise.all(
+      Array.from({ length: 4 }, async (_, i) => {
+        const response: any = await generateImageWithProvider({
+          messages: [{ role: 'user', content: [{ text: promptText }] }],
+        });
 
-    // Type assertion to access the media property
-    const media = (generateResponse as any).media;
+        let generatedUrl = '';
+        const media = response?.media;
+        if (typeof media?.url === 'string') {
+          generatedUrl = media.url;
+        } else if (Array.isArray(media) && typeof media[0]?.url === 'string') {
+          generatedUrl = media[0].url;
+        } else {
+          const text = response?.result?.content?.[0]?.text || '';
+          if (typeof text === 'string' && text.startsWith('Image generated: ')) {
+            generatedUrl = text.replace('Image generated: ', '').trim();
+          }
+        }
 
-    if (!media || !Array.isArray(media) || media.length === 0) {
-      throw new Error('Image generation failed. No media was returned.');
-    }
+        if (!generatedUrl) {
+          throw new Error(`Image generation failed for item ${i + 1}.`);
+        }
 
-    // Upload all generated images to Wasabi in parallel
-    const uploadPromises = media.map(async (img: any, index: number) => {
-      const dataUri = img.url; // Assuming the provider returns a data URI
-      const { publicUrl, sizeMB } = await uploadToWasabi(dataUri, 'images');
-
-      // Return data needed for the subsequent database write
-      return {
-        name: `${input.prompt.substring(0, 30)}... #${index + 1}`,
-        type: 'IMAGE' as const,
-        url: publicUrl,
-        size: sizeMB,
-        userId: session.user.id,
-      };
-    });
-
-    const uploadedImagesData = await Promise.all(uploadPromises);
+        const { publicUrl, sizeMB } = await uploadToWasabi(generatedUrl, 'images');
+        return {
+          name: `${input.prompt.substring(0, 30)}... #${i + 1}`,
+          type: 'IMAGE' as const,
+          url: publicUrl,
+          size: sizeMB,
+          userId: session.user.id,
+        };
+      })
+    );
 
     // Write all records to the database in a single transaction
     await prisma.mediaAsset.createMany({
-      data: uploadedImagesData,
+      data: generationResults,
     });
 
     return {
-      images: uploadedImagesData.map(d => d.url),
+      images: generationResults.map(d => d.url),
     };
   }
 );

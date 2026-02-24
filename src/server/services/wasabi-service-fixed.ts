@@ -66,17 +66,23 @@ async function getWasabiCredentials(): Promise<WasabiCredentials> {
             );
         }
 
+        const endpointRaw = wasabiEndpoint as string;
+        const region = wasabiRegion as string;
+        const accessKeyId = wasabiAccessKey as string;
+        const secretAccessKey = wasabiSecretKey as string;
+        const bucket = wasabiBucket as string;
+
         // Ensure endpoint has protocol
-        const endpoint = wasabiEndpoint.startsWith('http')
-            ? wasabiEndpoint
-            : `https://${wasabiEndpoint}`;
+        const endpoint = endpointRaw.startsWith('http')
+            ? endpointRaw
+            : `https://${endpointRaw}`;
 
         return {
             endpoint,
-            region: wasabiRegion,
-            accessKeyId: wasabiAccessKey,
-            secretAccessKey: wasabiSecretKey,
-            bucket: wasabiBucket,
+            region,
+            accessKeyId,
+            secretAccessKey,
+            bucket,
             cdnUrl: bunnyCdnUrl || null,
         };
     } catch (error) {

@@ -6,7 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import wav from 'wav';
-import { getAvailableTTSProvider, getAvailableVideoGenerator, generateStructuredOutput } from '@/lib/ai/api-service-manager';
+import { generateTtsWithProvider, generateStructuredOutput, generateImageWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -104,35 +104,29 @@ export async function generatePipelineVoiceOver(input: GeneratePipelineVoiceOver
     ? input.script.split(/Voiceover:|VO:|Narrator:|Dialogue:/).slice(1).join(' ').replace(/\[.*?\]/g, '')
     : input.script; // Fallback to using the whole script if no cues are found.
 
-  // Get the provider info and extract just the model string
-  const providerInfo = await getAvailableTTSProvider();
-
-  const { media } = await ai.generate({
-    prompt: voiceOverText,
-    model: providerInfo.model, // Use just the model string, not the full provider info
-    config: {
-      responseModalities: ['AUDIO'],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: input.voice },
-        },
-      }
-    }
+  const ttsResponse: any = await generateTtsWithProvider({
+    messages: [{ role: 'user' as const, content: [{ text: voiceOverText }] }],
   });
 
-  if (!media) {
-    throw new Error('Audio generation failed. No media was returned.');
+  const responseText = ttsResponse?.result?.content?.[0]?.text || '';
+  let publicUrl = responseText.replace('Speech generated: ', '').trim() || ttsResponse?.audioUrl || '';
+  let sizeMB = 0;
+
+  // If a provider returned raw audio media instead of URL, upload it.
+  if (!publicUrl && ttsResponse?.media?.url) {
+    const audioPcmBuffer = Buffer.from(
+      ttsResponse.media.url.substring(ttsResponse.media.url.indexOf(',') + 1),
+      'base64'
+    );
+    const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
+    const uploadResult = await uploadToWasabi(audioDataUri, 'audio');
+    publicUrl = uploadResult.publicUrl;
+    sizeMB = uploadResult.sizeMB;
   }
 
-  const audioPcmBuffer = Buffer.from(
-    media.url.substring(media.url.indexOf(',') + 1),
-    'base64'
-  );
-
-  const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
-
-  // Sequential upload and DB write to prevent orphaned files
-  const { publicUrl, sizeMB } = await uploadToWasabi(audioDataUri, 'audio');
+  if (!publicUrl) {
+    throw new Error('Audio generation failed. No media was returned.');
+  }
 
   // Extract the original prompt from the script for better naming
   const originalPromptMatch = input.script.match(/Core Idea: (.*?)\n/);
@@ -170,24 +164,27 @@ export async function generatePipelineVideo(input: GeneratePipelineVideoInput): 
       ? sceneDescriptions.join(' ').replace(/\[SCENE:/g, '').replace(/\]/g, '')
       : input.script.substring(0, 200); // Fallback to first 200 characters
 
-    // Generate an image from the visual prompt using the image generation service
-    const { getAvailableImageGenerator } = await import('@/lib/ai/api-service-manager');
-    const imageProvider = await getAvailableImageGenerator();
-
-    const { ai: genkitAi } = await import('@/ai/genkit');
-    const imageResponse = await genkitAi.generate({
-      model: imageProvider.model,
-      prompt: visualPrompt.substring(0, 500), // Limit prompt length
-      config: {
-        responseModalities: ['IMAGE']
-      }
+    // Generate placeholder scene image through provider manager to avoid model/provider mismatch.
+    const imageResponse: any = await generateImageWithProvider({
+      messages: [{ role: 'user' as const, content: [{ text: visualPrompt.substring(0, 500) }] }],
     });
 
-    if (!imageResponse.media) {
-      throw new Error('Image generation failed for video pipeline scene.');
+    let placeholderImageUrl = '';
+    const media = imageResponse?.media;
+    if (typeof media?.url === 'string') {
+      placeholderImageUrl = media.url;
+    } else if (Array.isArray(media) && typeof media[0]?.url === 'string') {
+      placeholderImageUrl = media[0].url;
+    } else {
+      const text = imageResponse?.result?.content?.[0]?.text || '';
+      if (typeof text === 'string' && text.startsWith('Image generated: ')) {
+        placeholderImageUrl = text.replace('Image generated: ', '').trim();
+      }
     }
 
-    const placeholderImageUrl = imageResponse.media.url;
+    if (!placeholderImageUrl) {
+      throw new Error('Image generation failed for video pipeline scene.');
+    }
 
 
     // Import the video generation function
