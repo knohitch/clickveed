@@ -42,6 +42,29 @@ async function verifyFeatureAccess(featureId: string): Promise<void> {
 
 export const findViralClips = findViralClipsFlow;
 
+async function readTextFromStream(stream: ReadableStream<any>): Promise<string> {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        if (typeof value === 'string') {
+            fullText += value;
+            continue;
+        }
+
+        if (value) {
+            fullText += decoder.decode(value as Uint8Array, { stream: true });
+        }
+    }
+
+    fullText += decoder.decode();
+    return fullText;
+}
+
 const GenerateWorkflowSchema = z.object({
     prompt: z.string().min(1, 'Prompt is required'),
     platform: z.enum(['n8n', 'Make.com']),
@@ -161,7 +184,7 @@ export async function creativeAssistantChatAction(prevState: any, formData: Form
     const historyJson = formData.get('history') as string;
 
     if (!message) {
-        return { message: 'Message is required', stream: null, errors: { message: ['Message is required'] } };
+        return { message: 'Message is required', stream: null, responseText: '', errors: { message: ['Message is required'] } };
     }
 
     let history: { role: 'user' | 'assistant'; content: string }[] = [];
@@ -183,10 +206,12 @@ export async function creativeAssistantChatAction(prevState: any, formData: Form
             message,
             history
         });
+        const responseText = await readTextFromStream(stream);
 
         return {
             message: '',
-            stream: stream,
+            stream: null,
+            responseText,
             errors: {}
         };
     } catch (error) {
@@ -194,6 +219,7 @@ export async function creativeAssistantChatAction(prevState: any, formData: Form
         return {
             message: error instanceof Error ? error.message : 'An unexpected error occurred',
             stream: null,
+            responseText: '',
             errors: {}
         };
     }
@@ -358,7 +384,7 @@ export async function supportChatAction(prevState: any, formData: FormData) {
     const historyJson = formData.get('history') as string;
 
     if (!message) {
-        return { message: 'Message is required', stream: null, errors: { message: ['Message is required'] } };
+        return { message: 'Message is required', stream: null, responseText: '', errors: { message: ['Message is required'] } };
     }
 
     let history: any[] = [];
@@ -375,10 +401,12 @@ export async function supportChatAction(prevState: any, formData: FormData) {
             message,
             history
         });
+        const responseText = await readTextFromStream(stream);
 
         return {
             message: '',
-            stream: stream,
+            stream: null,
+            responseText,
             errors: {}
         };
     } catch (error) {
@@ -386,6 +414,7 @@ export async function supportChatAction(prevState: any, formData: FormData) {
         return {
             message: error instanceof Error ? error.message : 'An unexpected error occurred',
             stream: null,
+            responseText: '',
             errors: {}
         };
     }

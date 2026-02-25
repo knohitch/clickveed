@@ -1,18 +1,13 @@
-
+'use client';
 
 import { PersonaAvatarStudio } from '@/components/persona-avatar-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
-import type { PlanFeature } from '@prisma/client';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 export default function PersonaAvatarStudioPage() {
-    return (
-        <FeatureGuard featureId="persona-studio" planName={null} fallback={<PersonaAvatarStudioLoading />}>
-            <PersonaAvatarStudioContent />
-        </FeatureGuard>
-    );
+    return <PersonaAvatarStudioContent />;
 }
 
 function PersonaAvatarStudioContent() {

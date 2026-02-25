@@ -236,7 +236,7 @@ export class GeminiClient {
     this.apiKey = apiKey;
   }
 
-  async generateText(messages: any[], model: string = 'gemini-2.0-flash'): Promise<TextGenerationResponse> {
+  async generateText(messages: any[], model: string = 'gemini-flash-latest'): Promise<TextGenerationResponse> {
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -272,7 +272,7 @@ export class GeminiClient {
     }
   }
 
-  async generateTextStream(messages: any[], model: string = 'gemini-2.0-flash'): Promise<AsyncIterableIterator<TextGenerationResponse>> {
+  async generateTextStream(messages: any[], model: string = 'gemini-flash-latest'): Promise<AsyncIterableIterator<TextGenerationResponse>> {
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -382,15 +382,16 @@ export class ImagenClient {
     }
   }
 
-  async generateImage(prompt: string, model: string = 'imagegeneration@006'): Promise<ImageGenerationResponse> {
+  async generateImage(prompt: string, model: string = 'imagen-4.0-generate-001'): Promise<ImageGenerationResponse> {
     try {
       if (!this.projectId) {
         throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
       }
 
-      // Accept either Genkit-style model id or Vertex publisher model id.
-      const vertexModel =
-        model === 'googleai/imagen-3.0-generate-001' ? 'imagegeneration@006' : model;
+      // Accept either prefixed model ids (googleai/...) or raw Vertex ids.
+      const rawModel = model.includes('/') ? model.split('/').pop() || model : model;
+      // Keep legacy compatibility for old Imagen 3 identifier.
+      const vertexModel = rawModel === 'imagen-3.0-generate-001' ? 'imagegeneration@006' : rawModel;
 
       // Using the correct Google Cloud Vertex AI endpoint with actual project ID
       const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predict`;
@@ -460,14 +461,15 @@ export class GoogleVeoClient {
     }
   }
 
-  async generateVideo(prompt: string, model: string = 'imagen-video-001'): Promise<VideoGenerationResponse> {
+  async generateVideo(prompt: string, model: string = 'veo-3.0-generate-001'): Promise<VideoGenerationResponse> {
     try {
       if (!this.projectId) {
         throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
       }
 
-      const vertexModel =
-        model === 'googleai/veo-2.0-generate-001' ? 'veo-2.0-generate-001' : model;
+      // Accept either prefixed model ids (googleai/...) or raw Vertex ids.
+      const rawModel = model.includes('/') ? model.split('/').pop() || model : model;
+      const vertexModel = rawModel;
 
       // Using the correct Google Cloud Vertex AI endpoint with actual project ID
       // Video generation is async, so we use predictLongRunning

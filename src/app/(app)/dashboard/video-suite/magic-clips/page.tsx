@@ -1,18 +1,13 @@
-
+'use client';
 
 import { MagicClipsGenerator } from '@/components/magic-clips-generator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
-import type { PlanFeature } from '@prisma/client';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 export default function MagicClipsPage() {
-    return (
-        <FeatureGuard featureId="magic-clips" planName={null} fallback={<MagicClipsLoading />}>
-            <MagicClipsContent />
-        </FeatureGuard>
-    );
+    return <MagicClipsContent />;
 }
 
 function MagicClipsContent() {

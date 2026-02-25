@@ -104,6 +104,10 @@ class AIProviderManager {
   private providers: Map<AIProvider, ProviderConfig> = new Map();
   private initialized = false;
 
+  private normalizeGeminiModel(model: string): string {
+    return model.includes('/') ? model.split('/').pop() || model : model;
+  }
+
   private async initialize() {
     if (this.initialized) return;
 
@@ -155,12 +159,18 @@ class AIProviderManager {
     // Gemini
     const geminiKey = apiKeys.gemini || process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
     if (geminiKey) {
+      const geminiDefaultModel = this.normalizeGeminiModel(
+        process.env.GEMINI_DEFAULT_MODEL || process.env.GEMINI_TEXT_MODEL || 'gemini-flash-latest'
+      );
+      const geminiFallbackModel = this.normalizeGeminiModel(
+        process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash-lite'
+      );
       this.providers.set('gemini', {
         name: 'gemini',
         enabled: true,
         apiKey: geminiKey,
-        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.0-flash-exp',
-        fallbackModel: process.env.GEMINI_FALLBACK_MODEL || 'gemini-1.5-flash',
+        defaultModel: geminiDefaultModel,
+        fallbackModel: geminiFallbackModel,
         priority: priority.indexOf('gemini') >= 0 ? priority.indexOf('gemini') : 1,
         healthStatus: 'healthy',
         failureCount: 0,

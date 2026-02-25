@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 
 const initialState = {
     stream: null,
+    responseText: '',
     message: '',
     errors: {}
 }
@@ -144,44 +145,23 @@ export default function AiAssistantChatPage() {
         return;
     }
 
-    if (!state.stream) {
+    if (!state.responseText) {
         return;
     }
 
-    const stream = state.stream;
-    let fullResponse = '';
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-
-    const readStream = async () => {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            try {
-                const { value, done } = await reader.read();
-                if (done) break;
-                
-                fullResponse += decoder.decode(typeof value === 'string' ? new TextEncoder().encode(value) : value, { stream: true });
-
-                setMessages(prev => {
-                    const newMessages = [...prev];
-                    const modelResponseIndex = newMessages.findIndex(m => m.id === 'thinking' || m.id === 'model-response');
-                    if (modelResponseIndex !== -1) {
-                        newMessages[modelResponseIndex] = { id: 'model-response', role: 'model', content: fullResponse };
-                    }
-                    return newMessages;
-                });
-            } catch (e) {
-                console.error("Stream reading error:", e);
-                toast({ variant: 'destructive', title: 'Stream Error', description: "Failed to read the response stream." });
-                setMessages(prev => prev.filter(m => m.id !== 'thinking'));
-                break;
-            }
+    setMessages(prev => {
+        const newMessages = [...prev];
+        const modelResponseIndex = newMessages.findIndex(m => m.id === 'thinking' || m.id === 'model-response');
+        if (modelResponseIndex !== -1) {
+            newMessages[modelResponseIndex] = { id: 'model-response', role: 'model', content: state.responseText };
+        } else {
+            newMessages.push({ id: 'model-response', role: 'model', content: state.responseText });
         }
-    }
-    readStream();
+        return newMessages;
+    });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.stream, state.message, toast]);
+  }, [state.responseText, state.message, toast]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {

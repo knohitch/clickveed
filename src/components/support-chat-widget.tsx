@@ -24,6 +24,7 @@ interface SupportChatWidgetProps {
 
 const initialState = {
     stream: null,
+    responseText: '',
     message: '',
     errors: {}
 }
@@ -92,47 +93,23 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
         return;
     }
 
-    if (!state.stream) {
+    if (!state.responseText) {
         return;
     }
 
-    const stream = state.stream;
-    let fullResponse = '';
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-
-    const readStream = async () => {
-        while (true) {
-            try {
-                const { value, done } = await reader.read();
-                if (done) break;
-                
-                // Check if value exists before decoding
-                if (value) {
-                    const chunk = decoder.decode(value as unknown as Uint8Array);
-                    fullResponse += chunk;
-                }
-
-                setMessages(prev => {
-                    const newMessages = [...prev];
-                    const modelResponseIndex = newMessages.findIndex(m => m.id === 'thinking' || m.id === 'model-response');
-                    if (modelResponseIndex !== -1) {
-                        newMessages[modelResponseIndex] = { id: 'model-response', role: 'model', content: fullResponse };
-                    }
-                    return newMessages;
-                });
-            } catch (e) {
-                console.error("Stream reading error:", e);
-                toast({ variant: 'destructive', title: 'Stream Error', description: "Failed to read the response stream." });
-                setMessages(prev => prev.filter(m => m.id !== 'thinking'));
-                break;
-            }
+    setMessages(prev => {
+        const newMessages = [...prev];
+        const modelResponseIndex = newMessages.findIndex(m => m.id === 'thinking' || m.id === 'model-response');
+        if (modelResponseIndex !== -1) {
+            newMessages[modelResponseIndex] = { id: 'model-response', role: 'model', content: state.responseText };
+        } else {
+            newMessages.push({ id: 'model-response', role: 'model', content: state.responseText });
         }
-    }
-    readStream();
+        return newMessages;
+    });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.stream, state.message, toast]);
+  }, [state.responseText, state.message, toast]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {

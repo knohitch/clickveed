@@ -1,18 +1,13 @@
-
+'use client';
 
 import { VoiceCloningStudio } from '@/components/voice-cloning-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGuard } from '@/components/feature-lock';
 import { useAuth } from '@/contexts/auth-context';
-import type { PlanFeature } from '@prisma/client';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 export default function VoiceClippingPage() {
-    return (
-        <FeatureGuard featureId="voice-cloning" planName={null} fallback={<VoiceClippingLoading />}>
-            <VoiceClippingContent />
-        </FeatureGuard>
-    );
+    return <VoiceClippingContent />;
 }
 
 function VoiceClippingContent() {

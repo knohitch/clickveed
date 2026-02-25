@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
         'gpt-3.5-turbo',
       ],
       gemini: [
-        'gemini-2.0-flash-exp',
-        'gemini-1.5-pro',
-        'gemini-1.5-flash',
-        'gemini-1.0-pro',
+        'gemini-flash-latest',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-pro',
       ],
       anthropic: [
         'claude-3-5-sonnet-20241022',

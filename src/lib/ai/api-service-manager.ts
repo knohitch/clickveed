@@ -289,9 +289,9 @@ function isQuotaError(error: unknown): boolean {
 // NOW WITH CIRCUIT BREAKER TRACKING AND QUOTA FALLBACK
 export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) {
   const { apiKeys } = await getAdminSettings();
-  const providerPriority = getProvidersForCapability('text')
+  const textProviders = getProvidersForCapability('text')
     .filter((p) => p.implemented && providerSupportsCapability(p.name, 'text'))
-    .map((p) => p.name);
+  const providerPriority = textProviders.map((p) => p.name);
 
   let lastError: Error | null = null;
 
@@ -307,7 +307,12 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 
     try {
       const client = await createProviderClient(providerName);
-      const response = await client.generateText(req.messages);
+      const providerModel = textProviders.find((p) => p.name === providerName)?.model;
+      // Provider clients expect raw model ids (without provider prefix like "googleai/").
+      const normalizedModel = providerModel?.includes('/') ? providerModel.split('/').pop() : providerModel;
+      const response = providerName === 'gemini'
+        ? await client.generateText(req.messages, normalizedModel)
+        : await client.generateText(req.messages);
 
       // Record success
       circuitBreaker.recordSuccess(providerName);
@@ -317,11 +322,11 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 
       // Return in Genkit-compatible format
       const modelMap: Record<string, string> = {
-        'gemini': MODEL_CONSTANTS.GEMINI_TEXT_MODEL,
-        'claude': MODEL_CONSTANTS.CLAUDE_TEXT_MODEL,
+        gemini: MODEL_CONSTANTS.GEMINI_TEXT_MODEL,
+        claude: MODEL_CONSTANTS.CLAUDE_TEXT_MODEL,
       };
       return {
-        model: modelMap[providerName] || 'openai/gpt-4o',
+        model: providerModel || modelMap[providerName] || 'openai/gpt-4o',
         result: {
           role: 'model' as const,
           content: [{ text: response.text }]
@@ -385,9 +390,9 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest, 'model'>) {
   const settings = await getAdminSettings();
   const apiKeys = settings.apiKeys;
-  const providerPriority = getProvidersForCapability('text_stream')
+  const streamProviders = getProvidersForCapability('text_stream')
     .filter((p) => p.implemented && providerSupportsCapability(p.name, 'text_stream'))
-    .map((p) => p.name);
+  const providerPriority = streamProviders.map((p) => p.name);
 
   // Debug: Log which keys are available (names only, not values)
   const configuredProviders = providerPriority.filter(p => !!apiKeys[p as keyof typeof apiKeys]);
@@ -413,7 +418,12 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
 
     try {
       const client = await createProviderClient(providerName);
-      const stream = await client.generateTextStream(req.messages);
+      const providerModel = streamProviders.find((p) => p.name === providerName)?.model;
+      // Provider clients expect raw model ids (without provider prefix like "googleai/").
+      const normalizedModel = providerModel?.includes('/') ? providerModel.split('/').pop() : providerModel;
+      const stream = providerName === 'gemini'
+        ? await client.generateTextStream(req.messages, normalizedModel)
+        : await client.generateTextStream(req.messages);
 
       circuitBreaker.recordSuccess(providerName);
       markProviderHealthy(providerName);
