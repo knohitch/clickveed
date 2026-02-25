@@ -2,9 +2,11 @@
 
 import IORedis from 'ioredis';
 import { Queue, Worker, Job } from 'bullmq';
+import { resolveRedisConnectionInfo } from '@/lib/redis-config';
 
-// Check if Redis URL is available
-const redisUrl = process.env.REDIS_URL;
+// Resolve Redis connection from either REDIS_URL or REDIS_HOST/PORT style env vars.
+const redisInfo = resolveRedisConnectionInfo();
+const redisUrl = redisInfo.url;
 
 // Create Redis connection only if Redis URL is available
 let redisConnection: IORedis | null = null;
@@ -13,6 +15,11 @@ if (redisUrl) {
     maxRetriesPerRequest: null,
     lazyConnect: true,
   });
+  redisConnection.on('error', (error) => {
+    console.error('[Queue] Redis connection error:', error.message);
+  });
+} else {
+  console.warn('[Queue] Redis not configured. Set REDIS_URL or REDIS_HOST/REDIS_PORT.');
 }
 
 // Create queue only if Redis is available

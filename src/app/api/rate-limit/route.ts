@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import IORedis from 'ioredis';
+import { getRedisUrl } from '@/lib/redis-config';
 
 // Redis connection for rate limiting (server-side only)
-const redisClient = process.env.REDIS_URL 
-  ? new IORedis(process.env.REDIS_URL, {
+const redisUrl = getRedisUrl();
+const redisClient = redisUrl
+  ? new IORedis(redisUrl, {
       maxRetriesPerRequest: null,
       lazyConnect: true,
     })

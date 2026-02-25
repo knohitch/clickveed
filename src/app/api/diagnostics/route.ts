@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { storageManager } from '@/lib/storage';
+import IORedis from 'ioredis';
+import { resolveRedisConnectionInfo } from '@/lib/redis-config';
 
 /**
  * Comprehensive Diagnostic Endpoint
@@ -44,6 +46,9 @@ export async function GET(request: Request) {
     AUTH_SECRET: !!process.env.AUTH_SECRET,
     NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
     ENCRYPTION_KEY: !!process.env.ENCRYPTION_KEY,
+    REDIS_URL: !!process.env.REDIS_URL,
+    REDIS_HOST: process.env.REDIS_HOST ? (isAuthorized ? process.env.REDIS_HOST : 'SET') : 'NOT SET',
+    REDIS_PORT: process.env.REDIS_PORT || 'NOT SET',
     NODE_ENV: process.env.NODE_ENV,
     WASABI_ACCESS_KEY_ID: !!process.env.WASABI_ACCESS_KEY_ID,
     WASABI_SECRET_ACCESS_KEY: !!process.env.WASABI_SECRET_ACCESS_KEY,
@@ -113,6 +118,49 @@ export async function GET(request: Request) {
       status: 'critical',
       error: error.message,
       issues: ['Database connection failed - app will not work'],
+    };
+  }
+
+  // 2.5 Redis Check
+  try {
+    const redisInfo = resolveRedisConnectionInfo();
+
+    if (!redisInfo.url) {
+      diagnostics.checks.redis = {
+        status: 'warning',
+        configured: false,
+        source: redisInfo.source,
+        issues: ['Redis not configured. Set REDIS_URL or REDIS_HOST/REDIS_PORT'],
+      };
+    } else {
+      const redisStart = Date.now();
+      const redis = new IORedis(redisInfo.url, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+        connectTimeout: 5000,
+      });
+
+      try {
+        await redis.connect();
+        const pong = await redis.ping();
+        diagnostics.checks.redis = {
+          status: pong === 'PONG' ? 'healthy' : 'critical',
+          configured: true,
+          source: redisInfo.source,
+          latency: Date.now() - redisStart,
+          ping: pong,
+          issues: pong === 'PONG' ? [] : ['Redis ping returned unexpected response'],
+        };
+      } finally {
+        await redis.quit().catch(() => {});
+      }
+    }
+  } catch (error: any) {
+    diagnostics.checks.redis = {
+      status: 'critical',
+      configured: true,
+      error: error.message,
+      issues: ['Redis connection failed - queue/rate limit features will fail'],
     };
   }
 
