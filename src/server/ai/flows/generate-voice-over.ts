@@ -42,7 +42,7 @@ const generateVoiceOverFlow = ai.defineFlow(
       throw new Error("User must be authenticated to generate audio.");
     }
 
-    // generateTtsWithProvider() routes to ElevenLabs (primary) or other configured providers.
+    // generateTtsWithProvider() routes to Minimax (primary) with ElevenLabs fallback.
     // This avoids using the plugin-less default ai instance and the non-existent
     // 'googleai/gemini-1.5-flash-tts' model that caused NOT_FOUND errors.
     const ttsMessages = [{ role: 'user' as const, content: [{ text: script }] }];

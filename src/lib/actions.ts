@@ -1,7 +1,7 @@
 'use server';
 
 import { removeImageBackground } from '@/server/ai/flows/remove-image-background';
-import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import { generateWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
 import { creativeAssistantChat } from '@/server/ai/flows/creative-assistant-chat';
 import { generateTimedTranscript } from '@/server/ai/flows/generate-timed-transcript';
 import { generateVideoFromImage } from '@/server/ai/flows/generate-video-from-image';
@@ -296,6 +296,70 @@ export async function generateVideoAction(prevState: any, formData: FormData) {
             videoUrl: null,
             audioUrl: null,
             errors: {}
+        };
+    }
+}
+
+export async function generateVideoGeneratorAction(prevState: any, formData: FormData) {
+    const prompt = (formData.get('prompt') as string || '').trim();
+    const style = (formData.get('style') as string || '').trim();
+    const duration = (formData.get('duration') as string || '').trim();
+    const aspectRatio = (formData.get('aspectRatio') as string || '').trim();
+    const camera = (formData.get('camera') as string || '').trim();
+    const motion = (formData.get('motion') as string || '').trim();
+
+    if (!prompt) {
+        return { message: 'Prompt is required', videoUrl: null, errors: { prompt: ['Prompt is required'] } };
+    }
+
+    try {
+        // Dedicated generator still follows plan-based video access
+        await verifyFeatureAccess('video-suite');
+
+        // Text-to-video generation is high cost
+        const creditResult = await consumeAICredits(4);
+        if (!creditResult.success) {
+            return { message: creditResult.error, videoUrl: null, errors: {} };
+        }
+
+        const enrichedPrompt = [
+            `Create a high-quality cinematic video with this concept: ${prompt}`,
+            style ? `Style: ${style}.` : '',
+            duration ? `Duration target: ${duration}.` : '',
+            aspectRatio ? `Aspect ratio: ${aspectRatio}.` : '',
+            camera ? `Camera direction: ${camera}.` : '',
+            motion ? `Motion pacing: ${motion}.` : '',
+            'Prioritize visual coherence, smooth motion, realistic lighting, and production-ready output.'
+        ].filter(Boolean).join('\n');
+
+        // Uses provider registry priority: Veo first, then configured fallbacks
+        const response: any = await generateVideoWithProvider({
+            messages: [{ role: 'user', content: [{ text: enrichedPrompt }] }],
+        });
+
+        const text = response?.result?.content?.[0]?.text || '';
+        const fromText = text.replace('Video generated: ', '').trim();
+        const direct = response?.videoUrl || response?.media?.url || '';
+        const videoUrl = fromText || direct;
+
+        if (!videoUrl || typeof videoUrl !== 'string') {
+            throw new Error('No video URL returned from the generation provider.');
+        }
+
+        return {
+            message: 'success',
+            videoUrl,
+            provider: response?.provider || null,
+            model: response?.model || null,
+            errors: {},
+        };
+    } catch (error) {
+        return {
+            message: error instanceof Error ? error.message : 'Failed to generate video',
+            videoUrl: null,
+            provider: null,
+            model: null,
+            errors: {},
         };
     }
 }

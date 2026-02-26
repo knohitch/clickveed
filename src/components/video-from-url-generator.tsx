@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clipboard, Download, FileText, Sparkles, Wand2 } from 'lucide-react';
+import { Clipboard, Download, FileText, Sparkles, Wand2, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
 import { useFormStatus } from 'react-dom';
@@ -33,6 +34,7 @@ export function VideoFromUrlGenerator() {
   const [state, setState] = useState(initialState); // Use local state
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
+  const router = useRouter();
   const { pending } = useFormStatus();
   // const pending = false; // Manually set to false
 
@@ -58,6 +60,12 @@ export function VideoFromUrlGenerator() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
+  };
+
+  const useScriptInPipeline = () => {
+    if (!state.script) return;
+    sessionStorage.setItem('pipeline_import_script', state.script);
+    router.push('/dashboard/video-pipeline?source=video-from-url');
   };
 
   const handleSubmit = async (formData: FormData) => {
@@ -141,6 +149,9 @@ export function VideoFromUrlGenerator() {
               Generated Script
               {state.script && !pending && (
                 <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={useScriptInPipeline} title="Use in video pipeline">
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={copyToClipboard} title="Copy script">
                       <Clipboard className="h-4 w-4" />
                     </Button>

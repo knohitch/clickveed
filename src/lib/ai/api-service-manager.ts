@@ -157,6 +157,17 @@ interface ProviderInfo {
   apiKey: string;
 }
 
+async function withGlobalAppContext(messages: Message[]): Promise<Message[]> {
+  const { appName } = await getAdminSettings();
+  const today = new Date().toISOString().slice(0, 10);
+  const context = `Platform context: The application name is "${appName || 'AI Video Creator'}". Current date is ${today}. When referring to the current year/date, use this context unless the user explicitly asks about historical data.`;
+
+  return [
+    { role: 'system', content: [{ text: context }] },
+    ...messages,
+  ];
+}
+
 type ProviderSkipReason = 'missing_key' | 'not_implemented' | 'unsupported_capability' | 'circuit_open' | 'recently_unhealthy';
 
 function logProviderSkip(feature: AICapability, provider: string, reason: ProviderSkipReason): void {
@@ -277,10 +288,28 @@ function isQuotaError(error: unknown): boolean {
   const errorMessage = error instanceof Error ? error.message : String(error);
   return (
     errorMessage.includes('429') ||
+    errorMessage.includes('402') ||
     errorMessage.includes('quota') ||
     errorMessage.includes('insufficient_quota') ||
     errorMessage.includes('rate limit') ||
-    errorMessage.includes('Too Many Requests')
+    errorMessage.includes('Too Many Requests') ||
+    errorMessage.includes('No credits') ||
+    errorMessage.includes('credits exhausted') ||
+    errorMessage.includes('subscription') ||
+    errorMessage.includes('expired')
+  );
+}
+
+function isMinimaxCreditOrSubscriptionError(error: unknown): boolean {
+  const errorMessage = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    errorMessage.includes('no credits') ||
+    errorMessage.includes('credits exhausted') ||
+    errorMessage.includes('insufficient credit') ||
+    errorMessage.includes('subscription') ||
+    errorMessage.includes('expired') ||
+    errorMessage.includes('402') ||
+    errorMessage.includes('payment required')
   );
 }
 
@@ -289,6 +318,7 @@ function isQuotaError(error: unknown): boolean {
 // NOW WITH CIRCUIT BREAKER TRACKING AND QUOTA FALLBACK
 export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) {
   const { apiKeys } = await getAdminSettings();
+  const contextualMessages = await withGlobalAppContext(req.messages);
   const textProviders = getProvidersForCapability('text')
     .filter((p) => p.implemented && providerSupportsCapability(p.name, 'text'))
   const providerPriority = textProviders.map((p) => p.name);
@@ -311,8 +341,8 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
       // Provider clients expect raw model ids (without provider prefix like "googleai/").
       const normalizedModel = providerModel?.includes('/') ? providerModel.split('/').pop() : providerModel;
       const response = providerName === 'gemini'
-        ? await client.generateText(req.messages, normalizedModel)
-        : await client.generateText(req.messages);
+        ? await client.generateText(contextualMessages, normalizedModel)
+        : await client.generateText(contextualMessages);
 
       // Record success
       circuitBreaker.recordSuccess(providerName);
@@ -390,6 +420,7 @@ export async function generateWithProvider(req: Omit<GenerateRequest, 'model'>) 
 export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest, 'model'>) {
   const settings = await getAdminSettings();
   const apiKeys = settings.apiKeys;
+  const contextualMessages = await withGlobalAppContext(req.messages);
   const streamProviders = getProvidersForCapability('text_stream')
     .filter((p) => p.implemented && providerSupportsCapability(p.name, 'text_stream'))
   const providerPriority = streamProviders.map((p) => p.name);
@@ -422,8 +453,8 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
       // Provider clients expect raw model ids (without provider prefix like "googleai/").
       const normalizedModel = providerModel?.includes('/') ? providerModel.split('/').pop() : providerModel;
       const stream = providerName === 'gemini'
-        ? await client.generateTextStream(req.messages, normalizedModel)
-        : await client.generateTextStream(req.messages);
+        ? await client.generateTextStream(contextualMessages, normalizedModel)
+        : await client.generateTextStream(contextualMessages);
 
       circuitBreaker.recordSuccess(providerName);
       markProviderHealthy(providerName);
@@ -535,89 +566,129 @@ export async function generateImageEditWithProvider(input: { prompt: string; ima
 }
 
 export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'model'>) {
-  const providerInfo = await getAvailableVideoGenerator();
-
-  // Use custom client implementations for video providers
+  const { apiKeys } = await getAdminSettings();
+  const candidates = getProvidersForCapability('video')
+    .filter((p) => p.implemented && providerSupportsCapability(p.name, 'video'));
   const customProviders = ['heygen', 'kling', 'modelscope', 'seedance', 'wan', 'googleVeo'];
 
-  if (customProviders.includes(providerInfo.provider)) {
+  let lastError: Error | null = null;
+
+  for (const candidate of candidates) {
+    const provider = candidate.name;
+    const apiKey = apiKeys[provider as keyof typeof apiKeys];
+    if (!apiKey) {
+      continue;
+    }
+    if (!circuitBreaker.shouldAttempt(provider)) {
+      logProviderSkip('video', provider, 'circuit_open');
+      continue;
+    }
+
     try {
-      const client = await createProviderClient(providerInfo.provider);
-      const prompt = req.messages.map(msg => {
-        if (Array.isArray(msg.content)) {
-          return msg.content[0]?.text || '';
-        }
-        return typeof msg.content === 'string' ? msg.content : '';
-      }).join(' ');
-      const response = await client.generateVideo(prompt, providerInfo.model);
+      if (customProviders.includes(provider)) {
+        const client = await createProviderClient(provider);
+        const prompt = req.messages.map(msg => {
+          if (Array.isArray(msg.content)) {
+            return msg.content[0]?.text || '';
+          }
+          return typeof msg.content === 'string' ? msg.content : '';
+        }).join(' ');
+        const response = await client.generateVideo(prompt, candidate.model);
+        circuitBreaker.recordSuccess(provider);
+        markProviderHealthy(provider);
+        return {
+          provider,
+          model: candidate.model,
+          result: {
+            role: 'model' as const,
+            content: [{ text: `Video generated: ${response.videoUrl}` }]
+          }
+        };
+      }
 
-      // Record success
-      circuitBreaker.recordSuccess(providerInfo.provider);
-      markProviderHealthy(providerInfo.provider);
-
+      const genkitInstance = createGenkitInstance({ [provider]: apiKey });
+      const result = await genkitInstance.generate({ ...req, model: candidate.model });
+      circuitBreaker.recordSuccess(provider);
+      markProviderHealthy(provider);
       return {
-        model: providerInfo.model,
-        result: {
-          role: 'model' as const,
-          content: [{ text: `Video generated: ${response.videoUrl}` }]
-        }
+        ...(result as any),
+        provider,
+        model: candidate.model,
       };
     } catch (error) {
-      circuitBreaker.recordFailure(providerInfo.provider);
-      markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
-      console.error(`Error generating video with ${providerInfo.provider}:`, error);
-      throw error;
-    }
-  } else {
-    try {
-      const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-      const result = await genkitInstance.generate({ ...req, model: providerInfo.model });
-      circuitBreaker.recordSuccess(providerInfo.provider);
-      markProviderHealthy(providerInfo.provider);
-      return result;
-    } catch (error) {
-      circuitBreaker.recordFailure(providerInfo.provider);
-      markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
-      throw error;
+      circuitBreaker.recordFailure(provider);
+      markProviderUnhealthy(provider, error instanceof Error ? error.message : 'Unknown error');
+      logFallback('video', provider, isQuotaError(error) ? 'quota_or_rate_limit' : 'provider_error');
+      lastError = error instanceof Error ? error : new Error(String(error));
+      continue;
     }
   }
+
+  if (!candidates.some((p) => !!apiKeys[p.name as keyof typeof apiKeys])) {
+    throw new Error('No video provider API key configured. Add Google Veo key first, then fallback video providers.');
+  }
+
+  throw lastError || new Error('All configured video providers failed.');
 }
 
 export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'>) {
-  const providerInfo = await getAvailableTTSProvider();
-
-  // Use custom client implementations for TTS providers
-  const customProviders = ['elevenlabs', 'azureTts', 'myshell'];
-
-  if (customProviders.includes(providerInfo.provider)) {
-    try {
-      const client = await createProviderClient(providerInfo.provider);
-      // For TTS, we would need to extract the text from the request
-      // This is a simplified implementation
-      const text = req.messages.map(msg => {
-        if (Array.isArray(msg.content)) {
-          return msg.content[0]?.text || '';
-        }
-        return typeof msg.content === 'string' ? msg.content : '';
-      }).join(' ');
-      const response = await client.generateSpeech(text, undefined, providerInfo.model);
-
-      // Return in Genkit-compatible format
-      return {
-        model: providerInfo.model,
-        result: {
-          role: 'model' as const,
-          content: [{ text: `Speech generated: ${response.audioUrl}` }]
-        }
-      };
-    } catch (error) {
-      console.error(`Error generating TTS with ${providerInfo.provider}:`, error);
-      throw error;
+  const { apiKeys } = await getAdminSettings();
+  const text = req.messages.map(msg => {
+    if (Array.isArray(msg.content)) {
+      return msg.content[0]?.text || '';
     }
-  } else {
-    // For providers with Genkit plugins, use Genkit
-    const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-    return genkitInstance.generate({ ...req, model: providerInfo.model });
+    return typeof msg.content === 'string' ? msg.content : '';
+  }).join(' ');
+
+  const callCustomTtsProvider = async (provider: 'minimax' | 'elevenlabs') => {
+    const providerInfo = getProvidersForCapability('tts').find((p) => p.name === provider);
+    const client = await createProviderClient(provider);
+    const response = await client.generateSpeech(text, undefined, providerInfo?.model);
+
+    circuitBreaker.recordSuccess(provider);
+    markProviderHealthy(provider);
+
+    return {
+      model: providerInfo?.model || provider,
+      result: {
+        role: 'model' as const,
+        content: [{ text: `Speech generated: ${response.audioUrl}` }]
+      }
+    };
+  };
+
+  const hasMinimaxKey = !!apiKeys.minimax;
+  const hasElevenLabsKey = !!apiKeys.elevenlabs;
+
+  // Policy: Minimax is primary for all TTS/audio generation.
+  // ElevenLabs is used only if Minimax key is missing, or Minimax has credit/subscription exhaustion.
+  if (!hasMinimaxKey) {
+    if (!hasElevenLabsKey) {
+      throw new Error('No TTS provider configured. Add Minimax API key (primary) or ElevenLabs API key (fallback).');
+    }
+    return callCustomTtsProvider('elevenlabs');
+  }
+
+  try {
+    return await callCustomTtsProvider('minimax');
+  } catch (error) {
+    circuitBreaker.recordFailure('minimax');
+    markProviderUnhealthy('minimax', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error generating TTS with minimax:', error);
+
+    if (hasElevenLabsKey && isMinimaxCreditOrSubscriptionError(error)) {
+      logFallback('tts', 'minimax', 'credits_or_subscription');
+      try {
+        return await callCustomTtsProvider('elevenlabs');
+      } catch (fallbackError) {
+        circuitBreaker.recordFailure('elevenlabs');
+        markProviderUnhealthy('elevenlabs', fallbackError instanceof Error ? fallbackError.message : 'Unknown error');
+        console.error('Error generating TTS with elevenlabs fallback:', fallbackError);
+        throw fallbackError;
+      }
+    }
+
+    throw error;
   }
 }
 

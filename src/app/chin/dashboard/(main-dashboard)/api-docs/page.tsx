@@ -49,6 +49,7 @@ export default function ApiDocsPage() {
             { name: "Unsplash (Stock Photos)", url: "https://unsplash.com/documentation#getting-started" },
         ],
         audioAndVoice: [
+            { name: "Minimax (Primary TTS)", url: "https://www.minimax.io/platform/document" },
             { name: "ElevenLabs", url: "https://elevenlabs.io/docs/api-reference/quick-start" },
         ],
     };

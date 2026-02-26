@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { UploadCloud, Download, RefreshCw, Palette, Type, Settings } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useAdminSettings } from '@/contexts/admin-settings-context';
 
 // Default filter state
 const initialFilters = {
@@ -22,7 +23,7 @@ const initialFilters = {
 
 // Default text state
 const initialTextState = {
-    content: 'ClickVid Pro',
+    content: 'AI Video Creator',
     color: '#ffffff',
     size: 50,
     x: 50,
@@ -30,11 +31,16 @@ const initialTextState = {
 };
 
 export default function FluxProPage() {
+    const { appName } = useAdminSettings();
     const [image, setImage] = useState<HTMLImageElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [filters, setFilters] = useState(initialFilters);
     const [text, setText] = useState(initialTextState);
     const [isTextActive, setIsTextActive] = useState(false);
+
+    useEffect(() => {
+        setText(prev => ({ ...prev, content: appName || 'AI Video Creator' }));
+    }, [appName]);
 
     const applyFilters = useCallback(() => {
         const canvas = canvasRef.current;

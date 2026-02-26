@@ -68,6 +68,7 @@ const PROVIDER_CAPABILITY_SUPPORT: Record<string, AICapability[]> = {
   seedance: ['video'],
   heygen: ['video'],
   wan: ['video'],
+  minimax: ['tts'],
   elevenlabs: ['tts'],
 };
 
@@ -360,6 +361,83 @@ export class ElevenLabsClient {
       };
     } catch (error) {
       console.error('ElevenLabs TTS error:', error);
+      throw error;
+    }
+  }
+}
+
+// Minimax TTS Client
+export class MinimaxClient {
+  private apiKey: string;
+  private baseUrl: string = 'https://api.minimax.chat/v1';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async generateSpeech(text: string, voiceId: string = 'female-tianmei', model: string = 'speech-01'): Promise<TTSResponse> {
+    try {
+      const voiceSettings: Record<string, string> = {
+        'female-tianmei': 'female-tianmei',
+        'male-qianxue': 'male-qianxue',
+        'presenter_male': 'presenter_male',
+        'presenter_female': 'presenter_female',
+      };
+
+      const selectedVoice = voiceSettings[voiceId] || voiceId;
+
+      const response = await axios.post(
+        `${this.baseUrl}/text_to_speech`,
+        {
+          model,
+          text,
+          voice_id: selectedVoice,
+          speed: 1.0,
+          vol: 1.0,
+          pitch: 1.0,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          responseType: 'arraybuffer',
+        }
+      );
+
+      const audioBuffer = Buffer.from(response.data);
+      const audioDataUri = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const { publicUrl } = await uploadToWasabi(audioDataUri, 'audio');
+
+      return {
+        audioUrl: publicUrl,
+        model,
+        provider: 'minimax'
+      };
+    } catch (error) {
+      console.error('[Minimax] TTS error:', error);
+      
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+        
+        if (status === 401 || status === 403) {
+          throw new Error('Minimax API authentication failed. Please check your API key.');
+        }
+        
+        if (status === 402 || status === 429) {
+          const message = errorData?.message || 'No credits available';
+          console.warn('[Minimax] Credits exhausted or rate limited:', message);
+          throw new Error(`Minimax: ${message}`);
+        }
+        
+        if (errorData?.error?.message) {
+          throw new Error(`Minimax API error: ${errorData.error.message}`);
+        }
+      }
+      
       throw error;
     }
   }
@@ -1002,6 +1080,8 @@ export async function createProviderClient(provider: string): Promise<any> {
       return new OpenAIClient(apiKey);
     case 'claude':
       return new ClaudeClient(apiKey);
+    case 'minimax':
+      return new MinimaxClient(apiKey);
     case 'elevenlabs':
       return new ElevenLabsClient(apiKey);
     case 'replicate':

@@ -40,6 +40,7 @@ async function initializeSystem() {
       { name: 'stripePublishableKey', value: process.env.STRIPE_PUBLISHABLE_KEY || '' },
       { name: 'stripeWebhookSecret', value: process.env.STRIPE_WEBHOOK_SECRET || '' },
       { name: 'openai', value: process.env.OPENAI_API_KEY || '' },
+      { name: 'minimax', value: process.env.MINIMAX_API_KEY || '' },
       { name: 'elevenlabs', value: process.env.ELEVENLABS_API_KEY || '' },
       { name: 'runwayml', value: process.env.RUNWAYML_API_KEY || '' },
       { name: 'pika', value: process.env.PIKA_API_KEY || '' },

@@ -38,6 +38,7 @@ interface FeatureLockProps {
 function matchFeatureKeywords(featureText: string, featureId: string): boolean {
   const keywordMap: Record<string, string[]> = {
     'video-suite': ['video', 'editing', 'creation'],
+    'video-generator': ['video', 'generator', 'text to video', 'render'],
     'ai-assistant': ['ai', 'assistant', 'chat'],
     'voice-cloning': ['voice', 'clone', 'cloning'],
     'background-remover': ['background', 'remove', 'remover'],

@@ -1,331 +1,723 @@
-
 'use client';
 
-import { useState, useRef, useTransition, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Film, Type, UploadCloud, Download, Play, Pause, FilePenLine, Sparkles, Bot, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  Clapperboard, Download, UploadCloud, Bot, Sparkles, FilePenLine, Play, Pause,
+  Plus, Trash2, Film, Music, Type, Clock3, SlidersHorizontal, Layers3, Scissors,
+  Copy, Undo2, Redo2, Volume2, Wand2
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 import { suggestBroll, fetchStockVideos } from '@/server/ai/flows/suggest-b-roll';
 import type { StockVideoResult } from '@/server/ai/flows/suggest-b-roll';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/contexts/auth-context';
-import type { BrandKit } from '@/server/actions/user-actions';
-import { getBrandKit } from '@/server/actions/user-actions';
 
+type TrackType = 'video' | 'audio' | 'text';
+type TransitionType = 'none' | 'cut' | 'dissolve' | 'fade';
+type EffectType = 'none' | 'cinematic' | 'vintage' | 'high-contrast';
+type RenderStatus = 'queued' | 'rendering' | 'completed';
 
-interface Scene {
-  id: number;
-  type: 'video' | 'image';
-  src: string;
-  duration: number; // in seconds
-  caption: {
-    text: string;
-    position: 'bottom' | 'top' | 'middle';
-  };
+interface TimelineClip {
+  id: string;
+  track: TrackType;
+  label: string;
+  src?: string;
+  thumbnail?: string;
+  start: number;
+  duration: number;
+  text?: string;
+  volume?: number;
+  transition?: TransitionType;
+  effect?: EffectType;
 }
 
-const initialScenes: Scene[] = [
-  { id: 1, type: 'video', src: 'https://placehold.co/1920x1080.png', duration: 5, caption: { text: 'Welcome to our presentation!', position: 'bottom' } },
+interface RenderJob {
+  id: string;
+  name: string;
+  status: RenderStatus;
+  progress: number;
+  createdAt: number;
+}
+
+const STORAGE_KEY = 'video_editor_timeline_v2';
+const SNAP_THRESHOLD = 0.25;
+
+const timelineBase: TimelineClip[] = [
+  {
+    id: 'v1',
+    track: 'video',
+    label: 'Intro Shot',
+    start: 0,
+    duration: 6,
+    src: 'https://placehold.co/1280x720.png',
+    thumbnail: 'https://placehold.co/320x180.png',
+    transition: 'none',
+    effect: 'cinematic',
+  },
+  {
+    id: 'a1',
+    track: 'audio',
+    label: 'Music Bed',
+    start: 0,
+    duration: 12,
+    volume: 80,
+    transition: 'none',
+    effect: 'none',
+  },
+  {
+    id: 't1',
+    track: 'text',
+    label: 'Headline',
+    start: 1,
+    duration: 4,
+    text: 'Build Better Videos Faster',
+    transition: 'dissolve',
+    effect: 'none',
+  },
 ];
 
+function TrackBadge({ track }: { track: TrackType }) {
+  if (track === 'video') return <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">VIDEO</span>;
+  if (track === 'audio') return <span className="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700">AUDIO</span>;
+  return <span className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700">TEXT</span>;
+}
+
+function cloneClips(clips: TimelineClip[]): TimelineClip[] {
+  return clips.map((c) => ({ ...c }));
+}
+
 export default function VideoEditorPage() {
-    const { toast } = useToast();
-    const [scenes, setScenes] = useState<Scene[]>(initialScenes);
-    const [selectedSceneId, setSelectedSceneId] = useState<number | null>(1);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const brollInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const [clips, setClips] = useState<TimelineClip[]>(timelineBase);
+  const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set(['v1']));
+  const [mediaBin, setMediaBin] = useState<StockVideoResult[]>([]);
+  const [brollSuggestions, setBrollSuggestions] = useState<string[]>([]);
+  const [timelineZoom, setTimelineZoom] = useState(90);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playheadSec, setPlayheadSec] = useState(0);
+  const [fetchPending, startFetchTransition] = useTransition();
+  const [suggestPending, startSuggestTransition] = useTransition();
+  const [historyStack, setHistoryStack] = useState<TimelineClip[][]>([]);
+  const [redoStack, setRedoStack] = useState<TimelineClip[][]>([]);
+  const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
+  const [trackMuted, setTrackMuted] = useState<Record<TrackType, boolean>>({
+    video: false,
+    audio: false,
+    text: false,
+  });
 
-    const [brollSuggestions, setBrollSuggestions] = useState<string[]>([]);
-    const [suggestIsPending, startSuggestTransition] = useTransition();
-    const [mediaBin, setMediaBin] = useState<StockVideoResult[]>([]);
-    const [fetchIsPending, startFetchTransition] = useTransition();
-    const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
-    const [blobUrls, setBlobUrls] = useState<string[]>([]);
-    const { subscriptionPlan } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        const loadBrandKit = async () => {
-            const kit = await getBrandKit();
-            if (kit) {
-                setBrandKit(kit);
-            }
-        };
-        loadBrandKit();
-        
-        return () => {
-            blobUrls.forEach(url => URL.revokeObjectURL(url));
-        };
-    }, [blobUrls]);
+  const selectedClips = useMemo(() => clips.filter((c) => selectedClipIds.has(c.id)), [clips, selectedClipIds]);
+  const selectedClip = selectedClips[0] || null;
+  const timelineDuration = useMemo(() => Math.max(20, ...clips.map((c) => c.start + c.duration + 1)), [clips]);
+  const tracks: TrackType[] = ['video', 'audio', 'text'];
 
-    const selectedScene = scenes.find(s => s.id === selectedSceneId) || null;
+  const commitClips = (updater: (prev: TimelineClip[]) => TimelineClip[], actionMessage?: string) => {
+    setClips((prev) => {
+      const next = updater(prev);
+      setHistoryStack((h) => [...h.slice(-39), cloneClips(prev)]);
+      setRedoStack([]);
+      if (actionMessage) {
+        toast({ title: 'Updated', description: actionMessage });
+      }
+      return next;
+    });
+  };
 
-    const addScene = () => {
-        const newScene: Scene = {
-            id: Date.now(),
-            type: 'image',
-            src: 'https://placehold.co/1920x1080.png',
-            duration: 4,
-            caption: { text: 'New Scene', position: 'bottom' },
-        };
-        setScenes([...scenes, newScene]);
-        setSelectedSceneId(newScene.id);
-    };
-    
-    const removeScene = (id: number) => {
-        setScenes(scenes.filter(s => s.id !== id));
-        if (selectedSceneId === id) {
-            setSelectedSceneId(scenes.length > 1 ? scenes[0].id : null);
-        }
-    };
+  const snapValue = (value: number, activeClipId?: string) => {
+    const edges = clips
+      .filter((c) => c.id !== activeClipId)
+      .flatMap((c) => [c.start, c.start + c.duration]);
+    let best = value;
+    let bestDiff = SNAP_THRESHOLD;
+    edges.forEach((edge) => {
+      const diff = Math.abs(edge - value);
+      if (diff <= bestDiff) {
+        best = edge;
+        bestDiff = diff;
+      }
+    });
+    return Number(best.toFixed(2));
+  };
 
-    const handleCaptionChange = (text: string) => {
-        if (!selectedScene) return;
-        const updatedScenes = scenes.map(s => s.id === selectedScene.id ? { ...s, caption: { ...s.caption, text } } : s);
-        setScenes(updatedScenes);
-    };
+  const undo = () => {
+    setHistoryStack((h) => {
+      if (h.length === 0) return h;
+      const previous = h[h.length - 1];
+      setRedoStack((r) => [...r, cloneClips(clips)]);
+      setClips(previous);
+      return h.slice(0, -1);
+    });
+  };
 
-    const handleBrollUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const url = URL.createObjectURL(file);
-            const thumbnail = file.type.startsWith('image') ? URL.createObjectURL(file) : 'https://placehold.co/400x300.png?text=Video';
-            const newMediaItem: StockVideoResult = {
-                id: `local-${Date.now()}`,
-                url,
-                thumbnail,
-                description: file.name,
-                photographer: "Local file",
-            };
-            setMediaBin(prev => [newMediaItem, ...prev]);
-            setBlobUrls(prev => [...prev, url, thumbnail]);
-            toast({ title: 'B-Roll Added', description: `${file.name} has been added to your media bin.` });
-        }
-    };
-    
-    const handleSuggestBroll = () => {
-        if (!selectedScene?.caption.text) {
-            toast({ variant: 'destructive', title: 'Cannot Suggest', description: 'Please add a caption to the selected scene first.'});
-            return;
-        }
-        startSuggestTransition(async () => {
-            setBrollSuggestions([]);
-            try {
-                const result = await suggestBroll({ script: selectedScene.caption.text });
-                setBrollSuggestions(result.suggestions);
-            } catch (e) {
-                 const error = e as Error;
-                 toast({ variant: 'destructive', title: 'Suggestion Failed', description: error.message });
-            }
+  const redo = () => {
+    setRedoStack((r) => {
+      if (r.length === 0) return r;
+      const next = r[r.length - 1];
+      setHistoryStack((h) => [...h, cloneClips(clips)]);
+      setClips(next);
+      return r.slice(0, -1);
+    });
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as TimelineClip[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setClips(parsed);
+        setSelectedClipIds(new Set([parsed[0].id]));
+      }
+    } catch {
+      // ignore restore failures
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clips));
+  }, [clips]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    if (isPlaying) {
+      timer = setInterval(() => {
+        setPlayheadSec((prev) => {
+          const next = prev + 0.1;
+          if (next >= timelineDuration) {
+            setIsPlaying(false);
+            return timelineDuration;
+          }
+          return Number(next.toFixed(1));
         });
+      }, 100);
     }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isPlaying, timelineDuration]);
 
-    const handleFetchStockVideos = (searchTerm: string) => {
-        startFetchTransition(async () => {
-            try {
-                const result = await fetchStockVideos({ searchTerm });
-                setMediaBin(prev => [...result.videos, ...prev]);
-                toast({ title: 'Media Added', description: `Added ${result.videos.length} clips for "${searchTerm}" to your bin.`})
-            } catch (e) {
-                const error = e as Error;
-                toast({ variant: 'destructive', title: 'Error', description: error.message })
-            }
-        });
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (isTyping) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsPlaying((p) => !p);
+      } else if (e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsPlaying(false);
+      } else if (e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setPlayheadSec((p) => Math.max(0, Number((p - 1).toFixed(2))));
+      } else if (e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        setPlayheadSec((p) => Math.min(timelineDuration, Number((p + 1).toFixed(2))));
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      } else if (e.key === 'Delete') {
+        e.preventDefault();
+        handleDeleteSelected(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRenderJobs((prev) =>
+        prev.map((job) => {
+          if (job.status === 'completed') return job;
+          const next = Math.min(100, job.progress + (job.status === 'queued' ? 18 : 12));
+          const status: RenderStatus = next >= 100 ? 'completed' : 'rendering';
+          return { ...job, progress: next, status };
+        })
+      );
+    }, 1200);
+    return () => clearInterval(timer);
+  }, []);
+
+  const addTextClip = () => {
+    const id = `t-${Date.now()}`;
+    const clip: TimelineClip = {
+      id,
+      track: 'text',
+      label: 'New Text',
+      start: snapValue(Math.max(0, Math.floor(playheadSec))),
+      duration: 3,
+      text: 'New caption',
+      transition: 'dissolve',
+      effect: 'none',
+    };
+    commitClips((prev) => [...prev, clip], 'Text clip added');
+    setSelectedClipIds(new Set([id]));
+  };
+
+  const addAudioClip = () => {
+    const id = `a-${Date.now()}`;
+    const clip: TimelineClip = {
+      id,
+      track: 'audio',
+      label: 'New Audio',
+      start: snapValue(Math.max(0, Math.floor(playheadSec))),
+      duration: 6,
+      volume: 80,
+      transition: 'none',
+      effect: 'none',
+    };
+    commitClips((prev) => [...prev, clip], 'Audio clip added');
+    setSelectedClipIds(new Set([id]));
+  };
+
+  const addVideoClipFromMedia = (item: StockVideoResult) => {
+    const id = `v-${Date.now()}`;
+    const clip: TimelineClip = {
+      id,
+      track: 'video',
+      label: item.description.slice(0, 24) || 'Video clip',
+      start: snapValue(Math.max(0, Math.floor(playheadSec))),
+      duration: 4,
+      src: item.url,
+      thumbnail: item.thumbnail,
+      transition: 'cut',
+      effect: 'none',
+    };
+    commitClips((prev) => [...prev, clip], 'Video clip added');
+    setSelectedClipIds(new Set([id]));
+  };
+
+  const handleDeleteSelected = (ripple: boolean) => {
+    if (selectedClipIds.size === 0) return;
+    commitClips((prev) => {
+      const selected = prev.filter((c) => selectedClipIds.has(c.id));
+      if (!ripple || selected.length === 0) {
+        return prev.filter((c) => !selectedClipIds.has(c.id));
+      }
+      const next = prev.filter((c) => !selectedClipIds.has(c.id));
+      const shifts = new Map<TrackType, { from: number; amount: number }[]>();
+      selected.forEach((c) => {
+        const entry = shifts.get(c.track) || [];
+        entry.push({ from: c.start, amount: c.duration });
+        shifts.set(c.track, entry);
+      });
+      return next.map((clip) => {
+        const trackShifts = shifts.get(clip.track) || [];
+        const totalShift = trackShifts
+          .filter((s) => clip.start >= s.from)
+          .reduce((acc, s) => acc + s.amount, 0);
+        return totalShift > 0 ? { ...clip, start: Math.max(0, Number((clip.start - totalShift).toFixed(2))) } : clip;
+      });
+    }, ripple ? 'Ripple delete applied' : 'Clips deleted');
+    const remaining = clips.filter((c) => !selectedClipIds.has(c.id));
+    setSelectedClipIds(new Set(remaining[0] ? [remaining[0].id] : []));
+  };
+
+  const splitSelectedClip = () => {
+    if (!selectedClip) return;
+    if (playheadSec <= selectedClip.start || playheadSec >= selectedClip.start + selectedClip.duration) {
+      toast({ variant: 'destructive', title: 'Invalid split point', description: 'Move playhead inside selected clip.' });
+      return;
     }
+    const leftDuration = Number((playheadSec - selectedClip.start).toFixed(2));
+    const rightDuration = Number((selectedClip.duration - leftDuration).toFixed(2));
+    const right: TimelineClip = {
+      ...selectedClip,
+      id: `${selectedClip.id}-s-${Date.now()}`,
+      start: Number(playheadSec.toFixed(2)),
+      duration: rightDuration,
+      label: `${selectedClip.label} (B)`,
+    };
+    commitClips((prev) =>
+      prev.flatMap((c) => {
+        if (c.id !== selectedClip.id) return [c];
+        return [{ ...c, duration: leftDuration, label: `${c.label} (A)` }, right];
+      }), 'Clip split');
+    setSelectedClipIds(new Set([right.id]));
+  };
 
+  const duplicateSelected = () => {
+    if (!selectedClip) return;
+    const dup: TimelineClip = {
+      ...selectedClip,
+      id: `${selectedClip.id}-dup-${Date.now()}`,
+      start: snapValue(selectedClip.start + selectedClip.duration, selectedClip.id),
+      label: `${selectedClip.label} Copy`,
+    };
+    commitClips((prev) => [...prev, dup], 'Clip duplicated');
+    setSelectedClipIds(new Set([dup.id]));
+  };
 
-    const handlePlayPause = () => {
-        if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            } else {
-                videoRef.current.play();
-                setIsPlaying(true);
-            }
-        }
+  const updateSelectedClip = (patch: Partial<TimelineClip>) => {
+    if (!selectedClip) return;
+    commitClips((prev) =>
+      prev.map((c) => {
+        if (c.id !== selectedClip.id) return c;
+        const maybeStart = patch.start !== undefined ? snapValue(Math.max(0, patch.start), c.id) : c.start;
+        return { ...c, ...patch, start: maybeStart };
+      })
+    );
+  };
+
+  const handleUpload = (file: File | null) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const media: StockVideoResult = {
+      id: `local-${Date.now()}`,
+      url,
+      thumbnail: file.type.startsWith('image') ? url : 'https://placehold.co/320x180.png?text=Video',
+      description: file.name,
+      photographer: 'Local Upload',
+    };
+    setMediaBin((prev) => [media, ...prev]);
+    toast({ title: 'Uploaded', description: `${file.name} added to media bin.` });
+  };
+
+  const handleSuggestBroll = () => {
+    const contextText = selectedClip?.text || selectedClip?.label || '';
+    if (!contextText) {
+      toast({ variant: 'destructive', title: 'No context', description: 'Select a clip with caption/label first.' });
+      return;
     }
+    startSuggestTransition(async () => {
+      try {
+        setBrollSuggestions([]);
+        const result = await suggestBroll({ script: contextText });
+        setBrollSuggestions(result.suggestions);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to get suggestions.';
+        toast({ variant: 'destructive', title: 'Suggestion failed', description: msg });
+      }
+    });
+  };
+
+  const handleFetchStock = (term: string) => {
+    startFetchTransition(async () => {
+      try {
+        const result = await fetchStockVideos({ searchTerm: term });
+        setMediaBin((prev) => [...result.videos, ...prev]);
+        toast({ title: 'Media fetched', description: `Added ${result.videos.length} clips for "${term}".` });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to fetch stock videos.';
+        toast({ variant: 'destructive', title: 'Fetch failed', description: msg });
+      }
+    });
+  };
+
+  const queueRender = () => {
+    const id = `render-${Date.now()}`;
+    const job: RenderJob = {
+      id,
+      name: `Render ${new Date().toLocaleTimeString()}`,
+      status: 'queued',
+      progress: 0,
+      createdAt: Date.now(),
+    };
+    setRenderJobs((prev) => [job, ...prev].slice(0, 8));
+    toast({ title: 'Render queued', description: 'Background render started.' });
+  };
+
+  const togglePlay = () => setIsPlaying((p) => !p);
+
+  const activeTextClip = clips.find((c) => c.track === 'text' && playheadSec >= c.start && playheadSec <= c.start + c.duration);
 
   return (
-    <div className="grid lg:grid-cols-12 gap-6 items-start h-full">
-        {/* Main Canvas & Timeline */}
-        <div className="lg:col-span-8 space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Video Preview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="aspect-video bg-black rounded-lg relative flex items-center justify-center">
-                        {selectedScene ? (
-                            selectedScene.type === 'video' ? (
-                                <video
-                                    ref={videoRef}
-                                    src={selectedScene.src}
-                                    className="w-full h-full object-contain rounded-lg"
-                                    onPlay={() => setIsPlaying(true)}
-                                    onPause={() => setIsPlaying(false)}
-                                    onEnded={() => setIsPlaying(false)}
-                                />
-                            ) : (
-                                <Image src={selectedScene.src} data-ai-hint="placeholder" fill objectFit="contain" alt="Scene preview" />
-                            )
-                        ) : (
-                            <p className="text-muted-foreground">Select a scene to preview</p>
-                        )}
-                        {selectedScene && selectedScene.caption.text && (
-                            <div className="absolute bottom-4 left-4 right-4 p-2 bg-black/50 text-white text-center rounded-md text-xl font-bold" style={{ fontFamily: brandKit?.headlineFont || 'Poppins' }}>
-                                {selectedScene.caption.text}
-                            </div>
-                        )}
-                        <div className="absolute bottom-2 left-2 flex gap-2">
-                             <Button size="icon" onClick={handlePlayPause}>
-                                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                            </Button>
-                        </div>
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <Card className="xl:col-span-3">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Layers3 className="h-5 w-5" />Media & AI</CardTitle>
+          <CardDescription>Upload assets, fetch stock media, and assist edits with AI.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button variant="outline" className="w-full" onClick={() => uploadRef.current?.click()}>
+            <UploadCloud className="mr-2 h-4 w-4" /> Upload Media
+          </Button>
+          <Input ref={uploadRef} type="file" className="hidden" accept="image/*,video/*,audio/*" onChange={(e) => handleUpload(e.target.files?.[0] || null)} />
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button className="w-full" variant="outline" onClick={addTextClip}><Type className="mr-2 h-4 w-4" />Text</Button>
+            <Button className="w-full" variant="outline" onClick={addAudioClip}><Music className="mr-2 h-4 w-4" />Audio</Button>
+          </div>
+
+          <Button className="w-full" variant="outline" onClick={handleSuggestBroll} disabled={suggestPending}>
+            {suggestPending ? <Sparkles className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+            Suggest B-Roll
+          </Button>
+
+          {brollSuggestions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {brollSuggestions.map((term) => (
+                <Button key={term} size="sm" variant="secondary" onClick={() => handleFetchStock(term)} disabled={fetchPending}>
+                  {term}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <Separator />
+          <div>
+            <Label>Media Bin</Label>
+            <ScrollArea className="h-64 mt-2 pr-2">
+              <div className="space-y-2">
+                {fetchPending && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                {!fetchPending && mediaBin.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No media yet. Upload or fetch clips.</p>
+                )}
+                {mediaBin.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => addVideoClipFromMedia(item)}
+                    className="w-full p-2 border rounded-md hover:bg-muted text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Image src={item.thumbnail} alt={item.description} width={72} height={40} className="rounded object-cover bg-muted aspect-video" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{item.description}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{item.photographer}</p>
+                      </div>
                     </div>
-                </CardContent>
-            </Card>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </CardContent>
+      </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Timeline</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ScrollArea className="w-full whitespace-nowrap pb-4">
-                        <div className="flex items-center gap-2 h-28">
-                            {scenes.map(scene => (
-                                <div 
-                                    key={scene.id} 
-                                    className={`h-full rounded-lg border-2 flex-shrink-0 cursor-pointer ${selectedSceneId === scene.id ? 'border-primary' : 'border-transparent'}`}
-                                    onClick={() => setSelectedSceneId(scene.id)}
-                                    style={{ width: `${scene.duration * 2}rem` }}
-                                >
-                                    <div className="relative h-full w-full bg-muted rounded-md overflow-hidden">
-                                        <Image src={scene.src} data-ai-hint="placeholder" fill objectFit="cover" alt={`Scene ${scene.id}`} />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-1 flex flex-col justify-end">
-                                            <p className="text-white text-xs truncate">{scene.caption.text || `Scene ${scene.id}`}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                             <Button variant="outline" size="icon" className="h-24 w-24 flex-shrink-0" onClick={addScene}>
-                                <Plus className="h-6 w-6" />
-                            </Button>
-                        </div>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        </div>
+      <div className="xl:col-span-6 space-y-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Clapperboard className="h-5 w-5" />Program Monitor</CardTitle>
+              <CardDescription>
+                Space: play/pause, J/K/L: shuttle, Ctrl/Cmd+Z/Y: undo/redo.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="icon" variant="outline" onClick={undo} disabled={historyStack.length === 0}><Undo2 className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" onClick={redo} disabled={redoStack.length === 0}><Redo2 className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" onClick={togglePlay}>{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</Button>
+              <Button size="icon" variant="outline" onClick={() => setPlayheadSec(0)}><Clock3 className="h-4 w-4" /></Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="relative aspect-video rounded-lg bg-black overflow-hidden">
+              {selectedClip?.track === 'video' ? (
+                selectedClip.src?.includes('placehold.co') ? (
+                  <Image src={selectedClip.src} alt="Preview" fill className="object-cover" />
+                ) : (
+                  <video ref={videoRef} src={selectedClip?.src} className="w-full h-full object-cover" controls={false} />
+                )
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                  <Film className="h-10 w-10 mr-2" /> Track preview
+                </div>
+              )}
+              {activeTextClip && !trackMuted.text && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/55 text-white px-4 py-2 rounded-md font-semibold">
+                  {activeTextClip.text}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Control Panel */}
-        <div className="lg:col-span-4 space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Editor</CardTitle>
-                    <CardDescription>Edit scene properties or use AI tools.</CardDescription>
-                </CardHeader>
-                 <CardContent>
-                     <Button className="w-full" asChild>
-                        <Link href="/dashboard/video-editor/transcript-editor">
-                           <FilePenLine className="mr-2 h-4 w-4" /> Edit with Transcript
-                        </Link>
-                    </Button>
-                </CardContent>
-                <CardContent className="space-y-4">
-                    {selectedScene ? (
-                        <>
-                            <div>
-                                <Label htmlFor="caption-text">Caption Text</Label>
-                                <Textarea 
-                                    id="caption-text" 
-                                    value={selectedScene.caption.text}
-                                    onChange={(e) => handleCaptionChange(e.target.value)}
-                                    placeholder="Enter caption for this scene"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="duration">Scene Duration (seconds)</Label>
-                                <Input 
-                                    id="duration" 
-                                    type="number"
-                                    value={selectedScene.duration}
-                                    onChange={(e) => setScenes(scenes.map(s => s.id === selectedSceneId ? { ...s, duration: Number(e.target.value) } : s))}
-                                />
-                            </div>
-                            <Button variant="destructive" className="w-full" onClick={() => removeScene(selectedScene.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Scene
-                            </Button>
-                        </>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center">Select a scene from the timeline to edit.</p>
-                    )}
-                </CardContent>
-            </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5" />Timeline</CardTitle>
+            <CardDescription>Multi-track timeline with snapping, split, duplicate, and ripple delete.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Label className="min-w-24">Zoom</Label>
+              <Input type="range" min={50} max={180} value={timelineZoom} onChange={(e) => setTimelineZoom(Number(e.target.value))} />
+              <span className="text-xs text-muted-foreground">{timelineZoom}%</span>
+              <span className="text-xs text-muted-foreground">Playhead: {playheadSec.toFixed(1)}s</span>
+            </div>
 
-             <Card>
-                <CardHeader>
-                    <CardTitle>AI B-Roll Suggestions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <Button className="w-full" variant="outline" onClick={handleSuggestBroll} disabled={!selectedScene || suggestIsPending}>
-                        {suggestIsPending ? <Sparkles className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
-                        Suggest B-Roll for Scene
-                    </Button>
-                    {brollSuggestions.length > 0 && (
-                        <div className="space-y-2">
-                            <Label>Click to find videos:</Label>
-                            <div className="flex flex-wrap gap-2">
-                                {brollSuggestions.map(term => (
-                                    <Button key={term} variant="secondary" size="sm" onClick={() => handleFetchStockVideos(term)} disabled={fetchIsPending}>
-                                        {fetchIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : term}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={splitSelectedClip} disabled={!selectedClip}><Scissors className="mr-2 h-4 w-4" />Split</Button>
+              <Button variant="outline" size="sm" onClick={duplicateSelected} disabled={!selectedClip}><Copy className="mr-2 h-4 w-4" />Duplicate</Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDeleteSelected(false)} disabled={selectedClipIds.size === 0}><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
+              <Button variant="secondary" size="sm" onClick={() => handleDeleteSelected(true)} disabled={selectedClipIds.size === 0}><Trash2 className="mr-2 h-4 w-4" />Ripple Delete</Button>
+              <Button variant="outline" size="sm" asChild><Link href="/dashboard/video-editor/transcript-editor"><FilePenLine className="mr-2 h-4 w-4" />Transcript Editor</Link></Button>
+            </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Media Bin</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button className="w-full" variant="outline" onClick={() => brollInputRef.current?.click()}>
-                        <UploadCloud className="mr-2 h-4 w-4" /> Upload Media
-                    </Button>
-                     <Input type="file" className="hidden" ref={brollInputRef} onChange={handleBrollUpload} accept="image/*,video/*" />
-                     
-                     <ScrollArea className="h-48">
-                        <div className="space-y-2 pr-4">
-                            {fetchIsPending ? (
-                                Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
-                            ) : mediaBin.length > 0 ? (
-                                mediaBin.map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 p-2 border rounded-md">
-                                        <Image src={item.thumbnail} data-ai-hint="stock video" alt={item.description} width={64} height={48} className="object-cover rounded aspect-video bg-muted" />
-                                        <p className="text-xs text-muted-foreground flex-1 truncate">{item.description}</p>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-center text-xs text-muted-foreground py-4">Upload or generate media to see it here.</p>
-                            )}
-                        </div>
-                     </ScrollArea>
-                </CardContent>
-            </Card>
-            
-            <Button size="lg" className="w-full">
-                <Download className="mr-2 h-4 w-4" /> Export Video
-            </Button>
-        </div>
+            <div className="relative border rounded-md p-3 overflow-x-auto">
+              <div className="absolute top-0 bottom-0 w-px bg-red-500/80 z-20" style={{ left: `${(playheadSec / timelineDuration) * 100}%` }} />
+              <div className="mb-3 flex">
+                {Array.from({ length: timelineDuration + 1 }).map((_, i) => (
+                  <div key={i} className="text-[10px] text-muted-foreground" style={{ width: `${timelineZoom / 2}px` }}>
+                    {i}s
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {tracks.map((track) => (
+                  <div key={track} className="flex items-stretch gap-2">
+                    <button
+                      type="button"
+                      className={`w-20 text-xs font-semibold uppercase border rounded px-2 py-2 ${trackMuted[track] ? 'bg-destructive/10 text-destructive' : 'bg-muted/40 text-muted-foreground'}`}
+                      onClick={() => setTrackMuted((prev) => ({ ...prev, [track]: !prev[track] }))}
+                    >
+                      {trackMuted[track] ? `M ${track}` : track}
+                    </button>
+                    <div className="relative flex-1 border rounded min-h-[56px] bg-muted/20">
+                      {clips.filter((c) => c.track === track).map((clip) => {
+                        const selected = selectedClipIds.has(clip.id);
+                        return (
+                          <button
+                            key={clip.id}
+                            onClick={(e) => {
+                              if (e.ctrlKey || e.metaKey) {
+                                setSelectedClipIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(clip.id)) next.delete(clip.id); else next.add(clip.id);
+                                  return next;
+                                });
+                              } else {
+                                setSelectedClipIds(new Set([clip.id]));
+                              }
+                            }}
+                            className={`absolute top-1/2 -translate-y-1/2 h-10 px-3 rounded-md border text-xs text-left ${selected ? 'border-primary bg-primary/15' : 'bg-background hover:bg-muted'}`}
+                            style={{
+                              left: `${clip.start * (timelineZoom / 2)}px`,
+                              width: `${Math.max(64, clip.duration * (timelineZoom / 2))}px`,
+                            }}
+                          >
+                            <p className="font-semibold truncate">{clip.label}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="xl:col-span-3">
+        <CardHeader>
+          <CardTitle>Inspector & Render</CardTitle>
+          <CardDescription>Clip properties, effects, and background export queue.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {selectedClip ? (
+            <>
+              <div className="flex items-center justify-between">
+                <Label>Clip Type</Label>
+                <TrackBadge track={selectedClip.track} />
+              </div>
+              <div className="space-y-2">
+                <Label>Label</Label>
+                <Input value={selectedClip.label} onChange={(e) => updateSelectedClip({ label: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Start</Label>
+                  <Input type="number" min={0} value={selectedClip.start} onChange={(e) => updateSelectedClip({ start: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Duration</Label>
+                  <Input type="number" min={1} value={selectedClip.duration} onChange={(e) => updateSelectedClip({ duration: Number(e.target.value) })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Transition</Label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  value={selectedClip.transition || 'none'}
+                  onChange={(e) => updateSelectedClip({ transition: e.target.value as TransitionType })}
+                >
+                  <option value="none">None</option>
+                  <option value="cut">Cut</option>
+                  <option value="dissolve">Dissolve</option>
+                  <option value="fade">Fade</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Effect</Label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  value={selectedClip.effect || 'none'}
+                  onChange={(e) => updateSelectedClip({ effect: e.target.value as EffectType })}
+                >
+                  <option value="none">None</option>
+                  <option value="cinematic">Cinematic</option>
+                  <option value="vintage">Vintage</option>
+                  <option value="high-contrast">High Contrast</option>
+                </select>
+              </div>
+              {selectedClip.track === 'text' && (
+                <div className="space-y-2">
+                  <Label>Text Content</Label>
+                  <Textarea value={selectedClip.text || ''} onChange={(e) => updateSelectedClip({ text: e.target.value })} rows={3} />
+                </div>
+              )}
+              {selectedClip.track === 'audio' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><Volume2 className="h-4 w-4" />Volume (%)</Label>
+                  <Input type="number" min={0} max={200} value={selectedClip.volume || 80} onChange={(e) => updateSelectedClip({ volume: Number(e.target.value) })} />
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Select a clip in the timeline.</p>
+          )}
+
+          <Separator />
+          <div className="space-y-2">
+            <Label>Export Preset</Label>
+            <Input defaultValue="H.264 - 1080p - 20Mbps - AAC" />
+          </div>
+          <div className="space-y-2">
+            <Label>Filename</Label>
+            <Input defaultValue="final-cut-v1.mp4" />
+          </div>
+          <Button className="w-full" onClick={queueRender}>
+            <Download className="mr-2 h-4 w-4" /> Queue Render
+          </Button>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2"><Wand2 className="h-4 w-4" />Render Queue</Label>
+            {renderJobs.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No render jobs yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {renderJobs.map((job) => (
+                  <div key={job.id} className="border rounded-md p-2">
+                    <p className="text-xs font-medium">{job.name}</p>
+                    <p className="text-[11px] text-muted-foreground capitalize">{job.status}</p>
+                    <div className="mt-1 h-1.5 bg-muted rounded">
+                      <div className={`h-1.5 rounded ${job.status === 'completed' ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${job.progress}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

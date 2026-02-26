@@ -16,6 +16,7 @@ const DEFAULT_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
   openai: { authType: 'apiKey', requiresSetup: false },
   azureOpenai: { authType: 'apiKey', requiresSetup: false },
   claude: { authType: 'apiKey', requiresSetup: false },
+  minimax: { authType: 'apiKey', requiresSetup: false },
   elevenlabs: { authType: 'apiKey', requiresSetup: false },
   replicate: { authType: 'apiKey', requiresSetup: false },
   huggingface: { authType: 'apiKey', requiresSetup: false },

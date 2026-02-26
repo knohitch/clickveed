@@ -5,9 +5,9 @@
 
 import { ai } from '@/ai/genkit';
 import { generateStreamWithProvider } from '@/lib/ai/api-service-manager';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 import {
   CreativeAssistantChatInputSchema,
-  creativeAssistantSystemPrompt,
   type CreativeAssistantChatInput,
 } from './types';
 
@@ -25,17 +25,31 @@ const creativeAssistantChatFlow = ai.defineFlow(
     outputSchema: (await import('genkit')).z.any(),
   },
   async ({ history, message }) => {
+    const { appName } = await getAdminSettings();
+    const today = new Date().toISOString().slice(0, 10);
+    const creativeAssistantSystemPrompt = `You are a Creative AI Assistant for ${appName}, a video marketing platform.
+You help users with:
+- Video content ideas and scripting
+- Thumbnail design suggestions
+- SEO optimization for video titles and descriptions
+- Content strategy and planning
+- Video editing tips and best practices
+
+Be creative, helpful, and provide actionable suggestions. Use markdown formatting for clarity.
+When suggesting ideas, be specific and provide examples.
+Current date is ${today}. Do not assume older years like 2024 unless explicitly asked for historical context.`;
+
     // Format messages properly for Genkit
     const formattedHistory = (history || []).map(h => ({
       role: h.role === 'assistant' ? 'model' as 'model' : 'user' as 'user',
       content: [{ text: h.content }]
     }));
 
-    // Combine system prompt, history, and user message
+    // Combine system prompt, history, and newest user message in chronological order
     const messages = [
       { role: 'system' as 'user' | 'model', content: [{ text: creativeAssistantSystemPrompt }] },
+      ...formattedHistory,
       { role: 'user' as 'user' | 'model', content: [{ text: message }] },
-      ...formattedHistory
     ];
 
     const { stream, response } = await generateStreamWithProvider({

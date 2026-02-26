@@ -16,7 +16,7 @@ export function ChatMessage({ message }: { message: Message }) {
     const isUserModel = message.role === 'user';
     
     // Handle the "thinking" placeholder
-    if (message.id === 'thinking' && message.role === 'model') {
+    if ((message.id === 'thinking' || message.id.startsWith('pending-')) && message.role === 'model') {
         return (
             <div className="flex items-start gap-4">
                 <Avatar className="w-8 h-8 border">

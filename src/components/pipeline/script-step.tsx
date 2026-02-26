@@ -73,6 +73,7 @@ export function ScriptStep({ onScriptGenerated }: ScriptStepProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [script, setScript] = useState<string | null>(null);
   const [videoType, setVideoType] = useState<VideoType | ''>('');
+  const [existingScript, setExistingScript] = useState('');
   const { pending } = useFormStatus();
 
 
@@ -118,9 +119,31 @@ export function ScriptStep({ onScriptGenerated }: ScriptStepProps) {
     setVideoType(value);
   }
 
+  const useExistingScript = () => {
+    const trimmed = existingScript.trim();
+    if (!trimmed) return;
+    setScript(trimmed);
+    onScriptGenerated(trimmed);
+    toast({ title: 'Script Loaded', description: 'Using your existing script in the pipeline.' });
+  };
+
   return (
     <div className="grid md:grid-cols-2 gap-8 items-start">
       <form ref={formRef} action={formAction} className="space-y-4">
+        <div className="space-y-2 border rounded-md p-3 bg-muted/40">
+            <Label htmlFor="existingScript">Use Existing Script (Optional)</Label>
+            <Textarea
+                id="existingScript"
+                value={existingScript}
+                onChange={(e) => setExistingScript(e.target.value)}
+                rows={4}
+                placeholder="Paste a script from Video from URL or any other source."
+            />
+            <Button type="button" variant="outline" onClick={useExistingScript} disabled={!existingScript.trim()} className="w-full">
+                Use This Script
+            </Button>
+        </div>
+
         <div className="space-y-2">
             <Label htmlFor="prompt">What is your video about?</Label>
             <Textarea

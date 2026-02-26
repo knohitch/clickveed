@@ -6,9 +6,9 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { generateStreamWithProvider } from '@/lib/ai/api-service-manager';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 import {
   SupportChatSchema,
-  supportChatSystemPrompt,
   type SupportChatRequest,
 } from './types';
 
@@ -26,17 +26,26 @@ const supportChatFlow = ai.defineFlow(
     outputSchema: z.any(),
   },
   async ({ history, message }) => {
+    const { appName } = await getAdminSettings();
+    const today = new Date().toISOString().slice(0, 10);
+    const supportChatSystemPrompt = `You are ${appName} Support AI, a helpful customer support assistant for the ${appName} video platform.
+You assist with technical issues, billing, features, and general questions.
+Be empathetic, clear, and solution-oriented. If you can't resolve, suggest contacting human support.
+Escalate complex issues (e.g., account suspension) by saying "I'll create a ticket for our team."
+Keep responses concise and use bullet points for steps.
+Current date is ${today}. Avoid outdated assumptions about the current year.`;
+
     // Format messages properly for Genkit
     const formattedHistory = (history || []).map(h => ({
       role: h.role === 'assistant' ? 'model' as 'model' : 'user' as 'user',
       content: [{ text: h.content }]
     }));
 
-    // Combine system prompt, history, and user message
+    // Combine system prompt, history, and newest user message in chronological order
     const messages = [
       { role: 'system' as 'user' | 'model', content: [{ text: supportChatSystemPrompt }] },
+      ...formattedHistory,
       { role: 'user' as 'user' | 'model', content: [{ text: message }] },
-      ...formattedHistory
     ];
 
     const { stream, response } = await generateStreamWithProvider({

@@ -39,6 +39,7 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [isPending, startTransition] = useTransition();
+  const pendingMessageIdRef = useRef<string | null>(null);
 
   const hasCreatedTicket = useRef(false);
 
@@ -73,12 +74,19 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
         hasCreatedTicket.current = true;
     }
 
-    const history = [...messages];
+    const history = messages
+      .filter(m => !m.id.startsWith('pending-'))
+      .map(msg => ({
+        role: msg.role === 'model' ? 'assistant' : 'user',
+        content: msg.content
+      }));
     const optimisticMessage: Message = { id: Date.now().toString(), role: 'user', content: userInput };
+    const pendingId = `pending-${Date.now()}`;
     
     startTransition(() => {
-        setMessages(prev => [...prev, optimisticMessage, { id: 'thinking', role: 'model', content: '' }]);
+        setMessages(prev => [...prev, optimisticMessage, { id: pendingId, role: 'model', content: '' }]);
     });
+    pendingMessageIdRef.current = pendingId;
     
     formRef.current?.reset();
     
@@ -89,7 +97,11 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
    useEffect(() => {
     if (state.message) {
         toast({ variant: 'destructive', title: 'Error', description: state.message });
-        setMessages(prev => prev.filter(m => m.id !== 'thinking'));
+        const pendingId = pendingMessageIdRef.current;
+        if (pendingId) {
+          setMessages(prev => prev.filter(m => m.id !== pendingId));
+        }
+        pendingMessageIdRef.current = null;
         return;
     }
 
@@ -97,16 +109,18 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
         return;
     }
 
+    const pendingId = pendingMessageIdRef.current;
     setMessages(prev => {
         const newMessages = [...prev];
-        const modelResponseIndex = newMessages.findIndex(m => m.id === 'thinking' || m.id === 'model-response');
+        const modelResponseIndex = pendingId ? newMessages.findIndex(m => m.id === pendingId) : -1;
         if (modelResponseIndex !== -1) {
-            newMessages[modelResponseIndex] = { id: 'model-response', role: 'model', content: state.responseText };
+            newMessages[modelResponseIndex] = { id: `model-${Date.now()}`, role: 'model', content: state.responseText };
         } else {
-            newMessages.push({ id: 'model-response', role: 'model', content: state.responseText });
+            newMessages.push({ id: `model-${Date.now()}`, role: 'model', content: state.responseText });
         }
         return newMessages;
     });
+    pendingMessageIdRef.current = null;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.responseText, state.message, toast]);

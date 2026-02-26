@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, FileText, Mic, Video, ArrowRight } from 'lucide-react';
@@ -23,6 +24,7 @@ const steps = [
 ];
 
 export default function VideoPipelinePage() {
+  const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState<Step>('script');
   const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set());
   
@@ -30,6 +32,23 @@ export default function VideoPipelinePage() {
   const [script, setScript] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const importedScript = sessionStorage.getItem('pipeline_import_script');
+    if (importedScript && !script) {
+      setScript(importedScript);
+      setCompletedSteps(new Set<Step>(['script']));
+      setCurrentStep('voice');
+      sessionStorage.removeItem('pipeline_import_script');
+    }
+  }, [script]);
+
+  React.useEffect(() => {
+    const step = searchParams.get('step');
+    if (step === 'video' && script) {
+      setCurrentStep('video');
+    }
+  }, [searchParams, script]);
 
   const currentStepIndex = steps.findIndex(step => step.id === currentStep);
   

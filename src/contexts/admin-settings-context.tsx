@@ -76,6 +76,7 @@ interface AdminSettingsContextType extends AllSettings {
   isMakeConfigured: boolean;
   isGoogleAIConfigured: boolean;
   isStripeConfigured: boolean;
+  isMinimaxConfigured: boolean;
   isElevenLabsConfigured: boolean;
   isPikaConfigured: boolean;
   isRunwayMLConfigured: boolean;
@@ -120,7 +121,7 @@ export const initialApiKeysObject: ApiKeys = {
   gemini: '', openai: '', claude: '', azureOpenai: '', openrouter: '', deepseek: '', grok: '', qwen: '', perplexity: '', mistral: '', cohere: '',
   stableDiffusion: '', midjourney: '', dalle: '', imagen: '', dreamstudio: '', leonardo: '', magnific: '',
   googleVeo: '', kling: '', sora: '', wan: '', seedance: '', skyReels: '', pika: '', luma: '', synthesia: '', colossyan: '', runwayml: '', heygen: '', modelscope: '', stableVideo: '', animateDiff: '', videoFusion: '',
-  elevenlabs: '', azureTts: '', myshell: '', coqui: '', assemblyai: '', deepgram: '', suno: '', udio: '', lalalai: '',
+  minimax: '', elevenlabs: '', azureTts: '', myshell: '', coqui: '', assemblyai: '', deepgram: '', suno: '', udio: '', lalalai: '',
   n8n: '', make: '', replicate: '', huggingface: '',
   modelslab: '', pexels: '', pixabay: '', unsplash: '',
   stripePublishableKey: '', stripeSecretKey: '', stripeWebhookSecret: '',
@@ -248,6 +249,7 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     isMakeConfigured: !!settings.apiKeys.make,
     isGoogleAIConfigured: !!settings.apiKeys.gemini,
     isStripeConfigured: !!settings.apiKeys.stripeSecretKey && !!settings.apiKeys.stripePublishableKey,
+    isMinimaxConfigured: !!settings.apiKeys.minimax,
     isElevenLabsConfigured: !!settings.apiKeys.elevenlabs,
     isPikaConfigured: !!settings.apiKeys.pika,
     isRunwayMLConfigured: !!settings.apiKeys.runwayml,

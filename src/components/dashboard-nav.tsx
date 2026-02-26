@@ -36,7 +36,8 @@ import {
     MessageCircle,
     Clapperboard,
     Scissors,
-    Lock
+    Lock,
+    Video
 } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -53,7 +54,9 @@ const mainLinks = [
 
 const videoSuiteTools = [
     { href: "/dashboard/video-suite", icon: Workflow, label: "All Tools", featureId: "video-suite" },
+    { href: "/dashboard/video-suite/video-generator", icon: Video, label: "Video Generator", featureId: "video-suite" },
     { href: "/dashboard/video-pipeline", icon: Workflow, label: "Video Pipeline", featureId: "video-pipeline" },
+    { href: "/dashboard/video-pipeline?step=video", icon: Video, label: "Generate Video (Step 3)", featureId: "video-pipeline" },
     { href: "/dashboard/video-editor", icon: Clapperboard, label: "Video Editor", featureId: "video-editor" },
     { href: "/dashboard/video-suite/magic-clips", icon: Scissors, label: "Magic Clips", featureId: "magic-clips" },
     { href: "/dashboard/video-suite/script-generator", icon: FileText, label: "Script Generator", featureId: "script-generator" },

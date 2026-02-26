@@ -65,7 +65,7 @@ const IntegrationStatus = ({ label, isConfigured }: { label: string, isConfigure
 export default function AIAgentsPage() {
   const [generateState, formAction] = useFormState(generateAutomationWorkflowAction, generateInitialState);
   const { toast } = useToast();
-  const { isN8nConfigured, isMakeConfigured } = useAdminSettings();
+  const { isN8nConfigured, isMakeConfigured, appName } = useAdminSettings();
   
   const [generatedWorkflow, setGeneratedWorkflow] = useState<any>(null);
   const [agentName, setAgentName] = useState('');
@@ -163,7 +163,7 @@ export default function AIAgentsPage() {
                 <Textarea
                   id="prompt"
                   name="prompt"
-                  placeholder="e.g., When a new video is ready in ClickVid, post it to my Facebook page every Friday at 3 PM."
+                  placeholder={`e.g., When a new video is ready in ${appName}, post it to my Facebook page every Friday at 3 PM.`}
                   rows={5}
                   required
                 />

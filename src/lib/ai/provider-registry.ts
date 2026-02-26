@@ -31,6 +31,7 @@ export type ProviderName =
   | 'stableVideo'
   | 'animateDiff'
   | 'videoFusion'
+  | 'minimax'
   | 'elevenlabs'
   | 'azureTts'
   | 'myshell'
@@ -101,11 +102,12 @@ const defs: ProviderDefinition[] = [
   { name: 'videoFusion', capability: 'video', priority: 9, model: 'openai/gpt-4o', implemented: false },
 
   // TTS
-  { name: 'elevenlabs', capability: 'tts', priority: 1, model: 'elevenlabs', implemented: true },
-  { name: 'gemini', capability: 'tts', priority: 2, model: MODEL_CONSTANTS.GEMINI_TEXT_MODEL, implemented: true },
-  { name: 'azureTts', capability: 'tts', priority: 3, model: 'openai/gpt-4o', implemented: false },
-  { name: 'myshell', capability: 'tts', priority: 4, model: 'openai/gpt-4o', implemented: false },
-  { name: 'coqui', capability: 'tts', priority: 5, model: 'openai/gpt-4o', implemented: false },
+  { name: 'minimax', capability: 'tts', priority: 1, model: 'minimax', implemented: true },
+  { name: 'elevenlabs', capability: 'tts', priority: 2, model: 'elevenlabs', implemented: true },
+  { name: 'gemini', capability: 'tts', priority: 3, model: MODEL_CONSTANTS.GEMINI_TEXT_MODEL, implemented: true },
+  { name: 'azureTts', capability: 'tts', priority: 4, model: 'openai/gpt-4o', implemented: false },
+  { name: 'myshell', capability: 'tts', priority: 5, model: 'openai/gpt-4o', implemented: false },
+  { name: 'coqui', capability: 'tts', priority: 6, model: 'openai/gpt-4o', implemented: false },
 ];
 
 export const PROVIDER_REGISTRY = defs;

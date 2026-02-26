@@ -1,10 +1,17 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, FileText, ImageIcon, MicVocal, Link as LinkIcon, Library, UserSquare, Clapperboard, Scissors, Workflow } from 'lucide-react';
+import { ArrowRight, FileText, ImageIcon, MicVocal, Link as LinkIcon, Library, UserSquare, Clapperboard, Scissors, Workflow, Video } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 const tools = [
+    {
+        title: "AI Video Generator",
+        description: "Generate direct text-to-video renders with Veo first and smart fallback providers.",
+        icon: Video,
+        href: "/dashboard/video-suite/video-generator",
+        cta: "Generate Video",
+    },
     {
         title: "Video Pipeline",
         description: "A step-by-step wizard to create a complete video from scratch.",

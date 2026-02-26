@@ -6,6 +6,7 @@ import prisma from './prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { formatDistanceToNow } from 'date-fns';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 
 export interface Agent {
     id: number;
@@ -48,7 +49,8 @@ export async function createAgent(data: { name: string, workflowJson: any }): Pr
     
     // Determine platform and trigger from the workflow JSON
     const platform = data.workflowJson.nodes ? 'n8n' : 'Make.com';
-    const trigger = 'ClickVid Pro Trigger'; // This would be more dynamic in a real app
+    const { appName } = await getAdminSettings();
+    const trigger = `${appName || 'AI Video Creator'} Trigger`;
 
     const newAgent = await prisma.agent.create({
         data: {

@@ -10,6 +10,7 @@ export const FEATURE_CONFIG = {
   'topic-researcher': { displayName: 'Topic Researcher', category: 'content' },
   'thumbnail-tester': { displayName: 'Thumbnail Tester', category: 'content' },
   'video-suite': { displayName: 'Video Suite', category: 'video' },
+  'video-generator': { displayName: 'Video Generator', category: 'video' },
   'video-pipeline': { displayName: 'Video Pipeline', category: 'video' },
   'video-editor': { displayName: 'Video Editor', category: 'video' },
   'magic-clips': { displayName: 'Magic Clips', category: 'video' },
@@ -52,6 +53,7 @@ export const ALWAYS_ACCESSIBLE_FEATURES = [
 // Keyword matching for flexible feature detection
 export const FEATURE_KEYWORD_MAP: Record<string, string[]> = {
   'video-suite': ['video', 'editing', 'creation'],
+  'video-generator': ['video', 'generator', 'render', 'text to video'],
   'ai-assistant': ['ai', 'assistant', 'chat'],
   'voice-cloning': ['voice', 'clone', 'cloning'],
   'background-remover': ['background', 'remove', 'remover'],
@@ -81,6 +83,7 @@ export const DEFAULT_FREE_PLAN_FEATURES = [
   'profile-settings',
   // Video tools for free users
   'video-suite',
+  'video-generator',
   'video-editor',
   'video-pipeline',
   'script-generator',
@@ -92,6 +95,7 @@ export const DEFAULT_STARTER_PLAN_FEATURES = [
   ...DEFAULT_FREE_PLAN_FEATURES,
   'topic-researcher',
   'video-suite',
+  'video-generator',
   'video-pipeline',
   'video-editor',
   'script-generator',
@@ -147,6 +151,7 @@ export const FEATURE_MINIMUM_PLAN: Record<string, string> = {
   // Free features (explicitly listed for clarity)
   'topic-researcher': 'Free',
   'video-suite': 'Free',
+  'video-generator': 'Free',
   'video-pipeline': 'Free',
   'video-editor': 'Free',
   'script-generator': 'Free',

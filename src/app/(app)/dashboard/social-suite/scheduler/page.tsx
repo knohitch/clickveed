@@ -50,11 +50,25 @@ const ThreadsIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+const LinkedInIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M4.98 3.5C4.98 4.88 3.86 6 2.48 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.5 8h4V24h-4V8zm7 0h3.8v2.2h.1c.53-1 1.83-2.2 3.78-2.2 4.04 0 4.79 2.66 4.79 6.12V24h-4v-7.7c0-1.84-.03-4.2-2.56-4.2-2.56 0-2.95 2-2.95 4.06V24h-4V8z"/>
+    </svg>
+);
+
+const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1227" fill="currentColor" {...props}>
+        <path d="M714 519 1160 0h-106L667 450 358 0H0l468 681L0 1227h106l409-476 327 476h358L714 519zM568 689l-47-67L150 91h163l300 428 47 67 389 550H886L568 689z" />
+    </svg>
+);
+
 const socialPlatforms = [
     { id: 'instagram', name: 'Instagram', icon: Instagram },
     { id: 'youtube', name: 'YouTube', icon: Youtube },
     { id: 'tiktok', name: 'TikTok', icon: TikTokIcon },
     { id: 'facebook', name: 'Facebook', icon: Facebook },
+    { id: 'linkedin', name: 'LinkedIn', icon: LinkedInIcon },
+    { id: 'x', name: 'X (Twitter)', icon: XIcon },
     { id: 'threads', name: 'Threads', icon: ThreadsIcon },
     { id: 'snapchat', name: 'Snapchat', icon: SnapchatIcon },
     { id: 'whatsapp', name: 'WhatsApp', icon: WhatsAppIcon },
@@ -75,7 +89,17 @@ export default function SchedulerPage() {
     const [scheduleTime, setScheduleTime] = useState('14:30');
     
     const [mainCaption, setMainCaption] = useState('');
-    const [customCaptions, setCustomCaptions] = useState<Captions>({ instagram: '', youtube: '', tiktok: '', facebook: '', threads: '', snapchat: '', whatsapp: '' });
+    const [customCaptions, setCustomCaptions] = useState<Captions>({
+        instagram: '',
+        youtube: '',
+        tiktok: '',
+        facebook: '',
+        linkedin: '',
+        x: '',
+        threads: '',
+        snapchat: '',
+        whatsapp: '',
+    });
     const [activeTab, setActiveTab] = useState<PlatformId | null>(null);
     
     useEffect(() => {

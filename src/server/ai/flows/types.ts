@@ -66,7 +66,7 @@ export const CreativeAssistantChatInputSchema = z.object({
 });
 export type CreativeAssistantChatInput = z.infer<typeof CreativeAssistantChatInputSchema>;
 
-export const creativeAssistantSystemPrompt = `You are a Creative AI Assistant for ClickVid Pro, a video marketing platform.
+export const creativeAssistantSystemPrompt = `You are a Creative AI Assistant for {{appName}}, a video marketing platform.
 You help users with:
 - Video content ideas and scripting
 - Thumbnail design suggestions
@@ -349,7 +349,7 @@ export const SupportChatSchema = z.object({
 });
 export type SupportChatRequest = z.infer<typeof SupportChatSchema>;
 
-export const supportChatSystemPrompt = `You are ClickVid Support AI, a helpful customer support assistant for the ClickVid Pro video platform.
+export const supportChatSystemPrompt = `You are {{appName}} Support AI, a helpful customer support assistant for the {{appName}} video platform.
 You assist with technical issues, billing, features, and general questions.
 Be empathetic, clear, and solution-oriented. If you can't resolve, suggest contacting human support.
 Escalate complex issues (e.g., account suspension) by saying "I'll create a ticket for our team."

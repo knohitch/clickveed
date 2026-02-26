@@ -136,15 +136,16 @@ export default function ApiIntegrationsPage() {
 
                 </div>
 
-                <div className="space-y-8">
-                     <ApiCategoryCard title="Image, Video & Audio Generation" icon={ImageIcon}>
-                        <ApiKeyInput name="elevenlabs" label="ElevenLabs API Key" value={localApiKeys.elevenlabs} onChange={handleKeyChange}/>
-                        <ApiKeyInput name="replicate" label="Replicate API Key" value={localApiKeys.replicate} onChange={handleKeyChange}/>
-                        <ApiKeyInput name="seedance" label="Seedance API Key" value={localApiKeys.seedance} onChange={handleKeyChange}/>
-                        <ApiKeyInput name="wan" label="Wan API Key" value={localApiKeys.wan} onChange={handleKeyChange}/>
-                        <ApiKeyInput name="imagen" label="Google Imagen API Key" value={localApiKeys.imagen} onChange={handleKeyChange}/>
-                        <ApiKeyInput name="googleVeo" label="Google VEO API Key" value={localApiKeys.googleVeo} onChange={handleKeyChange}/>
-                    </ApiCategoryCard>
+                 <div className="space-y-8">
+                      <ApiCategoryCard title="Image, Video & Audio Generation" icon={ImageIcon}>
+                         <ApiKeyInput name="minimax" label="Minimax API Key (Primary TTS)" value={localApiKeys.minimax} onChange={handleKeyChange}/>
+                         <ApiKeyInput name="elevenlabs" label="ElevenLabs API Key (Fallback TTS)" value={localApiKeys.elevenlabs} onChange={handleKeyChange}/>
+                         <ApiKeyInput name="replicate" label="Replicate API Key" value={localApiKeys.replicate} onChange={handleKeyChange}/>
+                         <ApiKeyInput name="seedance" label="Seedance API Key" value={localApiKeys.seedance} onChange={handleKeyChange}/>
+                         <ApiKeyInput name="wan" label="Wan API Key" value={localApiKeys.wan} onChange={handleKeyChange}/>
+                         <ApiKeyInput name="imagen" label="Google Imagen API Key" value={localApiKeys.imagen} onChange={handleKeyChange}/>
+                         <ApiKeyInput name="googleVeo" label="Google VEO API Key" value={localApiKeys.googleVeo} onChange={handleKeyChange}/>
+                     </ApiCategoryCard>
 
                      <ApiCategoryCard title="Platform & Workflow" icon={Workflow}>
                         <ApiKeyInput name="n8n" label="n8n API Key" value={localApiKeys.n8n} onChange={handleKeyChange}/>

@@ -8,6 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import { getAdminSettings } from '@/server/actions/admin-actions';
 import {
     GenerateAutomationWorkflowInput,
     GenerateAutomationWorkflowInputSchema,
@@ -15,10 +16,10 @@ import {
     GenerateAutomationWorkflowOutputSchema,
 } from './types';
 
-const getPromptForPlatform = (platform: 'n8n' | 'Make.com') => {
+const getPromptForPlatform = (platform: 'n8n' | 'Make.com', appName: string) => {
     const commonInstructions = `
 Analyze the user's request to identify triggers, actions, and the data flow between them.
-The trigger will often be related to an event in "ClickVid Pro", our video creation app.
+The trigger will often be related to an event in "${appName}", our video creation app.
 Actions might include posting to social media (Facebook, Instagram, YouTube), sending emails, transcribing video, etc.
 If the request includes a schedule (e.g., "every Friday at 3 PM"), you must include a scheduling or cron trigger.
 
@@ -37,7 +38,7 @@ ${commonInstructions}
 Example ClickVid Trigger Node for n8n:
 {
     "parameters": { "events": ["video.ready"] },
-    "name": "ClickVid Pro Trigger",
+    "name": "${appName} Trigger",
     "type": "n8n-nodes-base.webhook",
     "typeVersion": 1,
     "position": [ 800, 200 ],
@@ -81,7 +82,8 @@ const generateAutomationWorkflowFlow = ai.defineFlow(
         outputSchema: GenerateAutomationWorkflowOutputSchema,
     },
     async ({ prompt: userPrompt, platform }) => {
-        const promptText = getPromptForPlatform(platform);
+        const { appName } = await getAdminSettings();
+        const promptText = getPromptForPlatform(platform, appName || 'AI Video Creator');
 
         const messages = [
             {
