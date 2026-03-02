@@ -44,13 +44,13 @@ async function getWasabiCredentials(): Promise<WasabiCredentials> {
     try {
         const { apiKeys, storageSettings } = await getAdminSettings();
         
-        // Priority: storageSettings → apiKeys → env vars
-        const wasabiEndpoint = storageSettings?.wasabiEndpoint || apiKeys['wasabiEndpoint'] || process.env.WASABI_ENDPOINT;
-        const wasabiRegion = storageSettings?.wasabiRegion || apiKeys['wasabiRegion'] || process.env.WASABI_REGION;
-        const wasabiAccessKey = storageSettings?.wasabiAccessKey || apiKeys['wasabiAccessKey'] || process.env.WASABI_ACCESS_KEY_ID;
-        const wasabiSecretKey = storageSettings?.wasabiSecretKey || apiKeys['wasabiSecretKey'] || process.env.WASABI_SECRET_ACCESS_KEY;
-        const wasabiBucket = storageSettings?.wasabiBucket || apiKeys['wasabiBucket'] || process.env.WASABI_BUCKET;
-        const bunnyCdnUrl = storageSettings?.bunnyCdnUrl || apiKeys['bunnyCdnUrl'] || process.env.BUNNY_CDN_URL;
+        // Priority: apiKeys -> storageSettings -> env vars
+        const wasabiEndpoint = apiKeys['wasabiEndpoint'] || storageSettings?.wasabiEndpoint || process.env.WASABI_ENDPOINT;
+        const wasabiRegion = apiKeys['wasabiRegion'] || storageSettings?.wasabiRegion || process.env.WASABI_REGION;
+        const wasabiAccessKey = apiKeys['wasabiAccessKey'] || storageSettings?.wasabiAccessKey || process.env.WASABI_ACCESS_KEY_ID;
+        const wasabiSecretKey = apiKeys['wasabiSecretKey'] || storageSettings?.wasabiSecretKey || process.env.WASABI_SECRET_ACCESS_KEY;
+        const wasabiBucket = apiKeys['wasabiBucket'] || storageSettings?.wasabiBucket || process.env.WASABI_BUCKET;
+        const bunnyCdnUrl = apiKeys['bunnyCdnUrl'] || storageSettings?.bunnyCdnUrl || process.env.BUNNY_CDN_URL;
 
         const missingCredentials: string[] = [];
         if (!wasabiEndpoint) missingCredentials.push('endpoint');

@@ -2,18 +2,19 @@
 
 "use client";
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, Clipboard, Download, Sparkles, Clapperboard } from 'lucide-react';
+import { Bot, Clipboard, Download, Sparkles, Clapperboard, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from './ui/input';
 import { Skeleton } from './ui/skeleton';
 import { generateScriptAction } from '@/lib/actions';
+import { Progress } from './ui/progress';
 
 type ScriptActionState = {
   message: string;
@@ -53,14 +54,53 @@ function SubmitButton() {
   );
 }
 
+function FormStatusObserver({ onPendingChange }: { onPendingChange: (pending: boolean) => void }) {
+    const { pending } = useFormStatus();
+
+    useEffect(() => {
+        onPendingChange(pending);
+    }, [pending, onPendingChange]);
+
+    return null;
+}
+
 function ScriptGeneratorForm() {
     const [state, formAction] = useFormState<ScriptActionState, FormData>(generateScriptAction, initialState);
     const { toast } = useToast();
     const promptRef = useRef<HTMLTextAreaElement>(null);
     const [videoType, setVideoType] = useState<VideoType | ''>('');
-    const { pending } = useFormStatus();
-
     const [script, setScript] = useState<string | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [progress, setProgress] = useState(0);
+
+    const handlePendingChange = useCallback((pending: boolean) => {
+        setIsGenerating(pending);
+    }, []);
+
+    useEffect(() => {
+        if (!isGenerating) {
+            return;
+        }
+
+        setProgress(10);
+        const timer = setInterval(() => {
+            setProgress((current) => {
+                if (current >= 92) return 92;
+                return Math.min(92, current + 6);
+            });
+        }, 550);
+
+        return () => clearInterval(timer);
+    }, [isGenerating]);
+
+    useEffect(() => {
+        if (state.message === 'success' && state.script) {
+            setProgress(100);
+            const doneTimer = setTimeout(() => setProgress(0), 350);
+            return () => clearTimeout(doneTimer);
+        }
+        return undefined;
+    }, [state.message, state.script]);
 
     useEffect(() => {
         if (state.message === 'success' && state.script) {
@@ -109,6 +149,19 @@ function ScriptGeneratorForm() {
     return (
         <div className="grid md:grid-cols-2 gap-8 items-start">
             <form action={formAction} className="space-y-4">
+                <FormStatusObserver onPendingChange={handlePendingChange} />
+
+                {isGenerating && (
+                    <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Generating your script...
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                        <p className="text-xs text-muted-foreground">Drafting structure, tone, and final copy.</p>
+                    </div>
+                )}
+
                 <div className="space-y-2">
                     <Label htmlFor="prompt">What is your video about?</Label>
                     <Textarea
@@ -172,7 +225,7 @@ function ScriptGeneratorForm() {
                       <div className="flex items-center gap-2">
                         <Clapperboard className="h-5 w-5" /> Generated Script
                       </div>
-                      {script && !pending && (
+                      {script && !isGenerating && (
                         <div className="flex items-center gap-2">
                             <Button variant="ghost" size="icon" onClick={copyToClipboard} title="Copy script">
                               <Clipboard className="h-4 w-4" />
@@ -185,8 +238,12 @@ function ScriptGeneratorForm() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {pending ? (
+                    {isGenerating ? (
                         <div className="space-y-4">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Working on your script...
+                            </div>
                             <Skeleton className="h-4 w-3/4" />
                             <Skeleton className="h-4 w-full" />
                             <Skeleton className="h-4 w-1/2" />

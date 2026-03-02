@@ -23,7 +23,7 @@ export async function getStorageSettings(): Promise<StorageSettings> {
     return {
       wasabiEndpoint: adminSettings.apiKeys.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
       wasabiRegion: adminSettings.apiKeys.wasabiRegion || 'us-west-1',
-      wasabiBucket: adminSettings.apiKeys.wasabiBucket || 'clickvid-media',
+      wasabiBucket: adminSettings.apiKeys.wasabiBucket || adminSettings.storageSettings?.wasabiBucket || process.env.WASABI_BUCKET || '',
       bunnyCdnUrl: adminSettings.apiKeys.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
       wasabiAccessKey: adminSettings.apiKeys.wasabiAccessKey || '',
       wasabiSecretKey: adminSettings.apiKeys.wasabiSecretKey || '',

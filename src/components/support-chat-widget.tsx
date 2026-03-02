@@ -2,11 +2,11 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useTransition } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useFormState } from 'react-dom';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { MessageSquare, Send, Bot, Mail } from 'lucide-react';
+import { MessageSquare, Send, Loader2, Sparkles } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminSettings } from '@/contexts/admin-settings-context';
@@ -14,9 +14,9 @@ import { supportChatAction } from '@/lib/actions';
 import type { Message } from '@/lib/types';
 import { ChatMessage } from './chat-message';
 import { ScrollArea } from './ui/scroll-area';
-import { Sparkles } from 'lucide-react';
 import { createTicket } from '@/lib/support-actions';
 import type { User } from 'next-auth';
+import { Progress } from './ui/progress';
 
 interface SupportChatWidgetProps {
   user: User;
@@ -38,8 +38,9 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [isPending, startTransition] = useTransition();
   const pendingMessageIdRef = useRef<string | null>(null);
+  const [awaitingResponse, setAwaitingResponse] = useState(false);
+  const [thinkingProgress, setThinkingProgress] = useState(0);
 
   const hasCreatedTicket = useRef(false);
 
@@ -47,6 +48,8 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
     if (!isOpen) {
       hasCreatedTicket.current = false;
       setMessages([]); 
+      setAwaitingResponse(false);
+      setThinkingProgress(0);
     } else {
         // Add initial bot message when chat opens
         setMessages([{
@@ -60,6 +63,8 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
   }, [isOpen, isSupportOnline]);
 
   const handleFormSubmit = (formData: FormData) => {
+    if (awaitingResponse) return;
+
     const userInput = formData.get('message') as string;
     if (!userInput.trim()) return;
 
@@ -83,13 +88,12 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
     const optimisticMessage: Message = { id: Date.now().toString(), role: 'user', content: userInput };
     const pendingId = `pending-${Date.now()}`;
     
-    startTransition(() => {
-        setMessages(prev => [...prev, optimisticMessage, { id: pendingId, role: 'model', content: '' }]);
-    });
+    setMessages(prev => [...prev, optimisticMessage, { id: pendingId, role: 'model', content: '' }]);
     pendingMessageIdRef.current = pendingId;
     
     formRef.current?.reset();
     
+    setAwaitingResponse(true);
     formData.append('history', JSON.stringify(history));
     formAction(formData);
   }
@@ -102,6 +106,8 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
           setMessages(prev => prev.filter(m => m.id !== pendingId));
         }
         pendingMessageIdRef.current = null;
+        setAwaitingResponse(false);
+        setThinkingProgress(0);
         return;
     }
 
@@ -121,9 +127,28 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
         return newMessages;
     });
     pendingMessageIdRef.current = null;
+    setAwaitingResponse(false);
+    setThinkingProgress(100);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.responseText, state.message, toast]);
+
+  useEffect(() => {
+    if (!awaitingResponse) {
+      const resetTimer = setTimeout(() => setThinkingProgress(0), 300);
+      return () => clearTimeout(resetTimer);
+    }
+
+    setThinkingProgress(12);
+    const timer = setInterval(() => {
+      setThinkingProgress((current) => {
+        if (current >= 90) return 90;
+        return Math.min(90, current + 7);
+      });
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [awaitingResponse]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -138,8 +163,9 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg" size="icon">
-          <MessageSquare className="h-8 w-8" />
+        <Button className="fixed bottom-6 right-6 z-50 h-14 rounded-full shadow-lg px-4">
+          <MessageSquare className="h-5 w-5" />
+          <span className="ml-2 hidden sm:inline">Support</span>
            <span className={`absolute top-1 right-1 block h-3 w-3 rounded-full ${isSupportOnline ? 'bg-green-500' : 'bg-yellow-500'} ring-2 ring-background`} />
         </Button>
       </DialogTrigger>
@@ -158,12 +184,21 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
         </ScrollArea>
 
         <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(new FormData(e.currentTarget)); }} ref={formRef} className="relative">
+            {awaitingResponse && (
+              <div className="mb-2 rounded-md border bg-muted/40 px-3 py-2 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Assistant is working on your response...
+                </div>
+                <Progress value={thinkingProgress} className="h-1.5" />
+              </div>
+            )}
             <Textarea
                 name="message"
                 placeholder="Type your message..."
                 className="pr-12"
                 rows={3}
-                disabled={isPending}
+                disabled={awaitingResponse}
                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -171,8 +206,8 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
                     }
                 }}
             />
-            <Button type="submit" size="icon" className="absolute bottom-2 right-2 h-8 w-8" disabled={isPending}>
-                {isPending ? <Sparkles className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <Button type="submit" size="icon" className="absolute bottom-2 right-2 h-8 w-8" disabled={awaitingResponse}>
+                {awaitingResponse ? <Sparkles className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
         </form>
       </DialogContent>

@@ -29,7 +29,7 @@ const defaultConfig: StorageConfig = {
     region: 'us-west-1',
     accessKeyId: '',
     secretAccessKey: '',
-    bucket: 'clickvid-media'
+    bucket: ''
   },
   bunny: {
     cdnUrl: 'https://clickvid.b-cdn.net',

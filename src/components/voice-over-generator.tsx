@@ -2,18 +2,19 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { generateVoiceOverAction } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, Download, Mic, Plus, Sparkles, Trash2, Users } from 'lucide-react';
+import { Bot, Download, Mic, Plus, Sparkles, Trash2, Users, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
+import { Progress } from './ui/progress';
 
 type VoiceOverActionState = {
   message: string;
@@ -57,6 +58,16 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
   );
 }
 
+function FormStatusObserver({ onPendingChange }: { onPendingChange: (pending: boolean) => void }) {
+  const { pending } = useFormStatus();
+
+  useEffect(() => {
+    onPendingChange(pending);
+  }, [pending, onPendingChange]);
+
+  return null;
+}
+
 function VoiceSelector({ name, defaultValue, onValueChange }: { name: string, defaultValue?: string, onValueChange?: (value: string) => void }) {
     return (
         <Select name={name} defaultValue={defaultValue} onValueChange={onValueChange} required>
@@ -84,7 +95,37 @@ export function VoiceOverGenerator() {
   const [audio, setAudio] = useState<string | null>(null);
   const [isMultiSpeaker, setIsMultiSpeaker] = useState(false);
   const [speakers, setSpeakers] = useState([{ id: 1, voice: 'Algenib' }]);
-  const { pending } = useFormStatus();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handlePendingChange = useCallback((pending: boolean) => {
+    setIsGenerating(pending);
+  }, []);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      return;
+    }
+
+    setProgress(10);
+    const timer = setInterval(() => {
+      setProgress((current) => {
+        if (current >= 92) return 92;
+        return Math.min(92, current + 5);
+      });
+    }, 600);
+
+    return () => clearInterval(timer);
+  }, [isGenerating]);
+
+  useEffect(() => {
+    if (state.message === 'success' && state.audio) {
+      setProgress(100);
+      const doneTimer = setTimeout(() => setProgress(0), 350);
+      return () => clearTimeout(doneTimer);
+    }
+    return undefined;
+  }, [state.message, state.audio]);
 
 
   useEffect(() => {
@@ -124,7 +165,19 @@ export function VoiceOverGenerator() {
   return (
     <div className="grid md:grid-cols-2 gap-8 items-start">
       <form ref={formRef} action={formAction} className="space-y-4">
+        <FormStatusObserver onPendingChange={handlePendingChange} />
         <input type="hidden" name="speakers" value={JSON.stringify(speakers)} />
+
+        {isGenerating && (
+          <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating your voice over...
+            </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-xs text-muted-foreground">Synthesizing voice and preparing audio output.</p>
+          </div>
+        )}
 
         <div className="space-y-2">
             <Label htmlFor="script">Script</Label>
@@ -176,14 +229,14 @@ export function VoiceOverGenerator() {
             </div>
         )}
 
-        <SubmitButton disabled={pending} />
+        <SubmitButton disabled={isGenerating} />
       </form>
       <div className="sticky top-8">
         <Card className="h-full">
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               Generated Audio
-              {audio && !pending && (
+              {audio && !isGenerating && (
                 <Button variant="ghost" size="icon" asChild>
                   <a href={audio} download="voice-over.wav">
                     <Download className="h-4 w-4" />
@@ -193,8 +246,12 @@ export function VoiceOverGenerator() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center justify-center h-full">
-            {pending ? (
+            {isGenerating ? (
                 <div className="w-full space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Creating audio...
+                    </div>
                     <Skeleton className="h-12 w-full" />
                 </div>
              ) : audio ? (

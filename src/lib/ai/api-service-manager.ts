@@ -20,6 +20,7 @@ import { searchPexelsVideosTool } from '@/server/ai/tools/pexels-video-tool';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { createProviderClient, providerSupportsCapability } from './provider-clients';
 import { MODEL_CONSTANTS, getProvidersForCapability, type AICapability } from './provider-registry';
+import { getProviderMetadata } from '@/lib/database-config-service';
 
 /**
  * Circuit Breaker Implementation
@@ -168,7 +169,7 @@ async function withGlobalAppContext(messages: Message[]): Promise<Message[]> {
   ];
 }
 
-type ProviderSkipReason = 'missing_key' | 'not_implemented' | 'unsupported_capability' | 'circuit_open' | 'recently_unhealthy';
+type ProviderSkipReason = 'missing_key' | 'not_implemented' | 'unsupported_capability' | 'circuit_open' | 'recently_unhealthy' | 'setup_required';
 
 function logProviderSkip(feature: AICapability, provider: string, reason: ProviderSkipReason): void {
   console.log(JSON.stringify({ event: 'provider_skip', feature, provider, reason, at: new Date().toISOString() }));
@@ -180,6 +181,36 @@ function logProviderSelection(feature: AICapability, provider: string): void {
 
 function logFallback(feature: AICapability, provider: string, reason: string): void {
   console.warn(JSON.stringify({ event: 'provider_fallback', feature, provider, reason, at: new Date().toISOString() }));
+}
+
+function hasGoogleVertexRuntimeSetup(apiKeys: Record<string, string>): boolean {
+  const hasProjectId = Boolean(
+    apiKeys.googleCloudProjectId ||
+    process.env.GOOGLE_CLOUD_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT
+  );
+
+  const hasInlineCredentials = Boolean(
+    apiKeys.googleApplicationCredentialsJson ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+  );
+
+  const hasCredentialsPath = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+
+  return hasProjectId && (hasInlineCredentials || hasCredentialsPath);
+}
+
+async function isProviderSetupBlocked(provider: string, apiKeys: Record<string, string>): Promise<boolean> {
+  const metadata = await getProviderMetadata(provider);
+  if (!metadata?.requiresSetup) {
+    return false;
+  }
+
+  if (metadata.authType === 'oauth' && (provider === 'imagen' || provider === 'googleVeo')) {
+    return !hasGoogleVertexRuntimeSetup(apiKeys);
+  }
+
+  return true;
 }
 
 async function selectProviderForCapability(capability: AICapability): Promise<ProviderInfo> {
@@ -202,6 +233,11 @@ async function selectProviderForCapability(capability: AICapability): Promise<Pr
 
     if (!providerSupportsCapability(provider, capability)) {
       logProviderSkip(capability, provider, 'unsupported_capability');
+      continue;
+    }
+
+    if (await isProviderSetupBlocked(provider, apiKeys as Record<string, string>)) {
+      logProviderSkip(capability, provider, 'setup_required');
       continue;
     }
 
@@ -499,52 +535,86 @@ export async function generateStreamWithProvider(req: Omit<GenerateStreamRequest
 }
 
 export async function generateImageWithProvider(req: Omit<GenerateRequest, 'model'>) {
-  const providerInfo = await getAvailableImageGenerator();
-
-  // Use custom client implementations for image providers
+  const { apiKeys } = await getAdminSettings();
+  const candidates = getProvidersForCapability('image')
+    .filter((p) => p.implemented && providerSupportsCapability(p.name, 'image'));
   const customProviders = ['replicate', 'stableDiffusion', 'midjourney', 'imagen'];
+  let lastError: Error | null = null;
+  let configuredCount = 0;
+  const setupBlockedProviders: string[] = [];
 
-  if (customProviders.includes(providerInfo.provider)) {
+  const prompt = req.messages.map(msg => {
+    if (Array.isArray(msg.content)) {
+      return msg.content[0]?.text || '';
+    }
+    return typeof msg.content === 'string' ? msg.content : '';
+  }).join(' ');
+
+  for (const candidate of candidates) {
+    const provider = candidate.name;
+    const apiKey = apiKeys[provider as keyof typeof apiKeys];
+    if (!apiKey) {
+      continue;
+    }
+    configuredCount++;
+
+    if (await isProviderSetupBlocked(provider, apiKeys as Record<string, string>)) {
+      logProviderSkip('image', provider, 'setup_required');
+      setupBlockedProviders.push(provider);
+      continue;
+    }
+
+    if (!circuitBreaker.shouldAttempt(provider)) {
+      logProviderSkip('image', provider, 'circuit_open');
+      continue;
+    }
+
     try {
-      const client = await createProviderClient(providerInfo.provider);
-      const prompt = req.messages.map(msg => {
-        if (Array.isArray(msg.content)) {
-          return msg.content[0]?.text || '';
-        }
-        return typeof msg.content === 'string' ? msg.content : '';
-      }).join(' ');
-      const response = await client.generateImage(prompt, providerInfo.model);
+      if (customProviders.includes(provider)) {
+        const client = await createProviderClient(provider);
+        const response = await client.generateImage(prompt, candidate.model);
+        circuitBreaker.recordSuccess(provider);
+        markProviderHealthy(provider);
+        return {
+          model: candidate.model,
+          provider,
+          result: {
+            role: 'model' as const,
+            content: [{ text: `Image generated: ${response.imageUrl}` }]
+          }
+        };
+      }
 
-      // Record success
-      circuitBreaker.recordSuccess(providerInfo.provider);
-      markProviderHealthy(providerInfo.provider);
-
+      const genkitInstance = createGenkitInstance({ [provider]: apiKey });
+      const result = await genkitInstance.generate({ ...req, model: candidate.model });
+      circuitBreaker.recordSuccess(provider);
+      markProviderHealthy(provider);
       return {
-        model: providerInfo.model,
-        result: {
-          role: 'model' as const,
-          content: [{ text: `Image generated: ${response.imageUrl}` }]
-        }
+        ...(result as any),
+        provider,
+        model: candidate.model,
       };
     } catch (error) {
-      circuitBreaker.recordFailure(providerInfo.provider);
-      markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
-      console.error(`Error generating image with ${providerInfo.provider}:`, error);
-      throw error;
-    }
-  } else {
-    try {
-      const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-      const result = await genkitInstance.generate({ ...req, model: providerInfo.model });
-      circuitBreaker.recordSuccess(providerInfo.provider);
-      markProviderHealthy(providerInfo.provider);
-      return result;
-    } catch (error) {
-      circuitBreaker.recordFailure(providerInfo.provider);
-      markProviderUnhealthy(providerInfo.provider, error instanceof Error ? error.message : 'Unknown error');
-      throw error;
+      circuitBreaker.recordFailure(provider);
+      markProviderUnhealthy(provider, error instanceof Error ? error.message : 'Unknown error');
+      logFallback('image', provider, isQuotaError(error) ? 'quota_or_rate_limit' : 'provider_error');
+      lastError = error instanceof Error ? error : new Error(String(error));
+      continue;
     }
   }
+
+  if (configuredCount === 0) {
+    throw new Error('No image provider API key configured. Add at least one image provider key (recommended: Replicate or Gemini).');
+  }
+
+  if (setupBlockedProviders.length > 0 && setupBlockedProviders.length === configuredCount) {
+    throw new Error(
+      `Configured image provider(s) require OAuth/service-account setup: ${setupBlockedProviders.join(', ')}. ` +
+      'Set GOOGLE_APPLICATION_CREDENTIALS for Vertex providers, or configure a non-OAuth image provider key (Replicate/Gemini).'
+    );
+  }
+
+  throw lastError || new Error('All configured image providers failed or require additional setup.');
 }
 
 export async function generateImageEditWithProvider(input: { prompt: string; imageDataUri: string }) {
@@ -577,6 +647,10 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
     const provider = candidate.name;
     const apiKey = apiKeys[provider as keyof typeof apiKeys];
     if (!apiKey) {
+      continue;
+    }
+    if (await isProviderSetupBlocked(provider, apiKeys as Record<string, string>)) {
+      logProviderSkip('video', provider, 'setup_required');
       continue;
     }
     if (!circuitBreaker.shouldAttempt(provider)) {

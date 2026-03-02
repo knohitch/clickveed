@@ -36,7 +36,7 @@ export default function ChinSettingsPage() {
         storageSettings: {
             wasabiEndpoint: 's3.us-west-1.wasabisys.com',
             wasabiRegion: 'us-west-1',
-            wasabiBucket: 'clickvid-media',
+            wasabiBucket: '',
             bunnyCdnUrl: 'https://clickvid.b-cdn.net',
             wasabiAccessKey: '••••••••',
             wasabiSecretKey: '••••••••',

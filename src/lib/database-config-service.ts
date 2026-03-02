@@ -23,12 +23,12 @@ const DEFAULT_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
   imagen: {
     authType: 'oauth',
     requiresSetup: true,
-    setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.'
+    setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set googleCloudProjectId + googleApplicationCredentialsJson in Super Admin, or configure GOOGLE_APPLICATION_CREDENTIALS + GOOGLE_CLOUD_PROJECT_ID environment variables.'
   },
   googleVeo: {
     authType: 'oauth',
     requiresSetup: true,
-    setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.'
+    setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set googleCloudProjectId + googleApplicationCredentialsJson in Super Admin, or configure GOOGLE_APPLICATION_CREDENTIALS + GOOGLE_CLOUD_PROJECT_ID environment variables.'
   },
   heygen: { authType: 'apiKey', requiresSetup: false },
   seedance: { authType: 'apiKey', requiresSetup: false },

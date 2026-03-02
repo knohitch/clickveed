@@ -42,10 +42,101 @@ interface ProviderMetadata {
 import { getProviderMetadata } from '@/lib/database-config-service';
 import type { AICapability, ProviderName } from './provider-registry';
 
+function parseServiceAccountJson(raw: string): Record<string, any> {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error('Google service account JSON is empty.');
+  }
+
+  // Accept either raw JSON or base64-encoded JSON.
+  const jsonCandidate = trimmed.startsWith('{')
+    ? trimmed
+    : Buffer.from(trimmed, 'base64').toString('utf8');
+
+  return JSON.parse(jsonCandidate);
+}
+
+async function hasGoogleVertexSetup(): Promise<boolean> {
+  const { getAdminSettings } = await import('@/server/actions/admin-actions');
+  const settings = await getAdminSettings();
+  const apiKeys = settings?.apiKeys || {};
+
+  const hasProjectId = Boolean(
+    apiKeys.googleCloudProjectId ||
+    process.env.GOOGLE_CLOUD_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT
+  );
+
+  const hasInlineCredentials = Boolean(
+    apiKeys.googleApplicationCredentialsJson ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+  );
+
+  const hasCredentialsFilePath = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+
+  return hasProjectId && (hasInlineCredentials || hasCredentialsFilePath);
+}
+
+async function resolveGoogleVertexAuth(legacyAccessToken?: string): Promise<{ accessToken: string; projectId: string }> {
+  const { getAdminSettings } = await import('@/server/actions/admin-actions');
+  const settings = await getAdminSettings();
+  const apiKeys = settings?.apiKeys || {};
+
+  const projectId =
+    apiKeys.googleCloudProjectId ||
+    process.env.GOOGLE_CLOUD_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    '';
+
+  if (!projectId) {
+    throw new Error('Google Cloud Project ID is missing. Set googleCloudProjectId in Super Admin or GOOGLE_CLOUD_PROJECT_ID env.');
+  }
+
+  const inlineCredentialsRaw =
+    apiKeys.googleApplicationCredentialsJson ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ||
+    '';
+
+  // Backward compatibility: allow using direct access token in provider key field.
+  if (!inlineCredentialsRaw && !process.env.GOOGLE_APPLICATION_CREDENTIALS && legacyAccessToken?.trim()) {
+    return { accessToken: legacyAccessToken.trim(), projectId };
+  }
+
+  const { GoogleAuth } = await import('google-auth-library');
+
+  const auth = inlineCredentialsRaw
+    ? new GoogleAuth({
+        credentials: parseServiceAccountJson(inlineCredentialsRaw),
+        projectId,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      })
+    : new GoogleAuth({
+        projectId,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      });
+
+  const client = await auth.getClient();
+  const tokenResult = await client.getAccessToken();
+  const accessToken =
+    typeof tokenResult === 'string'
+      ? tokenResult
+      : tokenResult?.token || '';
+
+  if (!accessToken) {
+    throw new Error('Failed to obtain Google OAuth access token from configured service account.');
+  }
+
+  return { accessToken, projectId };
+}
+
 // Helper function to check provider setup status (now uses database)
 async function checkProviderSetup(provider: string): Promise<ProviderMetadata> {
   const metadata = await getProviderMetadata(provider);
   if (metadata?.requiresSetup) {
+    // Allow OAuth providers when runtime setup is present in admin/env.
+    if ((provider === 'imagen' || provider === 'googleVeo') && await hasGoogleVertexSetup()) {
+      return { ...metadata, requiresSetup: false };
+    }
     throw new Error(
       `[${provider}] Provider requires setup before use.\n` +
       `Authentication Type: ${metadata.authType}\n` +
@@ -445,26 +536,17 @@ export class MinimaxClient {
 
 // Imagen Client - FIXED for proper Google Cloud integration
 export class ImagenClient {
-  private accessToken: string;
-  private projectId: string;
+  private legacyAccessToken: string;
   private baseUrl: string = 'https://us-central1-aiplatform.googleapis.com';
 
   constructor(apiKey: string) {
-    // apiKey is actually the OAuth access token for Google Cloud
-    this.accessToken = apiKey;
-    // Get project ID from environment variable
-    this.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || '';
-
-    if (!this.projectId) {
-      console.warn('[Imagen] GOOGLE_CLOUD_PROJECT_ID not set. Image generation may fail.');
-    }
+    // Backward compatibility: this may contain a direct OAuth bearer token.
+    this.legacyAccessToken = apiKey;
   }
 
   async generateImage(prompt: string, model: string = 'imagen-4.0-generate-001'): Promise<ImageGenerationResponse> {
     try {
-      if (!this.projectId) {
-        throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
-      }
+      const { accessToken, projectId } = await resolveGoogleVertexAuth(this.legacyAccessToken);
 
       // Accept either prefixed model ids (googleai/...) or raw Vertex ids.
       const rawModel = model.includes('/') ? model.split('/').pop() || model : model;
@@ -472,7 +554,7 @@ export class ImagenClient {
       const vertexModel = rawModel === 'imagen-3.0-generate-001' ? 'imagegeneration@006' : rawModel;
 
       // Using the correct Google Cloud Vertex AI endpoint with actual project ID
-      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predict`;
+      const endpoint = `${this.baseUrl}/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predict`;
 
       const response = await axios.post(
         endpoint,
@@ -486,7 +568,7 @@ export class ImagenClient {
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
           timeout: 60000, // 60 second timeout
@@ -524,26 +606,17 @@ export class ImagenClient {
 
 // Google VEO Client - FIXED for proper Google Cloud integration with job polling
 export class GoogleVeoClient {
-  private accessToken: string;
-  private projectId: string;
+  private legacyAccessToken: string;
   private baseUrl: string = 'https://us-central1-aiplatform.googleapis.com';
 
   constructor(apiKey: string) {
-    // apiKey is actually the OAuth access token for Google Cloud
-    this.accessToken = apiKey;
-    // Get project ID from environment variable
-    this.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || '';
-
-    if (!this.projectId) {
-      console.warn('[GoogleVeo] GOOGLE_CLOUD_PROJECT_ID not set. Video generation may fail.');
-    }
+    // Backward compatibility: this may contain a direct OAuth bearer token.
+    this.legacyAccessToken = apiKey;
   }
 
   async generateVideo(prompt: string, model: string = 'veo-3.0-generate-001'): Promise<VideoGenerationResponse> {
     try {
-      if (!this.projectId) {
-        throw new Error('GOOGLE_CLOUD_PROJECT_ID environment variable not set');
-      }
+      const { accessToken, projectId } = await resolveGoogleVertexAuth(this.legacyAccessToken);
 
       // Accept either prefixed model ids (googleai/...) or raw Vertex ids.
       const rawModel = model.includes('/') ? model.split('/').pop() || model : model;
@@ -551,7 +624,7 @@ export class GoogleVeoClient {
 
       // Using the correct Google Cloud Vertex AI endpoint with actual project ID
       // Video generation is async, so we use predictLongRunning
-      const endpoint = `${this.baseUrl}/v1/projects/${this.projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predictLongRunning`;
+      const endpoint = `${this.baseUrl}/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predictLongRunning`;
 
       const startResponse = await axios.post(
         endpoint,
@@ -565,7 +638,7 @@ export class GoogleVeoClient {
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
           timeout: 60000, // 60 second timeout for initial request
@@ -590,7 +663,7 @@ export class GoogleVeoClient {
           `${this.baseUrl}/v1/${operationName}`,
           {
             headers: {
-              'Authorization': `Bearer ${this.accessToken}`,
+              'Authorization': `Bearer ${accessToken}`,
             },
             timeout: 30000,
           }

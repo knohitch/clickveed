@@ -6,22 +6,49 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
 import React from "react";
 
 type ApiKeyName = keyof ReturnType<typeof useAdminSettings>['apiKeys'];
 
-export const ApiKeyInput = ({ name, label, value, onChange }: { name: ApiKeyName, label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
+export const ApiKeyInput = ({
+    name,
+    label,
+    value,
+    onChange,
+    multiline = false,
+    inputType = 'password',
+}: {
+    name: ApiKeyName,
+    label: string,
+    value: string,
+    onChange: ((e: React.ChangeEvent<HTMLInputElement>) => void) | ((e: React.ChangeEvent<HTMLTextAreaElement>) => void),
+    multiline?: boolean,
+    inputType?: React.HTMLInputTypeAttribute,
+}) => (
     <div className="space-y-2">
         <Label htmlFor={name}>{label}</Label>
-        <Input 
-            id={name} 
-            name={name}
-            type="password" 
-            autoComplete="new-password"
-            placeholder={`Enter your ${label}`} 
-            value={value || ''}
-            onChange={onChange}
-        />
+        {multiline ? (
+            <Textarea
+                id={name}
+                name={name}
+                rows={6}
+                autoComplete="off"
+                placeholder={`Enter your ${label}`}
+                value={value || ''}
+                onChange={onChange as (e: React.ChangeEvent<HTMLTextAreaElement>) => void}
+            />
+        ) : (
+            <Input
+                id={name}
+                name={name}
+                type={inputType}
+                autoComplete={inputType === 'password' ? 'new-password' : 'off'}
+                placeholder={`Enter your ${label}`}
+                value={value || ''}
+                onChange={onChange as (e: React.ChangeEvent<HTMLInputElement>) => void}
+            />
+        )}
     </div>
 );
 

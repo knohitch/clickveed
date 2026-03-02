@@ -93,13 +93,14 @@ export async function getAdminSettings() {
             console.warn('Failed to parse storageSettings JSON:', error);
         }
 
+        // Prefer apiKeys (actively managed values) over legacy storageSettings blob.
         const storageSettings = {
-            wasabiEndpoint: parsedStorageSettings.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
-            wasabiRegion: parsedStorageSettings.wasabiRegion || 'us-west-1',
-            wasabiBucket: parsedStorageSettings.wasabiBucket || 'clickvid-media',
-            bunnyCdnUrl: parsedStorageSettings.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
-            wasabiAccessKey: parsedStorageSettings.wasabiAccessKey || '',
-            wasabiSecretKey: parsedStorageSettings.wasabiSecretKey || '',
+            wasabiEndpoint: mergedApiKeys['wasabiEndpoint'] || parsedStorageSettings.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
+            wasabiRegion: mergedApiKeys['wasabiRegion'] || parsedStorageSettings.wasabiRegion || 'us-west-1',
+            wasabiBucket: mergedApiKeys['wasabiBucket'] || parsedStorageSettings.wasabiBucket || '',
+            bunnyCdnUrl: mergedApiKeys['bunnyCdnUrl'] || parsedStorageSettings.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
+            wasabiAccessKey: mergedApiKeys['wasabiAccessKey'] || parsedStorageSettings.wasabiAccessKey || '',
+            wasabiSecretKey: mergedApiKeys['wasabiSecretKey'] || parsedStorageSettings.wasabiSecretKey || '',
         };
 
         return {
@@ -146,7 +147,7 @@ function getDefaultSettings() {
         storageSettings: {
             wasabiEndpoint: 's3.us-west-1.wasabisys.com',
             wasabiRegion: 'us-west-1',
-            wasabiBucket: 'clickvid-media',
+            wasabiBucket: '',
             bunnyCdnUrl: 'https://clickvid.b-cdn.net',
             wasabiAccessKey: '',
             wasabiSecretKey: '',

@@ -132,6 +132,7 @@ export const initialApiKeysObject: ApiKeys = {
   adyenApiKey: '', adyenClientKey: '',
   squareAppId: '', squareAccessToken: '',
   wasabiEndpoint: '', wasabiRegion: '', wasabiAccessKey: '', wasabiSecretKey: '', wasabiBucket: '', bunnyCdnUrl: '',
+  googleCloudProjectId: '', googleApplicationCredentialsJson: '',
   googleClientId: '', googleClientSecret: '',
   facebookClientId: '', facebookClientSecret: '',
   instagramClientId: '', instagramClientSecret: '',
