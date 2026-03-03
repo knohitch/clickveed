@@ -25,18 +25,35 @@ export interface StorageConfig {
 // Default configuration
 const defaultConfig: StorageConfig = {
   wasabi: {
-    endpoint: 's3.wasabisys.com',
-    region: 'us-west-1',
+    endpoint: '',
+    region: '',
     accessKeyId: '',
     secretAccessKey: '',
     bucket: ''
   },
   bunny: {
-    cdnUrl: 'https://clickvid.b-cdn.net',
+    cdnUrl: '',
     apiKey: '',
-    storageZone: 'clickvid-storage'
+    storageZone: ''
   }
 };
+
+function stripInvisibleChars(value: string): string {
+  return value
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .trim();
+}
+
+function normalizeEndpointHost(endpoint: string): string {
+  return stripInvisibleChars(endpoint).replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+}
+
+function normalizeCdnUrl(cdnUrl: string): string {
+  const cleaned = stripInvisibleChars(cdnUrl).replace(/\/+$/, '');
+  if (!cleaned) return '';
+  return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+}
 
 class StorageManager {
   private config: StorageConfig = defaultConfig;
@@ -49,11 +66,28 @@ class StorageManager {
    */
   async initialize(config?: Partial<StorageConfig>): Promise<void> {
     if (config) {
-      this.config = { 
+      this.config = {
         wasabi: { ...defaultConfig.wasabi, ...config.wasabi },
         bunny: { ...defaultConfig.bunny, ...config.bunny }
       };
     }
+
+    this.config = {
+      wasabi: {
+        ...this.config.wasabi,
+        endpoint: normalizeEndpointHost(this.config.wasabi.endpoint),
+        region: stripInvisibleChars(this.config.wasabi.region),
+        accessKeyId: stripInvisibleChars(this.config.wasabi.accessKeyId),
+        secretAccessKey: stripInvisibleChars(this.config.wasabi.secretAccessKey),
+        bucket: stripInvisibleChars(this.config.wasabi.bucket),
+      },
+      bunny: {
+        ...this.config.bunny,
+        cdnUrl: normalizeCdnUrl(this.config.bunny.cdnUrl),
+        apiKey: stripInvisibleChars(this.config.bunny.apiKey || ''),
+        storageZone: stripInvisibleChars(this.config.bunny.storageZone || ''),
+      },
+    };
 
     console.log('[Storage] Initializing with config:', {
       endpoint: this.config.wasabi.endpoint,
@@ -64,7 +98,13 @@ class StorageManager {
     });
 
     // Initialize Wasabi S3 client if credentials are available
-    if (this.config.wasabi.accessKeyId && this.config.wasabi.secretAccessKey) {
+    if (
+      this.config.wasabi.endpoint &&
+      this.config.wasabi.region &&
+      this.config.wasabi.accessKeyId &&
+      this.config.wasabi.secretAccessKey &&
+      this.config.wasabi.bucket
+    ) {
       try {
         this.s3Client = new AWS.S3({
           endpoint: `https://${this.config.wasabi.endpoint}`,
@@ -186,14 +226,17 @@ class StorageManager {
       throw new Error('Storage manager not initialized');
     }
 
-    return `https://${this.config.wasabi.bucket}.${this.config.wasabi.endpoint}/${key}`;
+    return `https://${this.config.wasabi.bucket}.${normalizeEndpointHost(this.config.wasabi.endpoint)}/${key}`;
   }
 
   /**
    * Get CDN URL for file (Bunny.net)
    */
   getCdnUrl(key: string): string {
-    return `${this.config.bunny.cdnUrl}/${key}`;
+    if (this.config.bunny.cdnUrl) {
+      return `${normalizeCdnUrl(this.config.bunny.cdnUrl)}/${key}`;
+    }
+    return this.getFileUrl(key);
   }
 
   /**
@@ -217,6 +260,8 @@ class StorageManager {
    */
   isConfigured(): boolean {
     return this.initialized && !!(
+      this.config.wasabi.endpoint &&
+      this.config.wasabi.region &&
       this.config.wasabi.accessKeyId &&
       this.config.wasabi.secretAccessKey &&
       this.config.wasabi.bucket

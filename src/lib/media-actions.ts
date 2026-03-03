@@ -14,6 +14,53 @@ export interface MediaAsset {
     createdAt: string;
 }
 
+function stripInvisibleChars(value: string): string {
+    return value.replace(/[\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, '').trim();
+}
+
+function normalizePublicUrl(rawUrl: string): string {
+    const value = stripInvisibleChars(rawUrl);
+    if (!value) return value;
+    if (value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://')) {
+        return value;
+    }
+    if (value.startsWith('//')) {
+        return `https:${value}`;
+    }
+    // Handle protocol-less host/path values like cdn.example.com/path/file.png
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(value)) {
+        return `https://${value}`;
+    }
+    return value;
+}
+
+function extractStorageKeyFromUrl(rawUrl: string): string | null {
+    const normalized = normalizePublicUrl(rawUrl);
+    if (!normalized) return null;
+
+    try {
+        const parsed = new URL(normalized);
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        if (segments.length === 0) return null;
+
+        const knownRoots = new Set(['media', 'images', 'videos', 'audio']);
+        const rootIndex = segments.findIndex((segment) => knownRoots.has(segment.toLowerCase()));
+        if (rootIndex >= 0) {
+            return segments.slice(rootIndex).join('/');
+        }
+
+        // Handle direct endpoint URLs that include bucket as first path segment:
+        // /<bucket>/<images|videos|audio|media>/...
+        if (segments.length >= 2 && knownRoots.has(segments[1].toLowerCase())) {
+            return segments.slice(1).join('/');
+        }
+
+        return segments.join('/');
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Retrieves all media assets for the current user from the database.
  */
@@ -37,7 +84,7 @@ export async function getMediaAssets(): Promise<MediaAsset[]> {
             id: asset.id,
             name: asset.name,
             type: asset.type as 'IMAGE' | 'VIDEO' | 'AUDIO',
-            url: asset.url,
+            url: normalizePublicUrl(asset.url),
             size: asset.size,
             createdAt: asset.createdAt.toLocaleDateString(),
         }));
@@ -76,7 +123,7 @@ export async function createMediaAsset(
             id: asset.id,
             name: asset.name,
             type: asset.type as 'IMAGE' | 'VIDEO' | 'AUDIO',
-            url: asset.url,
+            url: normalizePublicUrl(asset.url),
             size: asset.size,
             createdAt: asset.createdAt.toLocaleDateString(),
         };
@@ -108,14 +155,10 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
             return { success: false, error: 'Asset not found' };
         }
 
-        // Try to extract storage key from URL pattern
-        // URLs from our storage system look like: https://bucket.endpoint/media/userId/timestamp.ext
+        // Try to delete from object storage using key extracted from public URL.
         try {
-            const url = new URL(asset.url);
-            const pathParts = url.pathname.split('/');
-            if (pathParts.length >= 3 && pathParts[1] === 'media') {
-                const storageKey = pathParts.slice(1).join('/'); // Reconstruct media/userId/filename
-                
+            const storageKey = extractStorageKeyFromUrl(asset.url);
+            if (storageKey) {
                 const { deleteFromStorage } = await import('@/server/actions/storage-actions');
                 const storageResult = await deleteFromStorage(storageKey);
                 
@@ -124,7 +167,7 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
                 }
             }
         } catch (urlError) {
-            console.warn('Could not parse URL for storage deletion:', urlError);
+            console.warn('Could not extract storage key for deletion:', urlError);
         }
 
         // Delete from database

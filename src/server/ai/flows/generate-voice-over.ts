@@ -17,6 +17,32 @@ import {
 // Re-export types for consumers
 export type { GenerateVoiceOverInput, GenerateVoiceOverOutput } from './types';
 
+async function assertPlayableAudioUrl(audioUrl: string): Promise<void> {
+  const headResponse = await fetch(audioUrl, { method: 'HEAD' }).catch(() => null);
+  const headType = (headResponse?.headers.get('content-type') || '').toLowerCase();
+  const headLength = Number(headResponse?.headers.get('content-length') || '0');
+
+  if (headResponse?.ok && headType.startsWith('audio/') && headLength > 1024) {
+    return;
+  }
+
+  const getResponse = await fetch(audioUrl);
+  if (!getResponse.ok) {
+    throw new Error(`Generated audio URL is not accessible (${getResponse.status}).`);
+  }
+
+  const getType = (getResponse.headers.get('content-type') || '').toLowerCase();
+  const bytes = Buffer.from(await getResponse.arrayBuffer());
+
+  if (!getType.startsWith('audio/')) {
+    throw new Error(`Generated audio has invalid content-type: ${getType || 'unknown'}`);
+  }
+
+  if (bytes.length <= 1024) {
+    throw new Error('Generated audio file is too small or empty.');
+  }
+}
+
 export async function generateVoiceOver(
   input: GenerateVoiceOverInput
 ): Promise<GenerateVoiceOverOutput> {
@@ -59,9 +85,18 @@ const generateVoiceOverFlow = ai.defineFlow(
       audioUrl = (ttsResponse as any).audioUrl || '';
     }
 
+    // Normalize protocol-less absolute URLs without hardcoding provider domains.
+    const isLikelyAbsoluteHostPath = /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(audioUrl);
+    if (audioUrl && !audioUrl.startsWith('http') && isLikelyAbsoluteHostPath) {
+      audioUrl = `https://${audioUrl.replace(/^\/+/, '')}`;
+    }
+
     if (!audioUrl) {
       throw new Error('Audio generation failed. No audio URL was returned from the TTS provider.');
     }
+
+    // Prevent false "success" states with empty/invalid audio files.
+    await assertPlayableAudioUrl(audioUrl);
 
     await prisma.mediaAsset.create({
       data: {

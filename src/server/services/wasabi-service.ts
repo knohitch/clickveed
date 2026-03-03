@@ -38,6 +38,24 @@ const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000; // 1 second initial delay
 
+function stripInvisibleChars(value: string): string {
+    return value
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\u00A0/g, ' ')
+        .trim();
+}
+
+function sanitizeCredentialField(name: string, value: string): string {
+    const cleaned = stripInvisibleChars(value || '');
+    if (/^[•\*]+$/.test(cleaned)) {
+        return '';
+    }
+    if (name === 'wasabiAccessKey' || name === 'wasabiSecretKey') {
+        return cleaned.replace(/\s+/g, '');
+    }
+    return cleaned;
+}
+
 /**
  * Validate and extract credentials from admin settings
  */
@@ -67,16 +85,22 @@ async function getWasabiCredentials(): Promise<WasabiCredentials> {
             );
         }
 
-        const endpointRaw = wasabiEndpoint as string;
-        const region = wasabiRegion as string;
-        const accessKeyId = wasabiAccessKey as string;
-        const secretAccessKey = wasabiSecretKey as string;
-        const bucket = wasabiBucket as string;
+        const endpointRaw = sanitizeCredentialField('wasabiEndpoint', String(wasabiEndpoint));
+        const region = sanitizeCredentialField('wasabiRegion', String(wasabiRegion));
+        const accessKeyId = sanitizeCredentialField('wasabiAccessKey', String(wasabiAccessKey));
+        const secretAccessKey = sanitizeCredentialField('wasabiSecretKey', String(wasabiSecretKey));
+        const bucket = sanitizeCredentialField('wasabiBucket', String(wasabiBucket));
+        const cdnUrlRaw = sanitizeCredentialField('bunnyCdnUrl', String(bunnyCdnUrl || ''));
 
         // Ensure endpoint has protocol
         const endpoint = endpointRaw.startsWith('http')
             ? endpointRaw
             : `https://${endpointRaw}`;
+
+        // Ensure CDN URL has protocol when provided
+        const normalizedCdnUrl = cdnUrlRaw
+            ? (cdnUrlRaw.startsWith('http') ? cdnUrlRaw : `https://${cdnUrlRaw}`)
+            : null;
 
         return {
             endpoint,
@@ -84,7 +108,7 @@ async function getWasabiCredentials(): Promise<WasabiCredentials> {
             accessKeyId,
             secretAccessKey,
             bucket,
-            cdnUrl: bunnyCdnUrl || null,
+            cdnUrl: normalizedCdnUrl,
         };
     } catch (error) {
         console.error('[WasabiService] Error fetching credentials:', error);
@@ -131,6 +155,62 @@ function dataUriToBuffer(dataUri: string): { buffer: Buffer, contentType: string
 }
 
 /**
+ * Download a remote media URL and normalize it to uploadable bytes.
+ */
+async function remoteUrlToBuffer(url: string, timeoutMs: number): Promise<{ buffer: Buffer, contentType: string, extension: string, sizeBytes: number }> {
+    let parsedUrl: URL;
+    try {
+        parsedUrl = new URL(url);
+    } catch {
+        throw new Error('Invalid URL format. Expected an absolute http(s) URL.');
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        throw new Error('Invalid URL protocol. Only http(s) URLs are supported.');
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(parsedUrl.toString(), {
+            signal: controller.signal,
+            redirect: 'follow',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch remote media (${response.status} ${response.statusText}).`);
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const rawContentType = response.headers.get('content-type') || 'application/octet-stream';
+        const contentType = rawContentType.split(';')[0]?.trim() || 'application/octet-stream';
+
+        const extensionFromMime = contentType.includes('/') ? contentType.split('/')[1] : '';
+        const extensionFromPath = parsedUrl.pathname.split('.').pop() || '';
+        const extension = extensionFromMime || extensionFromPath || 'bin';
+
+        return {
+            buffer,
+            contentType,
+            extension,
+            sizeBytes: buffer.length,
+        };
+    } catch (error) {
+        if ((error as Error)?.name === 'AbortError') {
+            throw new Error(`Remote media fetch timed out after ${timeoutMs}ms.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function isRemoteMediaUrl(value: string): boolean {
+    return /^https?:\/\//i.test(value);
+}
+
+/**
  * Upload with retry logic using exponential backoff
  */
 async function uploadWithRetry(
@@ -172,9 +252,9 @@ async function uploadWithRetry(
 }
 
 /**
- * Uploads a file from a data URI to Wasabi with enhanced error handling
+ * Uploads a file from a Data URI or remote URL to Wasabi with enhanced error handling
  * 
- * @param dataUri - The data URI of file to upload
+ * @param mediaSource - The Data URI or remote URL of the file to upload
  * @param folder - The folder within bucket to upload file to
  * @param timeoutMs - Optional timeout in milliseconds (default: 30s)
  * @returns Object containing public URL, size in MB, and file key
@@ -182,7 +262,7 @@ async function uploadWithRetry(
  * @throws Error with specific failure reasons
  */
 export async function uploadToWasabi(
-    dataUri: string,
+    mediaSource: string,
     folder: 'images' | 'videos' | 'audio',
     timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<UploadResult> {
@@ -194,8 +274,10 @@ export async function uploadToWasabi(
         const creds = await getWasabiCredentials();
         console.log(`[WasabiService][${requestId}] Credentials validated, bucket: ${creds.bucket}`);
 
-        // Parse and validate Data URI
-        const { buffer, contentType, extension, sizeBytes } = dataUriToBuffer(dataUri);
+        // Parse and validate source (Data URI or remote URL)
+        const { buffer, contentType, extension, sizeBytes } = isRemoteMediaUrl(mediaSource)
+            ? await remoteUrlToBuffer(mediaSource, timeoutMs)
+            : dataUriToBuffer(mediaSource);
         const sizeMB = sizeBytes / (1024 * 1024);
 
         // Validate file size
@@ -266,8 +348,8 @@ export async function uploadToWasabi(
             if (error.message.includes('size')) {
                 throw error; // Re-throw size validation errors
             }
-            if (error.message.includes('Data URI')) {
-                throw error; // Re-throw Data URI errors
+            if (error.message.includes('Data URI') || error.message.includes('URL')) {
+                throw error; // Re-throw source validation errors
             }
         }
 

@@ -170,7 +170,7 @@ export default function ApiIntegrationsPage() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Imagen / Google Veo Setup</AlertTitle>
         <AlertDescription>
-          For `imagen` and `googleVeo`, save both `Google Cloud Project ID` and `Google Service Account JSON` below. API key alone is not sufficient.
+          For `imagen` and `googleVeo`, set `Google Cloud Project ID` plus OAuth credentials. Recommended: `Google Service Account JSON`. Legacy fallback: place a short-lived OAuth access token in the `imagen` or `googleVeo` key.
         </AlertDescription>
       </Alert>
 

@@ -4,21 +4,29 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreVertical, Video, Image as ImageIcon, Music, Download, Link as LinkIcon, Trash2, ArrowUpDown, FolderOpen } from 'lucide-react';
-import Image from 'next/image';
+import { Search, MoreVertical, Video, Image as ImageIcon, Music, Download, Link as LinkIcon, Trash2, ArrowUpDown, FolderOpen, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { type MediaAsset as MediaAssetType, getMediaAssets } from '@/lib/media-actions';
+import { type MediaAsset as MediaAssetType, getMediaAssets, deleteMediaAsset } from '@/lib/media-actions';
 import { useToast } from '@/hooks/use-toast';
 
 type AssetTypeFilter = 'all' | 'IMAGE' | 'VIDEO' | 'AUDIO';
 
-const AssetCard = ({ asset }: { asset: MediaAssetType }) => {
+const AssetCard = ({
+    asset,
+    onDelete,
+    isDeleting,
+}: {
+    asset: MediaAssetType;
+    onDelete: (assetId: number) => Promise<void>;
+    isDeleting: boolean;
+}) => {
     const { toast } = useToast();
     const TypeIcon = asset.type === 'VIDEO' ? Video : asset.type === 'IMAGE' ? ImageIcon : Music;
+    const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
     const copyShareLink = () => {
         navigator.clipboard.writeText(asset.url);
@@ -28,8 +36,14 @@ const AssetCard = ({ asset }: { asset: MediaAssetType }) => {
     return (
         <Card className="overflow-hidden">
             <CardHeader className="p-0 bg-muted aspect-video flex items-center justify-center">
-                {asset.type === 'IMAGE' ? (
-                    <Image src={asset.url} alt={asset.name} width={400} height={300} className="object-cover aspect-video" />
+                {asset.type === 'IMAGE' && !imageLoadFailed ? (
+                    <img
+                        src={asset.url}
+                        alt={asset.name}
+                        loading="lazy"
+                        className="object-cover aspect-video w-full h-full"
+                        onError={() => setImageLoadFailed(true)}
+                    />
                 ) : (
                     <TypeIcon className="w-16 h-16 text-muted-foreground" />
                 )}
@@ -50,7 +64,14 @@ const AssetCard = ({ asset }: { asset: MediaAssetType }) => {
                             <DropdownMenuItem onClick={copyShareLink}>
                                 <LinkIcon className="mr-2 h-4 w-4" />Get Share Link
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                            <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => onDelete(asset.id)}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                Delete
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -66,8 +87,10 @@ const AssetCard = ({ asset }: { asset: MediaAssetType }) => {
 };
 
 export default function MediaLibraryPage() {
+    const { toast } = useToast();
     const [assets, setAssets] = useState<MediaAssetType[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState<AssetTypeFilter>('all');
     const [sortBy, setSortBy] = useState('date-desc');
@@ -81,6 +104,36 @@ export default function MediaLibraryPage() {
         }
         loadAssets();
     }, []);
+
+    const handleDeleteAsset = async (assetId: number) => {
+        if (deletingAssetId !== null) return;
+        setDeletingAssetId(assetId);
+        try {
+            const result = await deleteMediaAsset(assetId);
+            if (!result.success) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Delete Failed',
+                    description: result.error || 'Could not delete this media item.',
+                });
+                return;
+            }
+
+            setAssets((current) => current.filter((asset) => asset.id !== assetId));
+            toast({
+                title: 'Media Deleted',
+                description: 'The media item was removed from your library.',
+            });
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Delete Failed',
+                description: error instanceof Error ? error.message : 'Unexpected delete error.',
+            });
+        } finally {
+            setDeletingAssetId(null);
+        }
+    };
 
     const filteredAssets = assets
         .filter(asset =>
@@ -137,7 +190,12 @@ export default function MediaLibraryPage() {
             ) : filteredAssets.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredAssets.map(asset => (
-                        <AssetCard key={asset.id} asset={asset} />
+                        <AssetCard
+                            key={asset.id}
+                            asset={asset}
+                            onDelete={handleDeleteAsset}
+                            isDeleting={deletingAssetId === asset.id}
+                        />
                     ))}
                 </div>
             ) : (

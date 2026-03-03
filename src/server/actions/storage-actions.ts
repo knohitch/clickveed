@@ -13,6 +13,51 @@ export interface StorageSettings {
   wasabiSecretKey: string;
 }
 
+function stripInvisibleChars(value: string): string {
+  return value
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ');
+}
+
+function sanitizeStorageField(name: keyof StorageSettings, value: string): string {
+  const cleaned = stripInvisibleChars(value || '');
+  if (/^[•\*]+$/.test(cleaned.trim())) {
+    return '';
+  }
+  if (name === 'wasabiAccessKey' || name === 'wasabiSecretKey') {
+    return cleaned.replace(/\s+/g, '');
+  }
+  return cleaned.trim();
+}
+
+function normalizeStorageKey(keyOrUrl: string): string {
+  const cleaned = stripInvisibleChars(keyOrUrl || '').trim();
+  if (!cleaned) return '';
+
+  // Accept full URL input and convert to key path.
+  if (/^https?:\/\//i.test(cleaned)) {
+    try {
+      const parsed = new URL(cleaned);
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      if (segments.length === 0) return '';
+
+      const knownRoots = new Set(['media', 'images', 'videos', 'audio']);
+      const rootIndex = segments.findIndex((segment) => knownRoots.has(segment.toLowerCase()));
+      if (rootIndex >= 0) {
+        return segments.slice(rootIndex).join('/');
+      }
+      if (segments.length >= 2 && knownRoots.has(segments[1].toLowerCase())) {
+        return segments.slice(1).join('/');
+      }
+      return segments.join('/');
+    } catch {
+      return '';
+    }
+  }
+
+  return cleaned.replace(/^\/+/, '');
+}
+
 /**
  * Get current storage configuration
  */
@@ -21,12 +66,12 @@ export async function getStorageSettings(): Promise<StorageSettings> {
     const adminSettings = await getAdminSettings();
 
     return {
-      wasabiEndpoint: adminSettings.apiKeys.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
-      wasabiRegion: adminSettings.apiKeys.wasabiRegion || 'us-west-1',
-      wasabiBucket: adminSettings.apiKeys.wasabiBucket || adminSettings.storageSettings?.wasabiBucket || process.env.WASABI_BUCKET || '',
-      bunnyCdnUrl: adminSettings.apiKeys.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
-      wasabiAccessKey: adminSettings.apiKeys.wasabiAccessKey || '',
-      wasabiSecretKey: adminSettings.apiKeys.wasabiSecretKey || '',
+      wasabiEndpoint: sanitizeStorageField('wasabiEndpoint', adminSettings.apiKeys.wasabiEndpoint || adminSettings.storageSettings?.wasabiEndpoint || process.env.WASABI_ENDPOINT || ''),
+      wasabiRegion: sanitizeStorageField('wasabiRegion', adminSettings.apiKeys.wasabiRegion || adminSettings.storageSettings?.wasabiRegion || process.env.WASABI_REGION || ''),
+      wasabiBucket: sanitizeStorageField('wasabiBucket', adminSettings.apiKeys.wasabiBucket || adminSettings.storageSettings?.wasabiBucket || process.env.WASABI_BUCKET || ''),
+      bunnyCdnUrl: sanitizeStorageField('bunnyCdnUrl', adminSettings.apiKeys.bunnyCdnUrl || adminSettings.storageSettings?.bunnyCdnUrl || process.env.BUNNY_CDN_URL || ''),
+      wasabiAccessKey: sanitizeStorageField('wasabiAccessKey', adminSettings.apiKeys.wasabiAccessKey || ''),
+      wasabiSecretKey: sanitizeStorageField('wasabiSecretKey', adminSettings.apiKeys.wasabiSecretKey || ''),
     };
   } catch (error) {
     console.error('Failed to get storage settings:', error);
@@ -39,6 +84,15 @@ export async function getStorageSettings(): Promise<StorageSettings> {
  */
 export async function updateStorageSettings(settings: StorageSettings): Promise<{ success: boolean; message: string }> {
   try {
+    const sanitizedSettings: StorageSettings = {
+      wasabiEndpoint: sanitizeStorageField('wasabiEndpoint', settings.wasabiEndpoint),
+      wasabiRegion: sanitizeStorageField('wasabiRegion', settings.wasabiRegion),
+      wasabiBucket: sanitizeStorageField('wasabiBucket', settings.wasabiBucket),
+      bunnyCdnUrl: sanitizeStorageField('bunnyCdnUrl', settings.bunnyCdnUrl),
+      wasabiAccessKey: sanitizeStorageField('wasabiAccessKey', settings.wasabiAccessKey),
+      wasabiSecretKey: sanitizeStorageField('wasabiSecretKey', settings.wasabiSecretKey),
+    };
+
     // Get current admin settings to preserve other API keys
     const currentSettings = await getAdminSettings();
     
@@ -46,25 +100,25 @@ export async function updateStorageSettings(settings: StorageSettings): Promise<
     const { updateApiKeys } = await import('./admin-actions');
     await updateApiKeys({
       ...currentSettings.apiKeys,
-      wasabiEndpoint: settings.wasabiEndpoint,
-      wasabiRegion: settings.wasabiRegion,
-      wasabiBucket: settings.wasabiBucket,
-      bunnyCdnUrl: settings.bunnyCdnUrl,
-      wasabiAccessKey: settings.wasabiAccessKey,
-      wasabiSecretKey: settings.wasabiSecretKey,
+      wasabiEndpoint: sanitizedSettings.wasabiEndpoint,
+      wasabiRegion: sanitizedSettings.wasabiRegion,
+      wasabiBucket: sanitizedSettings.wasabiBucket,
+      bunnyCdnUrl: sanitizedSettings.bunnyCdnUrl,
+      wasabiAccessKey: sanitizedSettings.wasabiAccessKey,
+      wasabiSecretKey: sanitizedSettings.wasabiSecretKey,
     });
 
     // Update storage manager configuration and reinitialize S3 client
     await storageManager.updateConfig({
       wasabi: {
-        endpoint: settings.wasabiEndpoint,
-        region: settings.wasabiRegion,
-        accessKeyId: settings.wasabiAccessKey,
-        secretAccessKey: settings.wasabiSecretKey,
-        bucket: settings.wasabiBucket,
+        endpoint: sanitizedSettings.wasabiEndpoint,
+        region: sanitizedSettings.wasabiRegion,
+        accessKeyId: sanitizedSettings.wasabiAccessKey,
+        secretAccessKey: sanitizedSettings.wasabiSecretKey,
+        bucket: sanitizedSettings.wasabiBucket,
       },
       bunny: {
-        cdnUrl: settings.bunnyCdnUrl,
+        cdnUrl: sanitizedSettings.bunnyCdnUrl,
       }
     });
 
@@ -224,14 +278,23 @@ export async function uploadToStorage(
  */
 export async function deleteFromStorage(key: string): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!storageManager.isConfigured()) {
+    const normalizedKey = normalizeStorageKey(key);
+    if (!normalizedKey) {
+      return {
+        success: false,
+        error: 'Invalid storage key'
+      };
+    }
+
+    const isInitialized = await storageManager.ensureInitialized();
+    if (!isInitialized || !storageManager.isConfigured()) {
       return {
         success: false,
         error: 'Storage not configured'
       };
     }
 
-    await storageManager.deleteFile(key);
+    await storageManager.deleteFile(normalizedKey);
 
     return { success: true };
   } catch (error) {

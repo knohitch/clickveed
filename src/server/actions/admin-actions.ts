@@ -6,6 +6,43 @@ import prisma from '@/server/prisma';
 import { sendEmail } from '@/server/services/email-service';
 import { revalidatePath } from 'next/cache';
 
+const STORAGE_KEY_NAMES = new Set([
+    'wasabiEndpoint',
+    'wasabiRegion',
+    'wasabiBucket',
+    'bunnyCdnUrl',
+    'wasabiAccessKey',
+    'wasabiSecretKey',
+]);
+
+function stripInvisibleChars(value: string): string {
+    return value
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\u00A0/g, ' ');
+}
+
+function isMaskedPlaceholder(value: string): boolean {
+    const normalized = value.trim();
+    if (!normalized) return false;
+    return /^[•\*]+$/.test(normalized);
+}
+
+function sanitizeStorageCredentialValue(name: string, value: string): string {
+    if (!STORAGE_KEY_NAMES.has(name)) return value;
+
+    const cleaned = stripInvisibleChars(value);
+    if (isMaskedPlaceholder(cleaned)) {
+        return '';
+    }
+
+    if (name === 'wasabiAccessKey' || name === 'wasabiSecretKey') {
+        // Credentials should never contain whitespace characters.
+        return cleaned.replace(/\s+/g, '');
+    }
+
+    return cleaned.trim();
+}
+
 // Define default email templates
 const defaultEmailTemplates: EmailTemplates = {
     userSignup: { subject: 'Welcome!', body: 'Hello {{name}}...' },
@@ -95,12 +132,12 @@ export async function getAdminSettings() {
 
         // Prefer apiKeys (actively managed values) over legacy storageSettings blob.
         const storageSettings = {
-            wasabiEndpoint: mergedApiKeys['wasabiEndpoint'] || parsedStorageSettings.wasabiEndpoint || 's3.us-west-1.wasabisys.com',
-            wasabiRegion: mergedApiKeys['wasabiRegion'] || parsedStorageSettings.wasabiRegion || 'us-west-1',
-            wasabiBucket: mergedApiKeys['wasabiBucket'] || parsedStorageSettings.wasabiBucket || '',
-            bunnyCdnUrl: mergedApiKeys['bunnyCdnUrl'] || parsedStorageSettings.bunnyCdnUrl || 'https://clickvid.b-cdn.net',
-            wasabiAccessKey: mergedApiKeys['wasabiAccessKey'] || parsedStorageSettings.wasabiAccessKey || '',
-            wasabiSecretKey: mergedApiKeys['wasabiSecretKey'] || parsedStorageSettings.wasabiSecretKey || '',
+            wasabiEndpoint: sanitizeStorageCredentialValue('wasabiEndpoint', String(mergedApiKeys['wasabiEndpoint'] || parsedStorageSettings.wasabiEndpoint || '')),
+            wasabiRegion: sanitizeStorageCredentialValue('wasabiRegion', String(mergedApiKeys['wasabiRegion'] || parsedStorageSettings.wasabiRegion || '')),
+            wasabiBucket: sanitizeStorageCredentialValue('wasabiBucket', String(mergedApiKeys['wasabiBucket'] || parsedStorageSettings.wasabiBucket || '')),
+            bunnyCdnUrl: sanitizeStorageCredentialValue('bunnyCdnUrl', String(mergedApiKeys['bunnyCdnUrl'] || parsedStorageSettings.bunnyCdnUrl || '')),
+            wasabiAccessKey: sanitizeStorageCredentialValue('wasabiAccessKey', String(mergedApiKeys['wasabiAccessKey'] || parsedStorageSettings.wasabiAccessKey || '')),
+            wasabiSecretKey: sanitizeStorageCredentialValue('wasabiSecretKey', String(mergedApiKeys['wasabiSecretKey'] || parsedStorageSettings.wasabiSecretKey || '')),
         };
 
         return {
@@ -145,10 +182,10 @@ function getDefaultSettings() {
         emailSettings: defaultEmailSettings,
         emailTemplates: defaultEmailTemplates,
         storageSettings: {
-            wasabiEndpoint: 's3.us-west-1.wasabisys.com',
-            wasabiRegion: 'us-west-1',
+            wasabiEndpoint: '',
+            wasabiRegion: '',
             wasabiBucket: '',
-            bunnyCdnUrl: 'https://clickvid.b-cdn.net',
+            bunnyCdnUrl: '',
             wasabiAccessKey: '',
             wasabiSecretKey: '',
         },
@@ -309,15 +346,17 @@ export async function updateApiKeys(keys: ApiKeys) {
 
     // Update or create new keys, or delete if empty
     for (const [name, value] of Object.entries(keys)) {
-        const isEmpty = value === '' || value === undefined;
+        const rawValue = typeof value === 'string' ? value : String(value ?? '');
+        const sanitizedValue = sanitizeStorageCredentialValue(name, rawValue);
+        const isEmpty = sanitizedValue === '' || value === undefined;
         console.log(`[updateApiKeys] Processing key: ${name}, isEmpty: ${isEmpty}`);
         
-        if (value !== '' && value !== undefined) {
+        if (!isEmpty) {
             console.log(`[updateApiKeys] Upserting key: ${name}`);
             await prisma.apiKey.upsert({
                 where: { name },
-                update: { value },
-                create: { name, value }
+                update: { value: sanitizedValue },
+                create: { name, value: sanitizedValue }
             });
         } else if (existingKeyNames.has(name)) {
             // Delete key if it's being set to empty

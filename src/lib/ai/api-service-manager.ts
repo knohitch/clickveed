@@ -196,8 +196,10 @@ function hasGoogleVertexRuntimeSetup(apiKeys: Record<string, string>): boolean {
   );
 
   const hasCredentialsPath = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  // Backward-compatible mode: allow direct OAuth bearer token in provider key.
+  const hasLegacyAccessToken = Boolean(apiKeys.imagen || apiKeys.googleVeo);
 
-  return hasProjectId && (hasInlineCredentials || hasCredentialsPath);
+  return hasProjectId && (hasInlineCredentials || hasCredentialsPath || hasLegacyAccessToken);
 }
 
 async function isProviderSetupBlocked(provider: string, apiKeys: Record<string, string>): Promise<boolean> {
@@ -219,9 +221,11 @@ async function selectProviderForCapability(capability: AICapability): Promise<Pr
 
   for (const candidate of candidates) {
     const provider = candidate.name;
-    const apiKey = apiKeys[provider as keyof typeof apiKeys];
+    const apiKey = (apiKeys[provider as keyof typeof apiKeys] || '') as string;
+    const metadata = await getProviderMetadata(provider);
+    const requiresApiKey = metadata.authType === 'apiKey';
 
-    if (!apiKey) {
+    if (requiresApiKey && !apiKey) {
       logProviderSkip(capability, provider, 'missing_key');
       continue;
     }
@@ -552,8 +556,11 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
 
   for (const candidate of candidates) {
     const provider = candidate.name;
-    const apiKey = apiKeys[provider as keyof typeof apiKeys];
-    if (!apiKey) {
+    const apiKey = (apiKeys[provider as keyof typeof apiKeys] || '') as string;
+    const metadata = await getProviderMetadata(provider);
+    const requiresApiKey = metadata.authType === 'apiKey';
+
+    if (requiresApiKey && !apiKey) {
       continue;
     }
     configuredCount++;
@@ -604,13 +611,15 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
   }
 
   if (configuredCount === 0) {
-    throw new Error('No image provider API key configured. Add at least one image provider key (recommended: Replicate or Gemini).');
+    throw new Error(
+      'No image provider configured. Add an image API key, or configure Vertex setup (googleCloudProjectId + googleApplicationCredentialsJson) for Imagen.'
+    );
   }
 
   if (setupBlockedProviders.length > 0 && setupBlockedProviders.length === configuredCount) {
     throw new Error(
       `Configured image provider(s) require OAuth/service-account setup: ${setupBlockedProviders.join(', ')}. ` +
-      'Set GOOGLE_APPLICATION_CREDENTIALS for Vertex providers, or configure a non-OAuth image provider key (Replicate/Gemini).'
+      'Configure googleCloudProjectId plus either googleApplicationCredentialsJson (recommended) or a legacy OAuth access token in imagen.'
     );
   }
 
@@ -621,18 +630,43 @@ export async function generateImageEditWithProvider(input: { prompt: string; ima
   const providerInfo = await getAvailableImageEditor();
   const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
 
-  const result = await genkitInstance.generate({
-    model: providerInfo.model,
-    prompt: [
-      { text: input.prompt },
-      { media: { url: input.imageDataUri } },
-    ],
-    config: {
-      responseModalities: ['TEXT', 'IMAGE'],
-    },
-  });
+  const runGenerate = async (modalities: Array<'TEXT' | 'IMAGE' | 'AUDIO'>) =>
+    genkitInstance.generate({
+      model: providerInfo.model,
+      prompt: [
+        { text: input.prompt },
+        { media: { url: input.imageDataUri } },
+      ],
+      config: {
+        responseModalities: modalities,
+      },
+    });
 
-  return result;
+  const hasMediaOutput = (result: any): boolean => {
+    if (typeof result?.media?.url === 'string' && result.media.url.length > 0) {
+      return true;
+    }
+    const messageParts = result?.message?.content;
+    if (Array.isArray(messageParts) && messageParts.some((part: any) => !!part?.media?.url || !!part?.inlineData?.data)) {
+      return true;
+    }
+    const customParts = result?.custom?.candidates?.[0]?.content?.parts;
+    return Array.isArray(customParts) && customParts.some((part: any) => !!part?.inlineData?.data || !!part?.fileData?.fileUri);
+  };
+
+  // First attempt: image-only response.
+  let result = await runGenerate(['IMAGE']);
+
+  // Fallback attempt: mixed text+image, for models that only emit image edits in mixed mode.
+  if (!hasMediaOutput(result)) {
+    result = await runGenerate(['TEXT', 'IMAGE']);
+  }
+
+  return {
+    ...(result as any),
+    provider: providerInfo.provider,
+    model: providerInfo.model,
+  };
 }
 
 export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'model'>) {
@@ -642,15 +676,23 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
   const customProviders = ['heygen', 'kling', 'modelscope', 'seedance', 'wan', 'googleVeo'];
 
   let lastError: Error | null = null;
+  let configuredCount = 0;
+  const setupBlockedProviders: string[] = [];
 
   for (const candidate of candidates) {
     const provider = candidate.name;
-    const apiKey = apiKeys[provider as keyof typeof apiKeys];
-    if (!apiKey) {
+    const apiKey = (apiKeys[provider as keyof typeof apiKeys] || '') as string;
+    const metadata = await getProviderMetadata(provider);
+    const requiresApiKey = metadata.authType === 'apiKey';
+
+    if (requiresApiKey && !apiKey) {
       continue;
     }
+    configuredCount++;
+
     if (await isProviderSetupBlocked(provider, apiKeys as Record<string, string>)) {
       logProviderSkip('video', provider, 'setup_required');
+      setupBlockedProviders.push(provider);
       continue;
     }
     if (!circuitBreaker.shouldAttempt(provider)) {
@@ -698,8 +740,17 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
     }
   }
 
-  if (!candidates.some((p) => !!apiKeys[p.name as keyof typeof apiKeys])) {
-    throw new Error('No video provider API key configured. Add Google Veo key first, then fallback video providers.');
+  if (configuredCount === 0) {
+    throw new Error(
+      'No video provider configured. Add a video API key, or configure Vertex setup (googleCloudProjectId + googleApplicationCredentialsJson) for Google Veo.'
+    );
+  }
+
+  if (setupBlockedProviders.length > 0 && setupBlockedProviders.length === configuredCount) {
+    throw new Error(
+      `Configured video provider(s) require OAuth/service-account setup: ${setupBlockedProviders.join(', ')}. ` +
+      'Configure googleCloudProjectId plus either googleApplicationCredentialsJson (recommended) or a legacy OAuth access token in googleVeo.'
+    );
   }
 
   throw lastError || new Error('All configured video providers failed.');

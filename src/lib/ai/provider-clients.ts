@@ -42,6 +42,74 @@ interface ProviderMetadata {
 import { getProviderMetadata } from '@/lib/database-config-service';
 import type { AICapability, ProviderName } from './provider-registry';
 
+function normalizeContentType(value: unknown): string {
+  return String(value || '').toLowerCase().split(';')[0].trim();
+}
+
+function extractErrorMessageFromBuffer(buffer: Buffer): string {
+  const text = buffer.toString('utf8').trim();
+  if (!text) return 'Empty response body';
+
+  try {
+    const parsed = JSON.parse(text);
+    return (
+      parsed?.message ||
+      parsed?.error?.message ||
+      parsed?.error_msg ||
+      parsed?.detail ||
+      text.slice(0, 300)
+    );
+  } catch {
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      return 'Received HTML error response from provider';
+    }
+    return text.slice(0, 300);
+  }
+}
+
+function formatAxiosErrorForUser(prefix: string, error: unknown): Error {
+  if (!axios.isAxiosError(error)) {
+    return new Error(`${prefix}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const status = error.response?.status;
+  const data = error.response?.data;
+
+  if (Buffer.isBuffer(data)) {
+    return new Error(`${prefix} (${status ?? 'unknown'}): ${extractErrorMessageFromBuffer(data)}`);
+  }
+
+  if (typeof data === 'string') {
+    const msg = data.includes('<!DOCTYPE') || data.includes('<html')
+      ? 'Received HTML error response (check model ID / endpoint / permissions).'
+      : data.slice(0, 300);
+    return new Error(`${prefix} (${status ?? 'unknown'}): ${msg}`);
+  }
+
+  const fallback =
+    (data as any)?.message ||
+    (data as any)?.error?.message ||
+    (data as any)?.error_msg ||
+    error.message;
+
+  return new Error(`${prefix} (${status ?? 'unknown'}): ${fallback}`);
+}
+
+function isLikelyModelNotFoundError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  if (error.response?.status === 404) return true;
+
+  const data = error.response?.data;
+  if (Buffer.isBuffer(data)) {
+    return /404|not found|requested url/i.test(data.toString('utf8'));
+  }
+  if (typeof data === 'string') {
+    return /404|not found|requested url/i.test(data);
+  }
+  const text = JSON.stringify(data || {});
+  return /404|not found|requested url/i.test(text);
+}
+
 function parseServiceAccountJson(raw: string): Record<string, any> {
   const trimmed = raw.trim();
   if (!trimmed) {
@@ -73,8 +141,10 @@ async function hasGoogleVertexSetup(): Promise<boolean> {
   );
 
   const hasCredentialsFilePath = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  // Backward-compatible mode: allow direct OAuth bearer token in provider key.
+  const hasLegacyAccessToken = Boolean(apiKeys.imagen || apiKeys.googleVeo);
 
-  return hasProjectId && (hasInlineCredentials || hasCredentialsFilePath);
+  return hasProjectId && (hasInlineCredentials || hasCredentialsFilePath || hasLegacyAccessToken);
 }
 
 async function resolveGoogleVertexAuth(legacyAccessToken?: string): Promise<{ accessToken: string; projectId: string }> {
@@ -439,7 +509,11 @@ export class ElevenLabsClient {
         }
       );
 
+      const contentType = normalizeContentType(response.headers?.['content-type']);
       const audioBuffer = Buffer.from(response.data);
+      if (!contentType.startsWith('audio/') || audioBuffer.length < 1024) {
+        throw new Error(`ElevenLabs returned non-audio or empty content: ${extractErrorMessageFromBuffer(audioBuffer)}`);
+      }
       const audioDataUri = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
 
       const { uploadToWasabi } = await import('@/server/services/wasabi-service');
@@ -496,7 +570,55 @@ export class MinimaxClient {
         }
       );
 
-      const audioBuffer = Buffer.from(response.data);
+      const contentType = normalizeContentType(response.headers?.['content-type']);
+      let audioBuffer = Buffer.from(response.data);
+
+      if (!contentType.startsWith('audio/')) {
+        // Some Minimax endpoints return JSON with audio_url/audio_base64 even on HTTP 200.
+        const payloadText = audioBuffer.toString('utf8').trim();
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(payloadText);
+        } catch {
+          throw new Error(`Minimax returned non-audio response: ${payloadText.slice(0, 300)}`);
+        }
+
+        const baseRespCode = parsed?.base_resp?.status_code;
+        if (typeof baseRespCode === 'number' && baseRespCode !== 0) {
+          const message = parsed?.base_resp?.status_msg || parsed?.message || 'Unknown Minimax error';
+          throw new Error(`Minimax API error: ${message}`);
+        }
+
+        const audioBase64 =
+          parsed?.audio_base64 ||
+          parsed?.data?.audio_base64 ||
+          parsed?.result?.audio_base64 ||
+          parsed?.data?.audio ||
+          parsed?.audio;
+
+        const audioUrl =
+          parsed?.audio_url ||
+          parsed?.data?.audio_url ||
+          parsed?.result?.audio_url ||
+          parsed?.data?.url;
+
+        if (typeof audioBase64 === 'string' && audioBase64.length > 0) {
+          audioBuffer = Buffer.from(audioBase64, 'base64');
+        } else if (typeof audioUrl === 'string' && audioUrl.startsWith('http')) {
+          const audioResponse = await fetch(audioUrl);
+          if (!audioResponse.ok) {
+            throw new Error(`Minimax returned audio URL but fetch failed (${audioResponse.status})`);
+          }
+          audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+        } else {
+          throw new Error(`Minimax returned JSON without audio payload: ${payloadText.slice(0, 300)}`);
+        }
+      }
+
+      if (audioBuffer.length < 1024) {
+        throw new Error('Minimax returned audio that is too small to be valid.');
+      }
+
       const audioDataUri = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
 
       const { uploadToWasabi } = await import('@/server/services/wasabi-service');
@@ -620,94 +742,111 @@ export class GoogleVeoClient {
 
       // Accept either prefixed model ids (googleai/...) or raw Vertex ids.
       const rawModel = model.includes('/') ? model.split('/').pop() || model : model;
-      const vertexModel = rawModel;
-
-      // Using the correct Google Cloud Vertex AI endpoint with actual project ID
-      // Video generation is async, so we use predictLongRunning
-      const endpoint = `${this.baseUrl}/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predictLongRunning`;
-
-      const startResponse = await axios.post(
-        endpoint,
-        {
-          instances: [{
-            prompt: prompt
-          }],
-          parameters: {
-            sampleCount: 1,
-          }
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 60000, // 60 second timeout for initial request
-        }
+      const normalizedModel = rawModel.replace(/-[a-f0-9]{8,}$/i, '');
+      const candidateModels = Array.from(
+        new Set([rawModel, normalizedModel, 'veo-3.0-generate-001', 'veo-2.0-generate-001'].filter(Boolean))
       );
 
-      // Get the operation name for polling
-      const operationName = startResponse.data.name;
+      for (const vertexModel of candidateModels) {
+        try {
+          // Using the correct Google Cloud Vertex AI endpoint with actual project ID
+          // Video generation is async, so we use predictLongRunning
+          const endpoint = `${this.baseUrl}/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${vertexModel}:predictLongRunning`;
 
-      if (!operationName) {
-        throw new Error('No operation name returned from Google Veo API');
-      }
-
-      // Poll for completion (video generation takes time)
-      let result;
-      const maxAttempts = 120; // 10 minutes max (5 sec intervals)
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-
-        const statusResponse = await axios.get(
-          `${this.baseUrl}/v1/${operationName}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
+          const startResponse = await axios.post(
+            endpoint,
+            {
+              instances: [{
+                prompt: prompt
+              }],
+              parameters: {
+                sampleCount: 1,
+              }
             },
-            timeout: 30000,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 60000, // 60 second timeout for initial request
+            }
+          );
+
+          // Get the operation name for polling
+          const operationName = startResponse.data.name;
+
+          if (!operationName) {
+            throw new Error('No operation name returned from Google Veo API');
           }
-        );
 
-        if (statusResponse.data.done) {
-          result = statusResponse.data.response;
-          break;
+          // Poll for completion (video generation takes time)
+          let result;
+          const maxAttempts = 120; // 10 minutes max (5 sec intervals)
+
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+            const statusResponse = await axios.get(
+              `${this.baseUrl}/v1/${operationName}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                },
+                timeout: 30000,
+              }
+            );
+
+            if (statusResponse.data.done) {
+              result = statusResponse.data.response;
+              break;
+            }
+
+            if (statusResponse.data.error) {
+              throw new Error(`Video generation failed: ${JSON.stringify(statusResponse.data.error)}`);
+            }
+
+            console.log(`[GoogleVeo] Polling attempt ${attempt + 1}/${maxAttempts} (model=${vertexModel})...`);
+          }
+
+          if (!result) {
+            throw new Error('Video generation timed out after 10 minutes');
+          }
+
+          // Extract the video from the response
+          const prediction = result.predictions?.[0];
+          const videoBase64 = prediction?.bytesBase64Encoded;
+
+          if (!videoBase64) {
+            throw new Error('No video data returned from Google Veo API');
+          }
+
+          // Upload to Wasabi for permanent storage
+          const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+          const videoDataUri = `data:video/mp4;base64,${videoBase64}`;
+          const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
+
+          return {
+            videoUrl: publicUrl,
+            model: vertexModel,
+            provider: 'googleVeo'
+          };
+        } catch (modelError) {
+          if (isLikelyModelNotFoundError(modelError)) {
+            console.warn(`[GoogleVeo] Model not found or unavailable: ${vertexModel}. Trying next candidate.`);
+            continue;
+          }
+          throw modelError;
         }
-
-        if (statusResponse.data.error) {
-          throw new Error(`Video generation failed: ${JSON.stringify(statusResponse.data.error)}`);
-        }
-
-        console.log(`[GoogleVeo] Polling attempt ${attempt + 1}/${maxAttempts}...`);
       }
 
-      if (!result) {
-        throw new Error('Video generation timed out after 10 minutes');
-      }
-
-      // Extract the video from the response
-      const prediction = result.predictions?.[0];
-      const videoBase64 = prediction?.bytesBase64Encoded;
-
-      if (!videoBase64) {
-        throw new Error('No video data returned from Google Veo API');
-      }
-
-      // Upload to Wasabi for permanent storage
-      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
-      const videoDataUri = `data:video/mp4;base64,${videoBase64}`;
-      const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
-
-      return {
-        videoUrl: publicUrl,
-        model: vertexModel,
-        provider: 'googleVeo'
-      };
+      throw new Error(
+        `Google Veo model not found/accessible for project ${projectId}. Tried: ${candidateModels.join(', ')}`
+      );
     } catch (error) {
       console.error('[GoogleVeo] Video generation error:', error);
       if (axios.isAxiosError(error) && error.response) {
         console.error('[GoogleVeo] API Response:', error.response.data);
-        throw new Error(`Google Veo API error (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+        throw formatAxiosErrorForUser('Google Veo API error', error);
       }
       throw error;
     }

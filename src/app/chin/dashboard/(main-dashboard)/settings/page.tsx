@@ -215,7 +215,7 @@ export default function AdminSettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="wasabiEndpoint">Wasabi Endpoint URL</Label>
-                            <Input id="wasabiEndpoint" name="wasabiEndpoint" placeholder="s3.us-west-1.wasabisys.com" value={localSettings.apiKeys.wasabiEndpoint || ''} onChange={(e) => handleNestedChange('apiKeys', e)} />
+                            <Input id="wasabiEndpoint" name="wasabiEndpoint" placeholder="storage-endpoint.example.com" value={localSettings.apiKeys.wasabiEndpoint || ''} onChange={(e) => handleNestedChange('apiKeys', e)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="wasabiRegion">Wasabi Region</Label>
@@ -227,7 +227,7 @@ export default function AdminSettingsPage() {
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="bunnyCdnUrl">Bunny.net CDN URL (Optional)</Label>
-                            <Input id="bunnyCdnUrl" name="bunnyCdnUrl" placeholder="https://your-pull-zone.b-cdn.net" value={localSettings.apiKeys.bunnyCdnUrl || ''} onChange={(e) => handleNestedChange('apiKeys', e)} />
+                            <Input id="bunnyCdnUrl" name="bunnyCdnUrl" placeholder="https://cdn.example.com" value={localSettings.apiKeys.bunnyCdnUrl || ''} onChange={(e) => handleNestedChange('apiKeys', e)} />
                         </div>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

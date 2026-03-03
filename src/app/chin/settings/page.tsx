@@ -28,18 +28,18 @@ export default function ChinSettingsPage() {
             smtpPort: '587',
             smtpSecure: 'auto',
             smtpUser: 'user@example.com',
-            smtpPass: '••••••••',
+            smtpPass: '',
             fromAdminEmail: 'noreply@example.com',
             fromSupportEmail: 'support@example.com',
             fromName: 'ClickVid Pro',
         },
         storageSettings: {
-            wasabiEndpoint: 's3.us-west-1.wasabisys.com',
-            wasabiRegion: 'us-west-1',
+            wasabiEndpoint: '',
+            wasabiRegion: '',
             wasabiBucket: '',
-            bunnyCdnUrl: 'https://clickvid.b-cdn.net',
-            wasabiAccessKey: '••••••••',
-            wasabiSecretKey: '••••••••',
+            bunnyCdnUrl: '',
+            wasabiAccessKey: '',
+            wasabiSecretKey: '',
         }
     });
 
@@ -481,7 +481,7 @@ export default function ChinSettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="wasabiEndpoint">Wasabi Endpoint URL</Label>
-                  <Input id="wasabiEndpoint" name="wasabiEndpoint" placeholder="s3.us-west-1.wasabisys.com" value={settings.storageSettings.wasabiEndpoint} onChange={(e) => handleNestedChange('storageSettings', e)} />
+                  <Input id="wasabiEndpoint" name="wasabiEndpoint" placeholder="storage-endpoint.example.com" value={settings.storageSettings.wasabiEndpoint} onChange={(e) => handleNestedChange('storageSettings', e)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="wasabiRegion">Wasabi Region</Label>
@@ -493,7 +493,7 @@ export default function ChinSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bunnyCdnUrl">Bunny.net CDN URL (Optional)</Label>
-                  <Input id="bunnyCdnUrl" name="bunnyCdnUrl" placeholder="https://your-pull-zone.b-cdn.net" value={settings.storageSettings.bunnyCdnUrl} onChange={(e) => handleNestedChange('storageSettings', e)} />
+                  <Input id="bunnyCdnUrl" name="bunnyCdnUrl" placeholder="https://cdn.example.com" value={settings.storageSettings.bunnyCdnUrl} onChange={(e) => handleNestedChange('storageSettings', e)} />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -623,3 +623,4 @@ export default function ChinSettingsPage() {
     </form>
   );
 }
+
