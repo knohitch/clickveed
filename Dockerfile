@@ -3,18 +3,19 @@ FROM node:18-alpine AS base
 
 # Install dependencies
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit
 
 # Build stage
 FROM base AS builder
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
@@ -23,7 +24,7 @@ ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
 # Build with minimal output
-RUN npm run build -- --no-lint
+RUN npm run build:docker -- --no-lint
 
 # Production stage
 FROM base AS runner

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "cross-env NODE_OPTIONS=\"--max-old-space-size=6144\" prisma generate && node --max-old-space-size=6144 ./node_modules/next/dist/bin/next build",
+    "build": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" prisma generate && next build",
+    "build:docker": "cross-env NODE_OPTIONS=\"--max-old-space-size=3072\" next build",
     "start": "next start",
     "genkit:dev": "genkit start -- tsx src/ai/dev-index.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev-index.ts",
