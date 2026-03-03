@@ -6,7 +6,7 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --prefer-offline --no-audit --no-fund --omit=dev --omit=optional --cache /tmp/.npm
+RUN npm ci --prefer-offline --no-audit --no-fund --cache /tmp/.npm
 
 # Build stage
 FROM base AS builder
@@ -21,7 +21,7 @@ ENV NODE_ENV=production
 
 # Generate Prisma client for Alpine only (linux-musl)
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 
 # Build with minimal output
 RUN npm run build:docker -- --no-lint
