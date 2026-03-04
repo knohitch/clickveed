@@ -24,6 +24,8 @@ echo "Database setup completed"
 echo "Starting application..."
 if [ -f "server.js" ]; then
     node server.js
-else
+elif [ -f ".next/standalone/server.js" ]; then
     node .next/standalone/server.js
+else
+    npx next start -p "${PORT:-3000}" -H "${HOSTNAME:-0.0.0.0}"
 fi
