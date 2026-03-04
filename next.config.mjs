@@ -21,13 +21,9 @@ const nextConfig = {
 
         return config;
     },
-    // Optimize for production builds
+    // Keep only the experimental option needed for server runtime compatibility.
     experimental: {
         serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
-        optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
-        typedRoutes: false,
-        cpus: 1,
-        webpackBuildWorker: false,
     },
     output: 'standalone',
     reactStrictMode: true,
