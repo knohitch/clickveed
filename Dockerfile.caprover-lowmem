@@ -1,49 +1,45 @@
-FROM node:20-bookworm-slim AS base
+# CapRover optimized Dockerfile for low-memory environments (8GB RAM)
+# Uses Alpine Linux and memory-optimized build settings
+
+FROM node:20-alpine AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
 FROM base AS deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    openssl \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache libc6-compat openssl
 COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional --cache /tmp/.npm
 
 FROM base AS builder
-ARG BUILD_MAX_OLD_SPACE_SIZE=16384
-ARG NEXT_DISABLE_SWC_WORKER=0
+ARG BUILD_MAX_OLD_SPACE_SIZE=6144
+ARG NEXT_DISABLE_SWC_WORKER=1
 ARG NEXT_PRIVATE_BUILD_WORKER=0
 
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--max-old-space-size=${BUILD_MAX_OLD_SPACE_SIZE}
 ENV NEXT_DISABLE_SWC_WORKER=${NEXT_DISABLE_SWC_WORKER}
 ENV NEXT_PRIVATE_BUILD_WORKER=${NEXT_PRIVATE_BUILD_WORKER}
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 RUN ./node_modules/.bin/prisma generate
-RUN npm run build:docker
+RUN npm run build:docker || (echo "Build failed with 6GB, retrying with 4GB..." && NODE_OPTIONS="--max-old-space-size=4096" npm run build:docker)
 RUN test -f /app/.next/standalone/server.js
 
-FROM node:20-bookworm-slim AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    openssl \
-    postgresql-client \
-    dumb-init \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache openssl libc6-compat postgresql-client dumb-init
 
-RUN groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid 1001 --create-home nextjs
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -u 1001 -S nextjs -G nodejs && \
+    mkdir -p .next && chown nextjs:nodejs .next
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
