@@ -24,7 +24,7 @@ ENV NEXT_PRIVATE_BUILD_WORKER=0
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN ./node_modules/.bin/prisma generate
 
-# Build with aggressive memory reduction to avoid OOM segfaults
+# Build directly (bypass npm script which overrides NODE_OPTIONS)
 RUN echo "Build attempt 1: 1024MB" && \
     NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/next build --no-lint 2>&1 || \
     (echo "Build attempt 2: 512MB" && \

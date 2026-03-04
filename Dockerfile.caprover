@@ -35,13 +35,13 @@ ENV PRISMA_HIDE_UPDATE_MESSAGE=true
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
-# Build with aggressive memory reduction to avoid OOM segfaults
+# Build directly (bypass npm script which overrides NODE_OPTIONS)
 RUN echo "Build attempt 1: 1024MB" && \
-    NODE_OPTIONS="--max-old-space-size=1024" npm run build 2>&1 || \
+    NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/next build --no-lint 2>&1 || \
     (echo "Build attempt 2: 512MB" && \
-    NODE_OPTIONS="--max-old-space-size=512" npm run build 2>&1) || \
+    NODE_OPTIONS="--max-old-space-size=512" node_modules/.bin/next build --no-lint 2>&1) || \
     (echo "Build attempt 3: 256MB" && \
-    NODE_OPTIONS="--max-old-space-size=256" npm run build 2>&1) || \
+    NODE_OPTIONS="--max-old-space-size=256" node_modules/.bin/next build --no-lint 2>&1) || \
     (echo "ERROR: All build attempts failed" && exit 1)
 RUN echo "Verifying .next directory exists..." && \
     test -d /app/.next || (echo "ERROR: .next not found after build" && exit 1)
