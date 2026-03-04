@@ -1,30 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    webpack: (config, { isServer }) => {
-        // Externalize heavy packages
-        config.externals = config.externals || [];
-        if (!isServer) {
-            config.externals.push({
-                'bcryptjs': 'bcryptjs',
-                'crypto': 'crypto'
-            });
-        }
-
-        // Ignore warnings to reduce build noise
-        config.ignoreWarnings = [
-            { module: /@opentelemetry\/instrumentation/ },
-            { module: /require-in-the-middle/ },
-            { module: /handlebars/ },
-            { module: /bcryptjs/ },
-            { module: /prisma/ },
-        ];
-
-        return config;
-    },
-    // Keep only the experimental option needed for server runtime compatibility.
-    experimental: {
-        serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
-    },
     output: 'standalone',
     reactStrictMode: true,
     
@@ -58,6 +33,62 @@ const nextConfig = {
     onDemandEntries: {
         maxInactiveAge: 25 * 1000,
         pagesBufferLength: 2,
+    },
+    
+    // Aggressive memory optimizations for 8GB VPS
+    experimental: {
+        serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
+        swcMinify: true,
+        swcPlugins: [],
+        swcLoader: false,
+        swcTraceProfiling: false,
+        swcMemoryLimit: 512, // 512MB limit for SWC
+        workerThreads: false, // Disable worker threads
+        cpus: 1, // Use only 1 CPU core
+    },
+    
+    // Disable source maps and optimize webpack
+    webpack: (config, { isServer, dev }) => {
+        // Externalize heavy packages
+        config.externals = config.externals || [];
+        if (!isServer) {
+            config.externals.push({
+                'bcryptjs': 'bcryptjs',
+                'crypto': 'crypto'
+            });
+        }
+
+        // Ignore warnings to reduce build noise
+        config.ignoreWarnings = [
+            { module: /@opentelemetry\/instrumentation/ },
+            { module: /require-in-the-middle/ },
+            { module: /handlebars/ },
+            { module: /bcryptjs/ },
+            { module: /prisma/ },
+        ];
+        
+        // Disable source maps to reduce memory
+        config.devtool = false;
+        
+        // Reduce parallelism for lower memory usage
+        config.optimization = {
+            ...config.optimization,
+            minimize: true,
+            minimizer: config.optimization.minimizer.map((plugin) => {
+                if (plugin.constructor.name === 'TerserPlugin') {
+                    plugin.options.parallel = 1; // Use only 1 thread for minification
+                }
+                return plugin;
+            }),
+        };
+        
+        // Reduce cache size
+        config.cache = {
+            type: 'memory',
+            maxGenerations: 1,
+        };
+        
+        return config;
     },
 };
 

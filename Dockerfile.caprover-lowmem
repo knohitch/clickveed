@@ -11,7 +11,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional --cache /tmp/.npm
 
 FROM base AS builder
-ARG BUILD_MAX_OLD_SPACE_SIZE=6144
+ARG BUILD_MAX_OLD_SPACE_SIZE=3072
 ARG NEXT_DISABLE_SWC_WORKER=1
 ARG NEXT_PRIVATE_BUILD_WORKER=0
 
@@ -21,11 +21,27 @@ ENV NEXT_DISABLE_SWC_WORKER=${NEXT_DISABLE_SWC_WORKER}
 ENV NEXT_PRIVATE_BUILD_WORKER=${NEXT_PRIVATE_BUILD_WORKER}
 ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
 
+# Copy only essential files first to reduce memory pressure
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma
+COPY next.config.mjs ./
+COPY tsconfig.json ./
 
 RUN ./node_modules/.bin/prisma generate
-RUN npm run build:docker || (echo "Build failed with 6GB, retrying with 4GB..." && NODE_OPTIONS="--max-old-space-size=4096" npm run build:docker)
+
+# Copy source files after Prisma generation
+COPY src ./src
+COPY public ./public
+COPY lib ./lib
+COPY components ./components
+
+# Build with progressive memory fallback
+RUN npm run build:docker || \
+    (echo "Build failed with 3GB, retrying with 2GB..." && NODE_OPTIONS="--max-old-space-size=2048" npm run build:docker) || \
+    (echo "Build failed with 2GB, retrying with 1.5GB..." && NODE_OPTIONS="--max-old-space-size=1536" npm run build:docker) || \
+    (echo "Build failed with 1.5GB, trying minimal build..." && NODE_OPTIONS="--max-old-space-size=1024" NEXT_DISABLE_SWC_WORKER=1 NEXT_PRIVATE_BUILD_WORKER=0 npm run build:docker)
+
 RUN test -f /app/.next/standalone/server.js
 
 FROM node:20-alpine AS runner
