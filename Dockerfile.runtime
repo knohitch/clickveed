@@ -1,44 +1,50 @@
-# Lightweight Docker image - skips build, assumes build is done separately
-# Use this if you build on the VPS or GitHub Actions
+# Runtime-safe multi-stage Dockerfile.
+# Builds inside Docker and does not depend on host .next artifacts.
 
-FROM node:18-alpine
+FROM node:18-alpine AS base
 
-# Install runtime dependencies
-RUN apk add --no-cache \
-    openssl \
-    ca-certificates \
-    postgresql-client \
-    libc6-compat
-
+FROM base AS deps
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
-
-# Copy package files
 COPY package.json package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional --cache /tmp/.npm
 
-# Install only production dependencies
-RUN npm ci --only=production --prefer-offline
+FROM base AS builder
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-# Copy built application files
-# Assumes you've run `npm run build` locally or on VPS
-COPY .next/standalone ./
-COPY .next/static ./.next/static
-COPY public ./public
-COPY prisma ./prisma
+ENV NODE_OPTIONS="--max-old-space-size=1536"
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV NEXT_DISABLE_SWC_WORKER=1
+ENV NEXT_PRIVATE_BUILD_WORKER=0
+ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 
-# Copy Prisma client
-COPY node_modules/.prisma ./node_modules/.prisma
+RUN ./node_modules/.bin/prisma generate
+RUN npm run build:docker -- --no-lint 2>&1 | tee /tmp/build.log || (echo "Docker build failed. Dumping /tmp/build.log" && cat /tmp/build.log && exit 1)
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs && \
-    chown -R nextjs:nodejs /app
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN apk add --no-cache openssl ca-certificates postgresql-client libc6-compat
+
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+RUN mkdir -p .next && chown nextjs:nodejs .next
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/startup.sh ./startup.sh
+RUN chmod +x ./startup.sh
 
 USER nextjs
-
 EXPOSE 3000
-
-ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
+CMD ["./startup.sh"]
