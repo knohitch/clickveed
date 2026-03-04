@@ -26,7 +26,7 @@ ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN ./node_modules/.bin/prisma generate
 
 # Build with minimal output
-RUN npm run build:docker -- --no-lint
+RUN npm run build:docker -- --no-lint 2>&1 | tee /tmp/build.log || (echo "Docker build failed. Dumping /tmp/build.log" && cat /tmp/build.log && exit 1)
 
 # Production stage
 FROM base AS runner
