@@ -35,8 +35,8 @@ ENV PRISMA_HIDE_UPDATE_MESSAGE=true
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
-# Build with deterministic failure handling (avoid masking errors in pipelines)
-RUN npm run build > /tmp/build.log 2>&1 || (cat /tmp/build.log && exit 1)
+# Build and stream logs directly so CapRover shows the real failure reason.
+RUN npm run build
 
 # Production stage - minimal footprint
 FROM node:18-alpine AS runner

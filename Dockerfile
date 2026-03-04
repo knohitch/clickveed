@@ -25,8 +25,8 @@ ENV NEXT_PRIVATE_BUILD_WORKER=0
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN ./node_modules/.bin/prisma generate
 
-# Build with deterministic failure handling (avoid masking errors in pipelines)
-RUN npm run build:docker -- --no-lint > /tmp/build.log 2>&1 || (echo "Docker build failed. Dumping /tmp/build.log" && cat /tmp/build.log && exit 1)
+# Build and stream logs directly so CapRover shows the real failure reason.
+RUN npm run build:docker -- --no-lint
 
 # Production stage
 FROM base AS runner
