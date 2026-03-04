@@ -24,13 +24,16 @@ ENV NEXT_PRIVATE_BUILD_WORKER=0
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN ./node_modules/.bin/prisma generate
 
-# Build with verification to catch OOM and other failures
-RUN echo "Starting Next.js build..." && \
-    NODE_OPTIONS="--max-old-space-size=1536" node_modules/.bin/next build --no-lint || \
-    (echo "First build attempt failed, retrying with reduced memory..." && \
-    NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/next build --no-lint)
+# Build with aggressive memory reduction to avoid OOM segfaults
+RUN echo "Build attempt 1: 1024MB" && \
+    NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/next build --no-lint 2>&1 || \
+    (echo "Build attempt 2: 512MB" && \
+    NODE_OPTIONS="--max-old-space-size=512" node_modules/.bin/next build --no-lint 2>&1) || \
+    (echo "Build attempt 3: 256MB" && \
+    NODE_OPTIONS="--max-old-space-size=256" node_modules/.bin/next build --no-lint 2>&1) || \
+    (echo "ERROR: All build attempts failed" && exit 1)
 RUN echo "Verifying .next directory exists..." && \
-    test -d /app/.next || (echo "ERROR: .next directory not found after build. Build may have failed due to OOM or other error." && exit 1)
+    test -d /app/.next || (echo "ERROR: .next not found after build. Build may have failed due to OOM or other error." && exit 1)
 
 # Production stage
 FROM base AS runner

@@ -21,8 +21,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Environment for low-memory builds
-ENV NODE_OPTIONS="--max-old-space-size=6144"
+# Environment for low-memory builds - start conservative
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV CI=true
@@ -35,10 +35,16 @@ ENV PRISMA_HIDE_UPDATE_MESSAGE=true
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
-# Build and verify .next exists
-# Try with reduced memory if first attempt fails
-RUN npm run build || npm run build || (echo "ERROR: Build failed" && exit 1)
-RUN test -d /app/.next || (echo "ERROR: .next not found after build" && exit 1)
+# Build with aggressive memory reduction to avoid OOM segfaults
+RUN echo "Build attempt 1: 1024MB" && \
+    NODE_OPTIONS="--max-old-space-size=1024" npm run build 2>&1 || \
+    (echo "Build attempt 2: 512MB" && \
+    NODE_OPTIONS="--max-old-space-size=512" npm run build 2>&1) || \
+    (echo "Build attempt 3: 256MB" && \
+    NODE_OPTIONS="--max-old-space-size=256" npm run build 2>&1) || \
+    (echo "ERROR: All build attempts failed" && exit 1)
+RUN echo "Verifying .next directory exists..." && \
+    test -d /app/.next || (echo "ERROR: .next not found after build" && exit 1)
 
 # Production stage - minimal footprint
 FROM node:18-alpine AS runner
