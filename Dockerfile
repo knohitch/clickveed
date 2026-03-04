@@ -26,7 +26,7 @@ ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN ./node_modules/.bin/prisma generate
 
 # Build and stream logs directly so CapRover shows the real failure reason.
-RUN npm run build:docker -- --no-lint
+RUN npm run build:docker
 
 # Production stage
 FROM base AS runner
