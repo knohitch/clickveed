@@ -6,7 +6,7 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --prefer-offline --no-audit --no-fund --cache /tmp/.npm
+RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional --cache /tmp/.npm
 
 # Build stage
 FROM base AS builder
@@ -15,9 +15,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NODE_OPTIONS="--max-old-space-size=3072"
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV NEXT_DISABLE_SWC_WORKER=1
+ENV NEXT_PRIVATE_BUILD_WORKER=0
 
 # Generate Prisma client for Alpine only (linux-musl)
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
