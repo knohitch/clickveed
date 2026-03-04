@@ -1,98 +1,57 @@
-# Optimized Dockerfile for CapRover deployment
-# CapRover builds Docker images from GitHub automatically
-
 FROM node:18-alpine AS base
 
-# Install dependencies stage
 FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl ca-certificates
 WORKDIR /app
-
 COPY package.json package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional --cache /tmp/.npm
 
-# Install with optimizations for low memory
-RUN npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps
-
-# Build stage
 FROM base AS builder
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
-
-# Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Environment for low-memory builds - start conservative
-ENV NODE_OPTIONS="--max-old-space-size=1024"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-ENV CI=true
+ENV NEXT_DISABLE_SWC_WORKER=1
+ENV NEXT_PRIVATE_BUILD_WORKER=0
 
-# Install build tools
-RUN apk add --no-cache python3 make g++
-
-# Generate Prisma client for Alpine only (doesn't need DB connection)
-ENV PRISMA_HIDE_UPDATE_MESSAGE=true
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 
-# Build directly (bypass npm script which overrides NODE_OPTIONS)
-RUN echo "Build attempt 1: 1024MB" && \
-    NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/next build --no-lint 2>&1 || \
-    (echo "Build attempt 2: 512MB" && \
-    NODE_OPTIONS="--max-old-space-size=512" node_modules/.bin/next build --no-lint 2>&1) || \
-    (echo "Build attempt 3: 256MB" && \
-    NODE_OPTIONS="--max-old-space-size=256" node_modules/.bin/next build --no-lint 2>&1) || \
-    (echo "ERROR: All build attempts failed" && exit 1)
-RUN echo "Verifying .next directory exists..." && \
-    test -d /app/.next || (echo "ERROR: .next not found after build" && exit 1)
+RUN npm run build:docker
+RUN test -f /app/.next/BUILD_ID
 
-# Production stage - minimal footprint
 FROM node:18-alpine AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install only runtime dependencies
 RUN apk add --no-cache \
     openssl \
     ca-certificates \
     postgresql-client \
     libc6-compat
 
-# Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Prepare directories
 RUN mkdir -p .next && chown nextjs:nodejs .next
 
-# Use standalone output (minimal size - only what Next.js needs)
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-# Copy Prisma files
 COPY --from=builder /app/prisma ./prisma
-
-# Copy startup files
 COPY --from=builder /app/startup.sh ./startup.sh
-COPY --from=builder /app/seed-fallback.sql ./seed-fallback.sql
 RUN chmod +x ./startup.sh
 
-# Switch to non-root user
 USER nextjs
-
-# Expose port (CapRover uses this)
 EXPOSE 3000
-
-# Environment variables
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start application
 CMD ["./startup.sh"]
