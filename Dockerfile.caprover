@@ -11,7 +11,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit --no-fund --omit=optional --cache /tmp/.npm
 
 FROM base AS builder
-ARG BUILD_MAX_OLD_SPACE_SIZE=16384
+ARG BUILD_MAX_OLD_SPACE_SIZE=4608
 ARG NEXT_DISABLE_SWC_WORKER=0
 ARG NEXT_PRIVATE_BUILD_WORKER=0
 
