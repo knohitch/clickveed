@@ -35,8 +35,8 @@ ENV PRISMA_HIDE_UPDATE_MESSAGE=true
 ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
-# Build with minimal output
-RUN npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
+# Build with deterministic failure handling (avoid masking errors in pipelines)
+RUN npm run build > /tmp/build.log 2>&1 || (cat /tmp/build.log && exit 1)
 
 # Production stage - minimal footprint
 FROM node:18-alpine AS runner
