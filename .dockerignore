@@ -6,10 +6,6 @@ yarn-error.log*
 
 # Next.js build output
 out
-# Keep .next/standalone and .next/static for Docker build
-.next/
-!.next/standalone
-!.next/static
 
 # Environment variables
 .env*.local
