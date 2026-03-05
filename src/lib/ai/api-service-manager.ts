@@ -627,20 +627,9 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
 }
 
 export async function generateImageEditWithProvider(input: { prompt: string; imageDataUri: string }) {
-  const providerInfo = await getAvailableImageEditor();
-  const genkitInstance = createGenkitInstance({ [providerInfo.provider]: providerInfo.apiKey });
-
-  const runGenerate = async (modalities: Array<'TEXT' | 'IMAGE' | 'AUDIO'>) =>
-    genkitInstance.generate({
-      model: providerInfo.model,
-      prompt: [
-        { text: input.prompt },
-        { media: { url: input.imageDataUri } },
-      ],
-      config: {
-        responseModalities: modalities,
-      },
-    });
+  const { apiKeys } = await getAdminSettings();
+  const candidates = getProvidersForCapability('image_edit')
+    .filter((p) => p.implemented && providerSupportsCapability(p.name, 'image_edit'));
 
   const hasMediaOutput = (result: any): boolean => {
     if (typeof result?.media?.url === 'string' && result.media.url.length > 0) {
@@ -654,19 +643,80 @@ export async function generateImageEditWithProvider(input: { prompt: string; ima
     return Array.isArray(customParts) && customParts.some((part: any) => !!part?.inlineData?.data || !!part?.fileData?.fileUri);
   };
 
-  // First attempt: image-only response.
-  let result = await runGenerate(['IMAGE']);
+  let lastError: Error | null = null;
+  let configuredCount = 0;
 
-  // Fallback attempt: mixed text+image, for models that only emit image edits in mixed mode.
-  if (!hasMediaOutput(result)) {
-    result = await runGenerate(['TEXT', 'IMAGE']);
+  for (const candidate of candidates) {
+    const provider = candidate.name;
+    const apiKey = (apiKeys[provider as keyof typeof apiKeys] || '') as string;
+    const metadata = await getProviderMetadata(provider);
+    const requiresApiKey = metadata.authType === 'apiKey';
+
+    if (requiresApiKey && !apiKey) {
+      logProviderSkip('image_edit', provider, 'missing_key');
+      continue;
+    }
+    configuredCount++;
+
+    if (await isProviderSetupBlocked(provider, apiKeys as Record<string, string>)) {
+      logProviderSkip('image_edit', provider, 'setup_required');
+      continue;
+    }
+
+    if (!circuitBreaker.shouldAttempt(provider)) {
+      logProviderSkip('image_edit', provider, 'circuit_open');
+      continue;
+    }
+
+    try {
+      const genkitInstance = createGenkitInstance({ [provider]: apiKey });
+
+      const runGenerate = async (modalities: Array<'TEXT' | 'IMAGE' | 'AUDIO'>) =>
+        genkitInstance.generate({
+          model: candidate.model,
+          prompt: [
+            { text: input.prompt },
+            { media: { url: input.imageDataUri } },
+          ],
+          config: { responseModalities: modalities },
+        });
+
+      // First attempt: image-only response.
+      let result = await runGenerate(['IMAGE']);
+
+      // Fallback modality: some models only return images in mixed TEXT+IMAGE mode.
+      if (!hasMediaOutput(result)) {
+        result = await runGenerate(['TEXT', 'IMAGE']);
+      }
+
+      if (!hasMediaOutput(result)) {
+        // This model returned no image — treat as a soft failure and try next candidate.
+        logProviderSkip('image_edit', provider, 'unsupported_capability');
+        lastError = new Error(`Model ${candidate.model} returned no image output`);
+        continue;
+      }
+
+      circuitBreaker.recordSuccess(provider);
+      markProviderHealthy(provider);
+      return {
+        ...(result as any),
+        provider,
+        model: candidate.model,
+      };
+    } catch (error) {
+      circuitBreaker.recordFailure(provider);
+      markProviderUnhealthy(provider, error instanceof Error ? error.message : 'Unknown error');
+      logFallback('image_edit', provider, isQuotaError(error) ? 'quota_or_rate_limit' : 'provider_error');
+      lastError = error instanceof Error ? error : new Error(String(error));
+      continue;
+    }
   }
 
-  return {
-    ...(result as any),
-    provider: providerInfo.provider,
-    model: providerInfo.model,
-  };
+  if (configuredCount === 0) {
+    throw new Error('No image editing provider configured. Add a Gemini API key in admin settings.');
+  }
+
+  throw lastError || new Error('All image editing providers failed. No media was returned.');
 }
 
 export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'model'>) {

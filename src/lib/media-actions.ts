@@ -155,13 +155,17 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
             return { success: false, error: 'Asset not found' };
         }
 
-        // Try to delete from object storage using key extracted from public URL.
+        // Delete from database first so the UI responds immediately
+        await prisma.mediaAsset.delete({
+            where: { id: assetId }
+        });
+
+        // Best-effort storage cleanup after DB delete (non-blocking for caller)
         try {
             const storageKey = extractStorageKeyFromUrl(asset.url);
             if (storageKey) {
                 const { deleteFromStorage } = await import('@/server/actions/storage-actions');
                 const storageResult = await deleteFromStorage(storageKey);
-                
                 if (!storageResult.success) {
                     console.warn('Failed to delete from storage:', storageResult.error);
                 }
@@ -170,16 +174,11 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
             console.warn('Could not extract storage key for deletion:', urlError);
         }
 
-        // Delete from database
-        await prisma.mediaAsset.delete({
-            where: { id: assetId }
-        });
-
         return { success: true };
     } catch (error) {
         console.error("Failed to delete media asset:", error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: error instanceof Error ? error.message : 'Delete failed'
         };
     }

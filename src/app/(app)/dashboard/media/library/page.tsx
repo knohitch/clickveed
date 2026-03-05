@@ -27,6 +27,7 @@ const AssetCard = ({
     const { toast } = useToast();
     const TypeIcon = asset.type === 'VIDEO' ? Video : asset.type === 'IMAGE' ? ImageIcon : Music;
     const [imageLoadFailed, setImageLoadFailed] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
 
     const copyShareLink = () => {
         navigator.clipboard.writeText(asset.url);
@@ -35,15 +36,20 @@ const AssetCard = ({
 
     return (
         <Card className="overflow-hidden">
-            <CardHeader className="p-0 bg-muted aspect-video flex items-center justify-center">
+            <CardHeader className="p-0 bg-muted aspect-video relative flex items-center justify-center overflow-hidden">
                 {asset.type === 'IMAGE' && !imageLoadFailed ? (
-                    <img
-                        src={asset.url}
-                        alt={asset.name}
-                        loading="lazy"
-                        className="object-cover aspect-video w-full h-full"
-                        onError={() => setImageLoadFailed(true)}
-                    />
+                    <>
+                        {!imageLoaded && <TypeIcon className="w-16 h-16 text-muted-foreground absolute" />}
+                        <img
+                            src={asset.url}
+                            alt=""
+                            loading="lazy"
+                            crossOrigin="anonymous"
+                            className={`object-cover aspect-video w-full h-full transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
+                            onLoad={() => setImageLoaded(true)}
+                            onError={() => setImageLoadFailed(true)}
+                        />
+                    </>
                 ) : (
                     <TypeIcon className="w-16 h-16 text-muted-foreground" />
                 )}

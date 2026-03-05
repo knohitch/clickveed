@@ -743,8 +743,10 @@ export class GoogleVeoClient {
       // Accept either prefixed model ids (googleai/...) or raw Vertex ids.
       const rawModel = model.includes('/') ? model.split('/').pop() || model : model;
       const normalizedModel = rawModel.replace(/-[a-f0-9]{8,}$/i, '');
+      // Try veo-2.0 first (generally available), then the requested model, then veo-3.0 last
+      // (veo-3.0 requires special Google Cloud allowlist access and is not publicly available)
       const candidateModels = Array.from(
-        new Set([rawModel, normalizedModel, 'veo-3.0-generate-001', 'veo-2.0-generate-001'].filter(Boolean))
+        new Set(['veo-2.0-generate-001', rawModel, normalizedModel, 'veo-3.0-generate-001'].filter(Boolean))
       );
 
       for (const vertexModel of candidateModels) {
@@ -847,6 +849,17 @@ export class GoogleVeoClient {
       if (axios.isAxiosError(error) && error.response) {
         console.error('[GoogleVeo] API Response:', error.response.data);
         throw formatAxiosErrorForUser('Google Veo API error', error);
+      }
+      // Strip raw HTML from any error message before surfacing to the user
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      const isHtml = rawMessage.includes('<!DOCTYPE') || rawMessage.includes('<html');
+      if (isHtml) {
+        throw new Error(
+          'Video generation failed: The Google Veo API returned an error page. ' +
+          'Please verify that (1) the Vertex AI API is enabled in your Google Cloud project, ' +
+          '(2) your project has been granted access to Veo models, and ' +
+          '(3) the correct Google Cloud Project ID and credentials are set in admin settings.'
+        );
       }
       throw error;
     }

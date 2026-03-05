@@ -5,7 +5,10 @@ const nextConfig = {
     
     // Optimize images - reduce processing
     images: {
-        domains: ['cdn.sanity.io', 'res.cloudinary.com', 'images.unsplash.com'],
+        remotePatterns: [
+            { protocol: 'https', hostname: '**' },
+            { protocol: 'http', hostname: '**' },
+        ],
         formats: ['image/webp'], // Only WebP to reduce build time
         deviceSizes: [640, 828], // Fewer sizes
         imageSizes: [16, 32, 48], // Fewer sizes

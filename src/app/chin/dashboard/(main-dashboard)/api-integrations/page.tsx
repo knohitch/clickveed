@@ -70,18 +70,79 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
 ];
 
 const LABEL_OVERRIDES: Record<string, string> = {
+  // --- Language Models ---
+  openai: 'OpenAI API Key',
+  azureOpenai: 'Azure OpenAI API Key',
+  openrouter: 'OpenRouter API Key',
+  huggingface: 'HuggingFace API Key',
+
+  // --- Image Generation ---
+  dalle: 'DALL-E API Key',
+  modelslab: 'ModelsLab API Key',
+
+  // --- Video Generation ---
+  heygen: 'HeyGen API Key',
+  runwayml: 'RunwayML API Key',
+  skyReels: 'SkyReels API Key',
+
+  // --- Audio / Speech ---
+  elevenlabs: 'ElevenLabs API Key',
+  azureTts: 'Azure TTS API Key',
+  myshell: 'MyShell API Key',
+  assemblyai: 'AssemblyAI API Key',
+  minimax: 'MiniMax API Key',
+
+  // --- Workflow ---
   n8n: 'n8n API Key',
-  xClientId: 'X (Twitter) Client ID',
-  xClientSecret: 'X (Twitter) Client Secret',
+
+  // --- Storage & CDN (these are NOT API keys — they are config values) ---
+  wasabiEndpoint: 'Wasabi Endpoint URL',
+  wasabiRegion: 'Wasabi Region',
+  wasabiBucket: 'Wasabi Bucket Name',
   wasabiAccessKey: 'Wasabi Access Key ID',
   wasabiSecretKey: 'Wasabi Secret Access Key',
+  bunnyCdnUrl: 'Bunny.net CDN URL (Optional)',
+
+  // --- Google Vertex Setup ---
+  googleCloudProjectId: 'Google Cloud Project ID',
+  googleApplicationCredentialsJson: 'Google Service Account JSON',
+
+  // --- Social OAuth (Client IDs/Secrets are not "API Keys") ---
+  googleClientId: 'Google Client ID',
+  googleClientSecret: 'Google Client Secret',
+  facebookClientId: 'Facebook Client ID',
+  facebookClientSecret: 'Facebook Client Secret',
+  instagramClientId: 'Instagram Client ID',
+  instagramClientSecret: 'Instagram Client Secret',
+  tiktokClientKey: 'TikTok Client Key',
+  tiktokClientSecret: 'TikTok Client Secret',
+  snapchatClientId: 'Snapchat Client ID',
+  snapchatClientSecret: 'Snapchat Client Secret',
+  whatsappClientId: 'WhatsApp Client ID',
+  whatsappClientSecret: 'WhatsApp Client Secret',
+  threadsClientId: 'Threads Client ID',
+  threadsClientSecret: 'Threads Client Secret',
+  linkedinClientId: 'LinkedIn Client ID',
+  linkedinClientSecret: 'LinkedIn Client Secret',
+  xClientId: 'X (Twitter) Client ID',
+  xClientSecret: 'X (Twitter) Client Secret',
+
+  // --- Payment Gateways ---
   stripePublishableKey: 'Stripe Publishable Key',
   stripeSecretKey: 'Stripe Secret Key',
   stripeWebhookSecret: 'Stripe Webhook Secret',
-  tiktokClientKey: 'TikTok Client Key',
-  tiktokClientSecret: 'TikTok Client Secret',
-  googleCloudProjectId: 'Google Cloud Project ID',
-  googleApplicationCredentialsJson: 'Google Service Account JSON',
+  paypalClientId: 'PayPal Client ID',
+  paypalClientSecret: 'PayPal Client Secret',
+  paystackPublicKey: 'Paystack Public Key',
+  paystackSecretKey: 'Paystack Secret Key',
+  flutterwavePublicKey: 'Flutterwave Public Key',
+  flutterwaveSecretKey: 'Flutterwave Secret Key',
+  braintreeMerchantId: 'Braintree Merchant ID',
+  braintreePublicKey: 'Braintree Public Key',
+  braintreePrivateKey: 'Braintree Private Key',
+  adyenClientKey: 'Adyen Client Key',
+  squareAppId: 'Square App ID',
+  squareAccessToken: 'Square Access Token',
 };
 
 function toHumanLabel(key: string): string {

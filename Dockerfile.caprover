@@ -49,6 +49,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Overwrite .prisma engines in both locations with the freshly-generated binaries.
+# This ensures the correct debian-openssl-3.0.x engine is present regardless of
+# what Next.js standalone mode may have bundled from the build context.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/startup.sh ./startup.sh
