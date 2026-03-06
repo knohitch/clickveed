@@ -353,6 +353,140 @@ function isMinimaxCreditOrSubscriptionError(error: unknown): boolean {
   );
 }
 
+function isMinimaxAuthError(error: unknown): boolean {
+  const errorMessage = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    errorMessage.includes('invalid api key') ||
+    errorMessage.includes('unauthorized') ||
+    errorMessage.includes('authentication') ||
+    errorMessage.includes('forbidden') ||
+    errorMessage.includes('401') ||
+    errorMessage.includes('403')
+  );
+}
+
+const geminiImageModelCache = new Map<string, { expiresAt: number; models: string[] }>();
+const GEMINI_IMAGE_MODEL_CACHE_TTL_MS = 30 * 60 * 1000;
+const GEMINI_LIST_MODELS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+function normalizeGoogleAiModel(model: string): string {
+  const value = model.trim();
+  if (!value) return value;
+  if (value.startsWith('googleai/')) return value;
+  if (value.startsWith('models/')) return `googleai/${value.slice('models/'.length)}`;
+  return `googleai/${value}`;
+}
+
+function toRawGoogleModel(model: string): string {
+  const value = model.trim();
+  if (!value) return value;
+  if (value.startsWith('googleai/')) return value.slice('googleai/'.length);
+  if (value.startsWith('models/')) return value.slice('models/'.length);
+  return value;
+}
+
+function uniqModels(models: string[]): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const model of models) {
+    const normalized = normalizeGoogleAiModel(model);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(normalized);
+  }
+  return ordered;
+}
+
+function isLikelyGeminiImageModel(model: string): boolean {
+  const raw = toRawGoogleModel(model).toLowerCase();
+  if (!raw.startsWith('gemini-')) return false;
+  if (raw.includes('embedding') || raw.includes('tts') || raw.includes('transcribe')) return false;
+  return raw.includes('image') || raw.includes('flash');
+}
+
+function scoreGeminiImageModel(model: string): number {
+  const raw = toRawGoogleModel(model).toLowerCase();
+  let score = 0;
+  if (raw.includes('image')) score += 100;
+  if (raw.includes('flash')) score += 30;
+  if (raw.includes('2.5')) score += 15;
+  if (raw.includes('2.0')) score += 5;
+  if (raw.includes('preview')) score -= 20;
+  if (raw.includes('exp')) score -= 15;
+  return score;
+}
+
+async function discoverGeminiImageModels(apiKey: string): Promise<string[]> {
+  const cacheKey = apiKey;
+  const cached = geminiImageModelCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.models;
+  }
+
+  try {
+    const response = await fetch(`${GEMINI_LIST_MODELS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini ListModels failed with status ${response.status}`);
+    }
+
+    const payload = await response.json() as {
+      models?: Array<{
+        name?: string;
+        supportedGenerationMethods?: string[];
+      }>;
+    };
+
+    const discovered = (payload.models || [])
+      .filter((model) => Array.isArray(model.supportedGenerationMethods) && model.supportedGenerationMethods.includes('generateContent'))
+      .map((model) => model.name || '')
+      .filter((name) => !!name)
+      .map((name) => normalizeGoogleAiModel(name))
+      .filter((name) => isLikelyGeminiImageModel(name))
+      .sort((a, b) => scoreGeminiImageModel(b) - scoreGeminiImageModel(a));
+
+    const models = uniqModels(discovered);
+    geminiImageModelCache.set(cacheKey, {
+      expiresAt: Date.now() + GEMINI_IMAGE_MODEL_CACHE_TTL_MS,
+      models,
+    });
+    return models;
+  } catch (error) {
+    console.warn('[Gemini Image Models] Discovery failed, using static fallbacks:', error);
+    return [];
+  }
+}
+
+async function getGeminiImageEditModelPool(apiKey: string, preferredModel: string): Promise<string[]> {
+  const configured = [
+    preferredModel,
+    MODEL_CONSTANTS.GEMINI_IMAGE_MODEL,
+    process.env.GEMINI_IMAGE_MODEL || '',
+    'googleai/gemini-2.5-flash-image',
+  ].filter(Boolean);
+
+  const discovered = await discoverGeminiImageModels(apiKey);
+  return uniqModels([...configured, ...discovered]);
+}
+
+function isGeminiModelCompatibilityError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes('404') ||
+    message.includes('400') ||
+    message.includes('not found') ||
+    message.includes('unsupported') ||
+    message.includes('does not support') ||
+    message.includes('response modalities') ||
+    message.includes('invalid argument')
+  );
+}
+
 // These functions create a new Genkit instance with the appropriate API keys
 // for each request, ensuring the correct provider is used
 // NOW WITH CIRCUIT BREAKER TRACKING AND QUOTA FALLBACK
@@ -545,6 +679,7 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
   const customProviders = ['replicate', 'stableDiffusion', 'midjourney', 'imagen'];
   let lastError: Error | null = null;
   let configuredCount = 0;
+  const attemptedModelsByProvider = new Map<string, Set<string>>();
   const setupBlockedProviders: string[] = [];
 
   const prompt = req.messages.map(msg => {
@@ -593,14 +728,47 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
       }
 
       const genkitInstance = createGenkitInstance({ [provider]: apiKey });
-      const result = await genkitInstance.generate({ ...req, model: candidate.model });
-      circuitBreaker.recordSuccess(provider);
-      markProviderHealthy(provider);
-      return {
-        ...(result as any),
-        provider,
-        model: candidate.model,
-      };
+      const attemptedModels = attemptedModelsByProvider.get(provider) || new Set<string>();
+      attemptedModelsByProvider.set(provider, attemptedModels);
+      const modelsToTry = provider === 'gemini'
+        ? await getGeminiImageEditModelPool(apiKey, candidate.model)
+        : [candidate.model];
+
+      let modelError: Error | null = null;
+      for (const model of modelsToTry) {
+        const normalizedModel = normalizeGoogleAiModel(model);
+        const modelKey = normalizedModel.toLowerCase();
+        if (attemptedModels.has(modelKey)) {
+          continue;
+        }
+        attemptedModels.add(modelKey);
+
+        try {
+          const result = await genkitInstance.generate({ ...req, model: normalizedModel });
+          circuitBreaker.recordSuccess(provider);
+          markProviderHealthy(provider);
+          return {
+            ...(result as any),
+            provider,
+            model: normalizedModel,
+          };
+        } catch (attemptError) {
+          modelError = attemptError instanceof Error ? attemptError : new Error(String(attemptError));
+          if (isQuotaError(attemptError)) {
+            throw modelError;
+          }
+          if (provider === 'gemini' && isGeminiModelCompatibilityError(attemptError)) {
+            logFallback('image', provider, `model_incompatible:${normalizedModel}`);
+            continue;
+          }
+          continue;
+        }
+      }
+
+      if (modelError) {
+        throw modelError;
+      }
+      throw new Error(`No compatible image model found for provider ${provider}`);
     } catch (error) {
       circuitBreaker.recordFailure(provider);
       markProviderUnhealthy(provider, error instanceof Error ? error.message : 'Unknown error');
@@ -645,6 +813,7 @@ export async function generateImageEditWithProvider(input: { prompt: string; ima
 
   let lastError: Error | null = null;
   let configuredCount = 0;
+  const attemptedModelsByProvider = new Map<string, Set<string>>();
 
   for (const candidate of candidates) {
     const provider = candidate.name;
@@ -670,44 +839,73 @@ export async function generateImageEditWithProvider(input: { prompt: string; ima
 
     try {
       const genkitInstance = createGenkitInstance({ [provider]: apiKey });
+      const attemptedModels = attemptedModelsByProvider.get(provider) || new Set<string>();
+      attemptedModelsByProvider.set(provider, attemptedModels);
+      const modelsToTry = provider === 'gemini'
+        ? await getGeminiImageEditModelPool(apiKey, candidate.model)
+        : [candidate.model];
 
-      const runGenerate = async (modalities: Array<'TEXT' | 'IMAGE' | 'AUDIO'>) =>
-        genkitInstance.generate({
-          model: candidate.model,
-          prompt: [
-            { text: input.prompt },
-            { media: { url: input.imageDataUri } },
-          ],
-          config: { responseModalities: modalities },
-        });
+      for (const model of modelsToTry) {
+        const normalizedModel = normalizeGoogleAiModel(model);
+        const modelKey = normalizedModel.toLowerCase();
+        if (attemptedModels.has(modelKey)) {
+          continue;
+        }
+        attemptedModels.add(modelKey);
 
-      // First attempt: image-only response.
-      let result = await runGenerate(['IMAGE']);
+        try {
+          const runGenerate = async (modalities: Array<'TEXT' | 'IMAGE' | 'AUDIO'>) =>
+            genkitInstance.generate({
+              model: normalizedModel,
+              prompt: [
+                { text: input.prompt },
+                { media: { url: input.imageDataUri } },
+              ],
+              config: { responseModalities: modalities },
+            });
 
-      // Fallback modality: some models only return images in mixed TEXT+IMAGE mode.
-      if (!hasMediaOutput(result)) {
-        result = await runGenerate(['TEXT', 'IMAGE']);
+          let result = await runGenerate(['IMAGE']);
+          if (!hasMediaOutput(result)) {
+            result = await runGenerate(['TEXT', 'IMAGE']);
+          }
+
+          if (!hasMediaOutput(result)) {
+            lastError = new Error(`Model ${normalizedModel} returned no image output`);
+            continue;
+          }
+
+          circuitBreaker.recordSuccess(provider);
+          markProviderHealthy(provider);
+          return {
+            ...(result as any),
+            provider,
+            model: normalizedModel,
+          };
+        } catch (modelError) {
+          const modelErrorObj = modelError instanceof Error ? modelError : new Error(String(modelError));
+          lastError = modelErrorObj;
+          if (provider === 'gemini' && isGeminiModelCompatibilityError(modelError)) {
+            logFallback('image_edit', provider, `model_incompatible:${normalizedModel}`);
+            continue;
+          }
+          logFallback('image_edit', provider, isQuotaError(modelError) ? 'quota_or_rate_limit' : 'provider_error');
+          continue;
+        }
       }
 
-      if (!hasMediaOutput(result)) {
-        // This model returned no image — treat as a soft failure and try next candidate.
-        logProviderSkip('image_edit', provider, 'unsupported_capability');
-        lastError = new Error(`Model ${candidate.model} returned no image output`);
-        continue;
+      if (!lastError) {
+        lastError = new Error(`No compatible model found for provider ${provider}`);
       }
-
-      circuitBreaker.recordSuccess(provider);
-      markProviderHealthy(provider);
-      return {
-        ...(result as any),
-        provider,
-        model: candidate.model,
-      };
+      throw lastError;
     } catch (error) {
       circuitBreaker.recordFailure(provider);
       markProviderUnhealthy(provider, error instanceof Error ? error.message : 'Unknown error');
-      logFallback('image_edit', provider, isQuotaError(error) ? 'quota_or_rate_limit' : 'provider_error');
       lastError = error instanceof Error ? error : new Error(String(error));
+      if (isQuotaError(error)) {
+        logFallback('image_edit', provider, 'quota_or_rate_limit');
+        continue;
+      }
+      logFallback('image_edit', provider, 'provider_error');
       continue;
     }
   }
@@ -851,8 +1049,12 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
     markProviderUnhealthy('minimax', error instanceof Error ? error.message : 'Unknown error');
     console.error('Error generating TTS with minimax:', error);
 
-    if (hasElevenLabsKey && isMinimaxCreditOrSubscriptionError(error)) {
-      logFallback('tts', 'minimax', 'credits_or_subscription');
+    if (hasElevenLabsKey && (isMinimaxCreditOrSubscriptionError(error) || isMinimaxAuthError(error))) {
+      logFallback(
+        'tts',
+        'minimax',
+        isMinimaxAuthError(error) ? 'auth_error' : 'credits_or_subscription'
+      );
       try {
         return await callCustomTtsProvider('elevenlabs');
       } catch (fallbackError) {
@@ -955,3 +1157,4 @@ Return your response as a JSON object.`;
     }
   }
 }
+

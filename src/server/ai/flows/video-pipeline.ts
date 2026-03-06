@@ -6,7 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import wav from 'wav';
-import { generateTtsWithProvider, generateStructuredOutput, generateImageWithProvider } from '@/lib/ai/api-service-manager';
+import { generateTtsWithProvider, generateStructuredOutput, generateImageWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -187,24 +187,31 @@ export async function generatePipelineVideo(input: GeneratePipelineVideoInput): 
     }
 
 
-    // Import the video generation function
-    const { generateVideoFromImage } = await import('./generate-video-from-image');
+    // Generate video through provider router (VEO first based on provider-registry priority).
+    // Do not invoke TTS here; voice generation is handled in Step 2.
+    const videoResponse: any = await generateVideoWithProvider({
+      messages: [{ role: 'user' as const, content: [{ text: `${visualPrompt}\nImage: ${placeholderImageUrl}` }] }],
+    });
 
-    try {
-      // Generate video using the real video generation API
-      const result = await generateVideoFromImage({
-        photoUrl: placeholderImageUrl,
-        musicPrompt: "Energetic background music",
-        videoDescription: visualPrompt
-      });
-
-      return {
-        videoUrl: result.videoUrl,
-      };
-    } catch (error) {
-      console.error("Video generation failed:", error);
-      throw new Error(`Failed to generate video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const videoText = videoResponse?.result?.content?.[0]?.text || '';
+    const videoUrl = videoText.replace('Video generated: ', '').trim();
+    if (!videoUrl) {
+      throw new Error('Video generation failed. No video URL was returned.');
     }
+
+    await prisma.mediaAsset.create({
+      data: {
+        name: `Pipeline Video: ${visualPrompt.substring(0, 30)}...`,
+        type: 'VIDEO',
+        url: videoUrl,
+        size: 0,
+        userId: session.user.id,
+      },
+    });
+
+    return {
+      videoUrl,
+    };
   } catch (error) {
     console.error('Pipeline video generation failed:', error);
     throw new Error(`Pipeline video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

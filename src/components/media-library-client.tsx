@@ -14,6 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 
 type AssetTypeFilter = 'all' | 'IMAGE' | 'VIDEO' | 'AUDIO';
 
+function getAssetLabel(asset: MediaAssetType): string {
+    const extensionMatch = asset.name.match(/\.([a-z0-9]+)$/i);
+    const extension = extensionMatch?.[1]?.toUpperCase();
+    const typeLabel = asset.type === 'IMAGE' ? 'Image' : asset.type === 'VIDEO' ? 'Video' : 'Audio';
+    return extension ? `${typeLabel} (${extension})` : typeLabel;
+}
+
 const AssetCard = ({
     asset,
     onDelete,
@@ -76,6 +83,8 @@ const AssetCard = ({
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                     <TypeIcon className="h-4 w-4" />
+                    <span>{getAssetLabel(asset)}</span>
+                    <span className="text-xs">&bull;</span>
                     <span>{asset.size.toFixed(2)} MB</span>
                     <span className="text-xs">&bull;</span>
                     <span>{asset.createdAt}</span>

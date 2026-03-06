@@ -50,10 +50,32 @@ function resolveModel(envValue: string | undefined, fallback: string): string {
   return value && value.length > 0 ? value : fallback;
 }
 
+function normalizeGeminiImageModel(model: string): string {
+  const value = model.trim().toLowerCase();
+  const unsupported = new Set([
+    'googleai/gemini-2.5-flash-preview-04-17',
+    'gemini-2.5-flash-preview-04-17',
+    'googleai/gemini-2.0-flash',
+    'gemini-2.0-flash',
+    'googleai/gemini-2.0-flash-exp',
+    'gemini-2.0-flash-exp',
+    'googleai/gemini-2.0-flash-generate-image',
+    'gemini-2.0-flash-generate-image',
+  ]);
+
+  if (unsupported.has(value)) {
+    return 'googleai/gemini-2.5-flash-image';
+  }
+
+  return model;
+}
+
 export const MODEL_CONSTANTS = {
   // Use model aliases / env overrides so model upgrades do not require code changes.
   GEMINI_TEXT_MODEL: resolveModel(process.env.GEMINI_TEXT_MODEL, 'googleai/gemini-flash-latest'),
-  GEMINI_IMAGE_MODEL: resolveModel(process.env.GEMINI_IMAGE_MODEL, 'googleai/gemini-2.0-flash-exp'),
+  GEMINI_IMAGE_MODEL: normalizeGeminiImageModel(
+    resolveModel(process.env.GEMINI_IMAGE_MODEL, 'googleai/gemini-2.5-flash-image')
+  ),
   IMAGEN_IMAGE_MODEL: resolveModel(process.env.IMAGEN_IMAGE_MODEL, 'googleai/imagen-4.0-generate-001'),
   GEMINI_VIDEO_MODEL: resolveModel(process.env.GEMINI_VIDEO_MODEL, 'googleai/veo-2.0-generate-001'),
   CLAUDE_TEXT_MODEL: 'anthropic/claude-3-5-sonnet',
@@ -92,8 +114,7 @@ const defs: ProviderDefinition[] = [
   // automatically falls back to the next model if the current one stops
   // supporting image output or becomes unavailable.
   { name: 'gemini', capability: 'image_edit', priority: 1, model: MODEL_CONSTANTS.GEMINI_IMAGE_MODEL, implemented: true },
-  { name: 'gemini', capability: 'image_edit', priority: 2, model: 'googleai/gemini-2.5-flash-preview-04-17', implemented: true },
-  { name: 'gemini', capability: 'image_edit', priority: 3, model: 'googleai/gemini-2.0-flash', implemented: true },
+  { name: 'gemini', capability: 'image_edit', priority: 2, model: 'googleai/gemini-2.5-flash-image', implemented: true },
 
   // Video
   { name: 'googleVeo', capability: 'video', priority: 1, model: MODEL_CONSTANTS.GEMINI_VIDEO_MODEL, implemented: true },

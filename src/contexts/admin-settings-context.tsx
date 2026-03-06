@@ -157,38 +157,96 @@ const initialSettings: AllSettings = {
     emailTemplates: defaultEmailTemplates,
 }
 
+const SETTINGS_LOAD_TIMEOUT_MS = 12000;
+
+function mergeFetchedSettings(
+  previous: AllSettings,
+  fetchedSettings: Partial<AllSettings> & { apiKeys?: ApiKeys }
+): AllSettings {
+  return {
+    ...previous,
+    ...fetchedSettings,
+    apiKeys: { ...initialApiKeysObject, ...(fetchedSettings.apiKeys || {}) },
+  };
+}
+
 export function AdminSettingsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<AllSettings>(initialSettings);
   
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchSettings() {
+      if (!isMounted) return;
       setLoading(true);
+
+      const settingsPromise = getAdminSettings();
+
+      // Prevent infinite skeleton state if server action stalls in production.
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), SETTINGS_LOAD_TIMEOUT_MS)
+      );
+
       try {
-        const fetchedSettings = await getAdminSettings();
-        setSettings(prev => ({
-            ...prev,
-            ...fetchedSettings,
-            apiKeys: { ...initialApiKeysObject, ...fetchedSettings.apiKeys }
-        }));
+        const firstResult = await Promise.race([settingsPromise, timeoutPromise]);
+        if (firstResult && isMounted) {
+          setSettings((prev) =>
+            mergeFetchedSettings(prev, firstResult as Partial<AllSettings> & { apiKeys?: ApiKeys })
+          );
+        } else {
+          console.warn(
+            `[AdminSettings] Initial settings load timed out after ${SETTINGS_LOAD_TIMEOUT_MS}ms. ` +
+            'Continuing with defaults and waiting for late response.'
+          );
+          // Late hydration: if server responds after timeout, update state without blocking UI.
+          settingsPromise
+            .then((lateSettings) => {
+              if (!isMounted) return;
+              setSettings((prev) =>
+                mergeFetchedSettings(prev, lateSettings as Partial<AllSettings> & { apiKeys?: ApiKeys })
+              );
+            })
+            .catch((error) => {
+              console.error('[AdminSettings] Late settings load failed:', error);
+            });
+        }
       } catch (error) {
         console.error("Failed to fetch admin settings:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setLoading((current) => {
+        if (current) {
+          console.warn('[AdminSettings] Loading watchdog triggered. Forcing loading=false.');
+          return false;
+        }
+        return current;
+      });
+    }, SETTINGS_LOAD_TIMEOUT_MS + 8000);
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Function to refetch settings from server
   const refetchSettings = useCallback(async () => {
     try {
       const fetchedSettings = await getAdminSettings();
-      setSettings(prev => ({
-        ...prev,
-        ...fetchedSettings,
-        apiKeys: { ...initialApiKeysObject, ...fetchedSettings.apiKeys }
-      }));
+      setSettings((prev) =>
+        mergeFetchedSettings(prev, fetchedSettings as Partial<AllSettings> & { apiKeys?: ApiKeys })
+      );
       console.log('[AdminSettings] Settings refetched from server');
     } catch (error) {
       console.error('[AdminSettings] Failed to refetch settings:', error);
