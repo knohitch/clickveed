@@ -10,11 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit --no-fund --omit=optional
+    npm ci --prefer-offline --no-audit --no-fund
 
 FROM base AS builder
-ARG BUILD_MAX_OLD_SPACE_SIZE=4608
-ARG NEXT_DISABLE_SWC_WORKER=0
+ARG BUILD_MAX_OLD_SPACE_SIZE=3072
+ARG NEXT_DISABLE_SWC_WORKER=1
 ARG NEXT_PRIVATE_BUILD_WORKER=0
 
 ENV NODE_ENV=production
@@ -27,7 +27,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 RUN ./node_modules/.bin/prisma generate
-RUN npm run build:docker
+RUN npm run build:docker || \
+    (echo "Retrying build with stricter memory settings..." && \
+     NODE_OPTIONS=--max-old-space-size=2560 NEXT_DISABLE_SWC_WORKER=1 NEXT_PRIVATE_BUILD_WORKER=0 npm run build:docker)
 RUN test -f /app/.next/standalone/server.js
 
 FROM node:20-bookworm-slim AS runner

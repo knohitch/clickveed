@@ -41,11 +41,8 @@ const nextConfig = {
     // Aggressive memory optimizations for 8GB VPS
     experimental: {
         serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
-        swcMinify: true,
         swcPlugins: [],
-        swcLoader: false,
         swcTraceProfiling: false,
-        swcMemoryLimit: 512, // 512MB limit for SWC
         workerThreads: false, // Disable worker threads
         cpus: 1, // Use only 1 CPU core
     },
