@@ -676,7 +676,7 @@ export async function generateImageWithProvider(req: Omit<GenerateRequest, 'mode
   const { apiKeys } = await getAdminSettings();
   const candidates = getProvidersForCapability('image')
     .filter((p) => p.implemented && providerSupportsCapability(p.name, 'image'));
-  const customProviders = ['replicate', 'stableDiffusion', 'midjourney', 'imagen'];
+  const customProviders = ['fal', 'replicate', 'stableDiffusion', 'midjourney', 'imagen'];
   let lastError: Error | null = null;
   let configuredCount = 0;
   const attemptedModelsByProvider = new Map<string, Set<string>>();
@@ -921,7 +921,7 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
   const { apiKeys } = await getAdminSettings();
   const candidates = getProvidersForCapability('video')
     .filter((p) => p.implemented && providerSupportsCapability(p.name, 'video'));
-  const customProviders = ['heygen', 'kling', 'modelscope', 'seedance', 'wan', 'googleVeo'];
+  const customProviders = ['minimax', 'runwayml', 'pika', 'fal', 'heygen', 'kling', 'modelscope', 'seedance', 'wan', 'googleVeo'];
 
   let lastError: Error | null = null;
   let configuredCount = 0;
@@ -1013,7 +1013,7 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
     return typeof msg.content === 'string' ? msg.content : '';
   }).join(' ');
 
-  const callCustomTtsProvider = async (provider: 'minimax' | 'elevenlabs') => {
+  const callCustomTtsProvider = async (provider: 'awsPolly' | 'elevenlabs') => {
     const providerInfo = getProvidersForCapability('tts').find((p) => p.name === provider);
     const client = await createProviderClient(provider);
     const response = await client.generateSpeech(text, undefined, providerInfo?.model);
@@ -1030,37 +1030,33 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
     };
   };
 
-  const hasMinimaxKey = !!apiKeys.minimax;
+  const hasAwsPollyKey = !!apiKeys.awsPolly;
   const hasElevenLabsKey = !!apiKeys.elevenlabs;
 
-  // Policy: Minimax is primary for all TTS/audio generation.
-  // ElevenLabs is used only if Minimax key is missing, or Minimax has credit/subscription exhaustion.
-  if (!hasMinimaxKey) {
+  // Policy: AWS Polly is primary for all TTS/audio generation.
+  // ElevenLabs is fallback.
+  if (!hasAwsPollyKey) {
     if (!hasElevenLabsKey) {
-      throw new Error('No TTS provider configured. Add Minimax API key (primary) or ElevenLabs API key (fallback).');
+      throw new Error('No TTS provider configured. Add AWS Polly (primary) or ElevenLabs API key (fallback).');
     }
     return callCustomTtsProvider('elevenlabs');
   }
 
   try {
-    return await callCustomTtsProvider('minimax');
+    return await callCustomTtsProvider('awsPolly');
   } catch (error) {
-    circuitBreaker.recordFailure('minimax');
-    markProviderUnhealthy('minimax', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Error generating TTS with minimax:', error);
+    circuitBreaker.recordFailure('awsPolly');
+    markProviderUnhealthy('awsPolly', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error generating TTS with AWS Polly:', error);
 
-    if (hasElevenLabsKey && (isMinimaxCreditOrSubscriptionError(error) || isMinimaxAuthError(error))) {
-      logFallback(
-        'tts',
-        'minimax',
-        isMinimaxAuthError(error) ? 'auth_error' : 'credits_or_subscription'
-      );
+    if (hasElevenLabsKey) {
+      logFallback('tts', 'awsPolly', 'provider_error');
       try {
         return await callCustomTtsProvider('elevenlabs');
       } catch (fallbackError) {
         circuitBreaker.recordFailure('elevenlabs');
         markProviderUnhealthy('elevenlabs', fallbackError instanceof Error ? fallbackError.message : 'Unknown error');
-        console.error('Error generating TTS with elevenlabs fallback:', fallbackError);
+        console.error('Error generating TTS with ElevenLabs fallback:', fallbackError);
         throw fallbackError;
       }
     }

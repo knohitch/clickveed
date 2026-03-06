@@ -31,8 +31,12 @@ export type ProviderName =
   | 'stableVideo'
   | 'animateDiff'
   | 'videoFusion'
+  | 'fal'
   | 'minimax'
+  | 'runwayml'
+  | 'pika'
   | 'elevenlabs'
+  | 'awsPolly'
   | 'azureTts'
   | 'myshell'
   | 'coqui';
@@ -78,6 +82,9 @@ export const MODEL_CONSTANTS = {
   ),
   IMAGEN_IMAGE_MODEL: resolveModel(process.env.IMAGEN_IMAGE_MODEL, 'googleai/imagen-4.0-generate-001'),
   GEMINI_VIDEO_MODEL: resolveModel(process.env.GEMINI_VIDEO_MODEL, 'googleai/veo-2.0-generate-001'),
+  MINIMAX_VIDEO_MODEL: resolveModel(process.env.MINIMAX_VIDEO_MODEL, 't2v-01'),
+  FAL_IMAGE_MODEL: resolveModel(process.env.FAL_IMAGE_MODEL, 'fal-ai/flux/schnell'),
+  FAL_VIDEO_MODEL: resolveModel(process.env.FAL_VIDEO_MODEL, 'fal-ai/animatediff'),
   CLAUDE_TEXT_MODEL: 'anthropic/claude-3-5-sonnet',
 } as const;
 
@@ -101,13 +108,14 @@ const defs: ProviderDefinition[] = [
   { name: 'claude', capability: 'text_stream', priority: 4, model: MODEL_CONSTANTS.CLAUDE_TEXT_MODEL, implemented: false },
 
   // Image
-  { name: 'imagen', capability: 'image', priority: 1, model: MODEL_CONSTANTS.IMAGEN_IMAGE_MODEL, implemented: true },
-  { name: 'stableDiffusion', capability: 'image', priority: 2, model: 'openai/gpt-4o', implemented: false },
-  { name: 'replicate', capability: 'image', priority: 3, model: 'openai/gpt-4o', implemented: true },
-  { name: 'gemini', capability: 'image', priority: 4, model: MODEL_CONSTANTS.GEMINI_IMAGE_MODEL, implemented: true },
-  { name: 'dreamstudio', capability: 'image', priority: 5, model: 'openai/gpt-4o', implemented: false },
-  { name: 'midjourney', capability: 'image', priority: 6, model: 'openai/gpt-4o', implemented: false },
-  { name: 'modelslab', capability: 'image', priority: 7, model: 'openai/gpt-4o', implemented: false },
+  { name: 'fal', capability: 'image', priority: 1, model: MODEL_CONSTANTS.FAL_IMAGE_MODEL, implemented: true },
+  { name: 'imagen', capability: 'image', priority: 2, model: MODEL_CONSTANTS.IMAGEN_IMAGE_MODEL, implemented: true },
+  { name: 'stableDiffusion', capability: 'image', priority: 3, model: 'openai/gpt-4o', implemented: false },
+  { name: 'replicate', capability: 'image', priority: 4, model: 'openai/gpt-4o', implemented: true },
+  { name: 'gemini', capability: 'image', priority: 5, model: MODEL_CONSTANTS.GEMINI_IMAGE_MODEL, implemented: true },
+  { name: 'dreamstudio', capability: 'image', priority: 6, model: 'openai/gpt-4o', implemented: false },
+  { name: 'midjourney', capability: 'image', priority: 7, model: 'openai/gpt-4o', implemented: false },
+  { name: 'modelslab', capability: 'image', priority: 8, model: 'openai/gpt-4o', implemented: false },
 
   // Image editing (background removal, masking).
   // Multiple Gemini model variants listed in priority order so the system
@@ -117,18 +125,22 @@ const defs: ProviderDefinition[] = [
   { name: 'gemini', capability: 'image_edit', priority: 2, model: 'googleai/gemini-2.5-flash-image', implemented: true },
 
   // Video
-  { name: 'googleVeo', capability: 'video', priority: 1, model: MODEL_CONSTANTS.GEMINI_VIDEO_MODEL, implemented: true },
-  { name: 'seedance', capability: 'video', priority: 2, model: 'openai/gpt-4o', implemented: true },
-  { name: 'kling', capability: 'video', priority: 3, model: 'openai/gpt-4o', implemented: false },
-  { name: 'heygen', capability: 'video', priority: 4, model: 'openai/gpt-4o', implemented: true },
-  { name: 'wan', capability: 'video', priority: 5, model: 'openai/gpt-4o', implemented: true },
-  { name: 'modelscope', capability: 'video', priority: 6, model: 'openai/gpt-4o', implemented: false },
-  { name: 'stableVideo', capability: 'video', priority: 7, model: 'openai/gpt-4o', implemented: false },
-  { name: 'animateDiff', capability: 'video', priority: 8, model: 'openai/gpt-4o', implemented: false },
-  { name: 'videoFusion', capability: 'video', priority: 9, model: 'openai/gpt-4o', implemented: false },
+  { name: 'minimax', capability: 'video', priority: 1, model: MODEL_CONSTANTS.MINIMAX_VIDEO_MODEL, implemented: true },
+  { name: 'runwayml', capability: 'video', priority: 2, model: 'runwayml-image-to-video', implemented: true },
+  { name: 'pika', capability: 'video', priority: 3, model: 'pika-image-to-video', implemented: true },
+  { name: 'fal', capability: 'video', priority: 4, model: MODEL_CONSTANTS.FAL_VIDEO_MODEL, implemented: true },
+  { name: 'googleVeo', capability: 'video', priority: 5, model: MODEL_CONSTANTS.GEMINI_VIDEO_MODEL, implemented: true },
+  { name: 'seedance', capability: 'video', priority: 6, model: 'openai/gpt-4o', implemented: true },
+  { name: 'kling', capability: 'video', priority: 7, model: 'openai/gpt-4o', implemented: false },
+  { name: 'heygen', capability: 'video', priority: 8, model: 'openai/gpt-4o', implemented: true },
+  { name: 'wan', capability: 'video', priority: 9, model: 'openai/gpt-4o', implemented: true },
+  { name: 'modelscope', capability: 'video', priority: 10, model: 'openai/gpt-4o', implemented: false },
+  { name: 'stableVideo', capability: 'video', priority: 11, model: 'openai/gpt-4o', implemented: false },
+  { name: 'animateDiff', capability: 'video', priority: 12, model: 'openai/gpt-4o', implemented: false },
+  { name: 'videoFusion', capability: 'video', priority: 13, model: 'openai/gpt-4o', implemented: false },
 
   // TTS
-  { name: 'minimax', capability: 'tts', priority: 1, model: 'minimax', implemented: true },
+  { name: 'awsPolly', capability: 'tts', priority: 1, model: 'neural', implemented: true },
   { name: 'elevenlabs', capability: 'tts', priority: 2, model: 'elevenlabs', implemented: true },
   { name: 'gemini', capability: 'tts', priority: 3, model: MODEL_CONSTANTS.GEMINI_TEXT_MODEL, implemented: true },
   { name: 'azureTts', capability: 'tts', priority: 4, model: 'openai/gpt-4o', implemented: false },

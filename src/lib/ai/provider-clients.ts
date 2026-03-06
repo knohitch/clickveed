@@ -5,6 +5,10 @@
 
 import OpenAI from 'openai';
 import axios from 'axios';
+import AWS from 'aws-sdk';
+
+import { generateAndWaitForVideo as generateRunwayVideoFromImage } from '@/lib/runwayml-client';
+import { generateAndWaitForVideo as generatePikaVideoFromImage } from '@/lib/pika-client';
 
 // Define types for our responses
 interface TextGenerationResponse {
@@ -224,12 +228,16 @@ const PROVIDER_CAPABILITY_SUPPORT: Record<string, AICapability[]> = {
   claude: ['text'],
   huggingface: ['text'],
   imagen: ['image'],
+  fal: ['image', 'video'],
   replicate: ['image'],
   googleVeo: ['video'],
   seedance: ['video'],
+  runwayml: ['video'],
+  pika: ['video'],
   heygen: ['video'],
   wan: ['video'],
-  minimax: ['tts'],
+  minimax: ['tts', 'video'],
+  awsPolly: ['tts'],
   elevenlabs: ['tts'],
 };
 
@@ -531,13 +539,217 @@ export class ElevenLabsClient {
   }
 }
 
-// Minimax TTS Client
+function parseAwsPollyCredentials(apiKey: string) {
+  const direct = String(apiKey || '').trim();
+  try {
+    const parsed = JSON.parse(direct) as {
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      region?: string;
+      voiceId?: string;
+    };
+
+    if (parsed?.accessKeyId && parsed?.secretAccessKey) {
+      return {
+        accessKeyId: parsed.accessKeyId,
+        secretAccessKey: parsed.secretAccessKey,
+        region: parsed.region || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+        voiceId: parsed.voiceId,
+      };
+    }
+  } catch {
+    // fall through for non-JSON keys
+  }
+
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_SECRET_KEY || '';
+  return {
+    accessKeyId: direct,
+    secretAccessKey,
+    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+    voiceId: process.env.AWS_POLLY_VOICE_ID,
+  };
+}
+
+// AWS Polly Client
+class AwsPollyClient {
+  private polly: AWS.Polly;
+  private defaultVoiceId: string;
+  private region: string;
+
+  constructor(apiKey: string) {
+    if (!apiKey || !apiKey.trim()) {
+      throw new Error('AWS Polly credentials are required');
+    }
+
+    const credentials = parseAwsPollyCredentials(apiKey);
+    if (!credentials.accessKeyId || !credentials.secretAccessKey) {
+      throw new Error(
+        'AWS Polly credentials incomplete. Use JSON string with accessKeyId and secretAccessKey, or set AWS_* env vars.'
+      );
+    }
+
+    this.defaultVoiceId = credentials.voiceId || process.env.AWS_POLLY_VOICE_ID || 'Joanna';
+    this.region = credentials.region || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+    this.polly = new AWS.Polly({
+      region: this.region,
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+    });
+  }
+
+  async generateSpeech(text: string, voiceId: string = this.defaultVoiceId, model: string = 'neural'): Promise<TTSResponse> {
+    try {
+      const response = await this.polly
+        .synthesizeSpeech({
+          Engine: model === 'standard' ? 'standard' : 'neural',
+          OutputFormat: 'mp3',
+          TextType: 'text',
+          VoiceId: voiceId || this.defaultVoiceId,
+          Text: text,
+        })
+        .promise();
+
+      if (!response.AudioStream) {
+        throw new Error('AWS Polly returned no audio payload');
+      }
+
+      const audioStream = response.AudioStream as unknown;
+      let audioBuffer: Buffer;
+
+      if (Buffer.isBuffer(audioStream)) {
+        audioBuffer = audioStream;
+      } else if (typeof audioStream === 'string') {
+        audioBuffer = Buffer.from(audioStream);
+      } else if ((audioStream as any)[Symbol.asyncIterator]) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of audioStream as AsyncIterable<Buffer>) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+        audioBuffer = Buffer.concat(chunks);
+      } else {
+        throw new Error('AWS Polly returned audio stream in an unsupported format');
+      }
+
+      if (!audioBuffer.length) {
+        throw new Error('AWS Polly returned empty audio payload');
+      }
+
+      const audioDataUri = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const { publicUrl } = await uploadToWasabi(audioDataUri, 'audio');
+
+      return {
+        audioUrl: publicUrl,
+        model,
+        provider: 'awsPolly'
+      };
+    } catch (error) {
+      console.error('[AWS Polly] TTS error:', error);
+      throw error;
+    }
+  }
+}
+
+// Minimax (Hailuo) Client
 export class MinimaxClient {
   private apiKey: string;
-  private baseUrl: string = 'https://api.minimax.chat/v1';
+  private baseUrl: string = 'https://api.minimax.io/v1';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+  }
+
+  async generateVideo(prompt: string, model: string = 't2v-01'): Promise<VideoGenerationResponse> {
+    try {
+      const startResponse = await axios.post(
+        `${this.baseUrl}/video_generation`,
+        {
+          model,
+          prompt,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 45000,
+        }
+      );
+
+      const directVideoUrl =
+        startResponse.data?.video_url ||
+        startResponse.data?.videoUrl ||
+        startResponse.data?.data?.video_url ||
+        startResponse.data?.result?.video_url;
+
+      if (directVideoUrl) {
+        const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+        const videoResponse = await fetch(directVideoUrl);
+        const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+        const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+        const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
+        return {
+          videoUrl: publicUrl,
+          model,
+          provider: 'minimax',
+        };
+      }
+
+      const taskId = startResponse.data?.task_id || startResponse.data?.id || startResponse.data?.data?.id;
+      if (!taskId) {
+        throw new Error('MiniMax Hailuo did not return a task id or direct URL');
+      }
+
+      const taskResult = await this.pollVideoTask(taskId);
+      const taskVideoUrl =
+        taskResult?.video_url ||
+        taskResult?.videoUrl ||
+        taskResult?.result?.video_url ||
+        taskResult?.result?.video?.url;
+
+      if (!taskVideoUrl) {
+        throw new Error('MiniMax Hailuo task completed without a video URL');
+      }
+
+      const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+      const videoResponse = await fetch(taskVideoUrl);
+      const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+      const videoDataUri = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+      const { publicUrl } = await uploadToWasabi(videoDataUri, 'videos');
+
+      return {
+        videoUrl: publicUrl,
+        model,
+        provider: 'minimax',
+      };
+    } catch (error) {
+      console.error('[MiniMax Hailuo] Video generation error:', error);
+      throw error;
+    }
+  }
+
+  private async pollVideoTask(taskId: string, maxAttempts = 80, intervalMs = 5000): Promise<any> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+
+      const response = await axios.get(`${this.baseUrl}/video_generation/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const status = String(response.data?.status || '').toLowerCase();
+      if (status === 'succeeded' || status === 'completed' || status === 'finished') {
+        return response.data;
+      }
+
+      if (status === 'failed' || status === 'error') {
+        throw new Error(`MiniMax Hailuo task failed: ${response.data?.message || response.data?.error || status}`);
+      }
+    }
+
+    throw new Error('MiniMax Hailuo video generation timed out');
   }
 
   async generateSpeech(text: string, voiceId: string = 'female-tianmei', model: string = 'speech-01'): Promise<TTSResponse> {
@@ -938,6 +1150,263 @@ export class ReplicateClient {
   }
 }
 
+// Fal AI Client
+class FalClient {
+  private apiKey: string;
+  private baseUrl: string = 'https://fal.run';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  private getHeaders() {
+    return {
+      'Authorization': `Key ${this.apiKey}`,
+      'x-api-key': this.apiKey,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  private parsePrompt(prompt: string): { prompt: string; imageUrl?: string } {
+    const imageMatch = prompt.match(/Image:\s*(https?:\/\/\S+)/i) || prompt.match(/image[_-]url:\s*(https?:\/\/\S+)/i);
+    if (!imageMatch) {
+      return { prompt };
+    }
+
+    return {
+      prompt: prompt.replace(imageMatch[0], '').replace(/\s+$/, '').trim(),
+      imageUrl: imageMatch[1],
+    };
+  }
+
+  private pickMediaUrl(payload: any, kind: 'image' | 'video'): string | null {
+    const candidates = kind === 'image'
+      ? [
+          payload?.images?.[0]?.url,
+          payload?.image?.url,
+          payload?.output?.image_url,
+          payload?.output?.images?.[0]?.url,
+          payload?.url,
+        ]
+      : [
+          payload?.video_url,
+          payload?.videoUrl,
+          payload?.output?.video_url,
+          payload?.output?.videoUrl,
+          payload?.video?.url,
+          payload?.output?.video?.url,
+          payload?.url,
+        ];
+
+    return candidates.find((value) => typeof value === 'string' && value.startsWith('http')) || null;
+  }
+
+  private async uploadMedia(mediaUrl: string, kind: 'image' | 'video'): Promise<string> {
+    const response = await fetch(mediaUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    const mediaBuffer = Buffer.from(arrayBuffer);
+    const dataUri = `${kind === 'image' ? 'data:image/png;base64,' : 'data:video/mp4;base64,'}${mediaBuffer.toString('base64')}`;
+    const { uploadToWasabi } = await import('@/server/services/wasabi-service');
+    const { publicUrl } = await uploadToWasabi(dataUri, kind === 'image' ? 'images' : 'videos');
+    return publicUrl;
+  }
+
+  private async waitForFalResult(model: string, requestId: string): Promise<any> {
+    const statusUrl = `${this.baseUrl}/${model}/requests/${requestId}`;
+    const maxAttempts = 120;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      const statusResponse = await axios.get(statusUrl, {
+        headers: this.getHeaders(),
+      });
+
+      const status = String(statusResponse.data?.status || '').toLowerCase();
+      const output = statusResponse.data?.output;
+
+      if (status === 'completed' || status === 'succeeded' || status === 'ready' || status === 'finished') {
+        return output || statusResponse.data;
+      }
+
+      if (status === 'failed' || status === 'error' || status === 'canceled') {
+        throw new Error(
+          `Fal job failed (${requestId}): ${statusResponse.data?.error?.message || statusResponse.data?.detail || statusResponse.data}`
+        );
+      }
+    }
+
+    throw new Error(`Fal job timed out after ${maxAttempts} attempts`);
+  }
+
+  private async generateFromFal(
+    model: string,
+    input: Record<string, any>,
+    kind: 'image' | 'video'
+  ): Promise<string> {
+    const startResponse = await axios.post(`${this.baseUrl}/${model}`, input, {
+      headers: this.getHeaders(),
+      timeout: 30000,
+    });
+
+    const immediateResultUrl = this.pickMediaUrl(startResponse.data, kind);
+    if (immediateResultUrl) {
+      return await this.uploadMedia(immediateResultUrl, kind);
+    }
+
+    const requestId = startResponse.data?.request_id || startResponse.data?.id || startResponse.data?.requestId;
+    if (!requestId) {
+      throw new Error(`Fal did not return a direct result or request ID for model ${model}`);
+    }
+
+    const finalResult = await this.waitForFalResult(model, requestId);
+    const resultUrl = this.pickMediaUrl(finalResult, kind);
+    if (!resultUrl) {
+      throw new Error(`Fal returned no ${kind} output URL for request ${requestId}`);
+    }
+
+    return await this.uploadMedia(resultUrl, kind);
+  }
+
+  async generateImage(prompt: string, model: string = 'fal-ai/flux/schnell'): Promise<ImageGenerationResponse> {
+    try {
+      const imageUrl = await this.generateFromFal(model, { prompt }, 'image');
+      return {
+        imageUrl,
+        model,
+        provider: 'fal'
+      };
+    } catch (error) {
+      console.error('[Fal] Image generation error:', error);
+      throw error;
+    }
+  }
+
+  async generateVideo(prompt: string, model: string = 'fal-ai/animatediff'): Promise<VideoGenerationResponse> {
+    try {
+      const parsed = this.parsePrompt(prompt);
+      const input: Record<string, any> = {
+        prompt: parsed.prompt || 'Generate a short cinematic clip based on the provided prompt.',
+      };
+
+      if (parsed.imageUrl) {
+        input.image_url = parsed.imageUrl;
+      }
+
+      const videoUrl = await this.generateFromFal(model, input, 'video');
+      return {
+        videoUrl,
+        model,
+        provider: 'fal'
+      };
+    } catch (error) {
+      console.error('[Fal] Video generation error:', error);
+      throw error;
+    }
+  }
+}
+
+class RunwayMlClient {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  private extractImagePrompt(prompt: string): { imagePrompt: string; imageUrl?: string } {
+    const imageMatch = prompt.match(/Image:\s*(https?:\/\/\S+)/i) || prompt.match(/image[_-]url:\s*(https?:\/\/\S+)/i);
+    if (!imageMatch) {
+      return { imagePrompt: prompt };
+    }
+
+    return {
+      imagePrompt: prompt.replace(imageMatch[0], '').replace(/\s+$/, '').trim(),
+      imageUrl: imageMatch[1],
+    };
+  }
+
+  private async ensureImageUrl(prompt: string): Promise<string> {
+    const parsed = this.extractImagePrompt(prompt);
+    if (parsed.imageUrl) return parsed.imageUrl;
+
+    const { getAdminSettings } = await import('@/server/actions/admin-actions');
+    const { apiKeys } = await getAdminSettings();
+    if (!apiKeys.fal) {
+      throw new Error(
+        'Runway fallback needs an image to animate. Include image URL in the prompt or configure Fal API key for bootstrap image generation.'
+      );
+    }
+
+    const fallbackImagePrompt = parsed.imagePrompt || 'A cinematic scene for video generation.';
+    const falClient = new FalClient(apiKeys.fal);
+    const image = await falClient.generateImage(fallbackImagePrompt, 'fal-ai/flux/schnell');
+    return image.imageUrl;
+  }
+
+  async generateVideo(prompt: string, model: string = 'runwayml-image-to-video'): Promise<VideoGenerationResponse> {
+    try {
+      const parsed = this.extractImagePrompt(prompt);
+      const imageUrl = await this.ensureImageUrl(parsed.imagePrompt);
+      const videoPrompt = parsed.imagePrompt || 'Animate this scene';
+      const videoUrl = await generateRunwayVideoFromImage(imageUrl, videoPrompt);
+      return { videoUrl, model, provider: 'runwayml' };
+    } catch (error) {
+      console.error('[RunwayML] Video generation error:', error);
+      throw error;
+    }
+  }
+}
+
+class PikaClient {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  private extractImagePrompt(prompt: string): { imagePrompt: string; imageUrl?: string } {
+    const imageMatch = prompt.match(/Image:\s*(https?:\/\/\S+)/i) || prompt.match(/image[_-]url:\s*(https?:\/\/\S+)/i);
+    if (!imageMatch) {
+      return { imagePrompt: prompt };
+    }
+
+    return {
+      imagePrompt: prompt.replace(imageMatch[0], '').replace(/\s+$/, '').trim(),
+      imageUrl: imageMatch[1],
+    };
+  }
+
+  private async ensureImageUrl(prompt: string): Promise<string> {
+    const parsed = this.extractImagePrompt(prompt);
+    if (parsed.imageUrl) return parsed.imageUrl;
+
+    const { getAdminSettings } = await import('@/server/actions/admin-actions');
+    const { apiKeys } = await getAdminSettings();
+    if (!apiKeys.fal) {
+      throw new Error(
+        'Pika fallback needs an image to animate. Include image URL in the prompt or configure Fal API key for bootstrap image generation.'
+      );
+    }
+
+    const fallbackImagePrompt = parsed.imagePrompt || 'A cinematic scene for video generation.';
+    const falClient = new FalClient(apiKeys.fal);
+    const image = await falClient.generateImage(fallbackImagePrompt, 'fal-ai/flux/schnell');
+    return image.imageUrl;
+  }
+
+  async generateVideo(prompt: string, model: string = 'pika-image-to-video'): Promise<VideoGenerationResponse> {
+    try {
+      const parsed = this.extractImagePrompt(prompt);
+      const imageUrl = await this.ensureImageUrl(parsed.imagePrompt);
+      const videoPrompt = parsed.imagePrompt || 'Animate this scene';
+      const videoUrl = await generatePikaVideoFromImage(imageUrl, videoPrompt);
+      return { videoUrl, model, provider: 'pika' };
+    } catch (error) {
+      console.error('[Pika] Video generation error:', error);
+      throw error;
+    }
+  }
+}
+
 // Seedance Client - FIXED with proper job polling
 export class SeedanceClient {
   private apiKey: string;
@@ -1305,10 +1774,10 @@ export async function createProviderClient(provider: string): Promise<any> {
       return new OpenAIClient(apiKey);
     case 'claude':
       return new ClaudeClient(apiKey);
+    case 'fal':
+      return new FalClient(apiKey);
     case 'minimax':
       return new MinimaxClient(apiKey);
-    case 'elevenlabs':
-      return new ElevenLabsClient(apiKey);
     case 'replicate':
       return new ReplicateClient(apiKey);
     case 'huggingface':
@@ -1317,12 +1786,20 @@ export async function createProviderClient(provider: string): Promise<any> {
       return new ImagenClient(apiKey);
     case 'googleVeo':
       return new GoogleVeoClient(apiKey);
+    case 'awsPolly':
+      return new AwsPollyClient(apiKey);
     case 'heygen':
       return new HeyGenClient(apiKey);
+    case 'runwayml':
+      return new RunwayMlClient(apiKey);
+    case 'pika':
+      return new PikaClient(apiKey);
     case 'seedance':
       return new SeedanceClient(apiKey);
     case 'wan':
       return new WanClient(apiKey);
+    case 'elevenlabs':
+      return new ElevenLabsClient(apiKey);
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }

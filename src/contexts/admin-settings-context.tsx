@@ -78,6 +78,7 @@ interface AdminSettingsContextType extends AllSettings {
   isStripeConfigured: boolean;
   isMinimaxConfigured: boolean;
   isElevenLabsConfigured: boolean;
+  isAwsPollyConfigured: boolean;
   isPikaConfigured: boolean;
   isRunwayMLConfigured: boolean;
   loading: boolean;
@@ -120,7 +121,9 @@ const defaultEmailTemplates: EmailTemplates = {
 export const initialApiKeysObject: ApiKeys = {
   gemini: '', openai: '', claude: '', azureOpenai: '', openrouter: '', deepseek: '', grok: '', qwen: '', perplexity: '', mistral: '', cohere: '',
   stableDiffusion: '', midjourney: '', dalle: '', imagen: '', dreamstudio: '', leonardo: '', magnific: '',
+  fal: '',
   googleVeo: '', kling: '', sora: '', wan: '', seedance: '', skyReels: '', pika: '', luma: '', synthesia: '', colossyan: '', runwayml: '', heygen: '', modelscope: '', stableVideo: '', animateDiff: '', videoFusion: '',
+  awsPolly: '',
   minimax: '', elevenlabs: '', azureTts: '', myshell: '', coqui: '', assemblyai: '', deepgram: '', suno: '', udio: '', lalalai: '',
   n8n: '', make: '', replicate: '', huggingface: '',
   modelslab: '', pexels: '', pixabay: '', unsplash: '',
@@ -310,6 +313,7 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     isStripeConfigured: !!settings.apiKeys.stripeSecretKey && !!settings.apiKeys.stripePublishableKey,
     isMinimaxConfigured: !!settings.apiKeys.minimax,
     isElevenLabsConfigured: !!settings.apiKeys.elevenlabs,
+    isAwsPollyConfigured: !!settings.apiKeys.awsPolly,
     isPikaConfigured: !!settings.apiKeys.pika,
     isRunwayMLConfigured: !!settings.apiKeys.runwayml,
     loading: loading,

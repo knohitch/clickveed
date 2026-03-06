@@ -9,10 +9,21 @@ function assertPrimaryProviders(): void {
   const textPrimary = getProvidersForCapability('text')[0]?.name;
   const imagePrimary = getProvidersForCapability('image')[0]?.name;
   const videoPrimary = getProvidersForCapability('video')[0]?.name;
+  const ttsPrimary = getProvidersForCapability('tts')[0]?.name;
 
   assert(textPrimary === 'gemini', `Expected text primary to be gemini, got ${textPrimary}`);
-  assert(imagePrimary === 'imagen', `Expected image primary to be imagen, got ${imagePrimary}`);
-  assert(videoPrimary === 'googleVeo', `Expected video primary to be googleVeo, got ${videoPrimary}`);
+  assert(imagePrimary === 'fal', `Expected image primary to be fal, got ${imagePrimary}`);
+  assert(videoPrimary === 'minimax', `Expected video primary to be minimax (Hailuo path), got ${videoPrimary}`);
+  assert(ttsPrimary === 'awsPolly', `Expected tts primary to be awsPolly, got ${ttsPrimary}`);
+}
+
+function assertFallbackProviders(): void {
+  const videoProviders = getProvidersForCapability('video').map((provider) => provider.name);
+  const ttsProviders = getProvidersForCapability('tts').map((provider) => provider.name);
+
+  assert(videoProviders.includes('runwayml'), 'Expected video fallback providers to include runwayml');
+  assert(videoProviders.includes('pika'), 'Expected video fallback providers to include pika');
+  assert(ttsProviders.includes('elevenlabs'), 'Expected tts fallback providers to include elevenlabs');
 }
 
 function assertImplementedProvidersSupportCapabilities(): void {
@@ -37,9 +48,9 @@ function assertImplementedProvidersSupportCapabilities(): void {
 
 function main(): void {
   assertPrimaryProviders();
+  assertFallbackProviders();
   assertImplementedProvidersSupportCapabilities();
   console.log('AI provider contract checks passed');
 }
 
 main();
-

@@ -17,18 +17,23 @@ const DEFAULT_PROVIDER_METADATA: Record<string, ProviderMetadata> = {
   azureOpenai: { authType: 'apiKey', requiresSetup: false },
   claude: { authType: 'apiKey', requiresSetup: false },
   elevenlabs: { authType: 'apiKey', requiresSetup: false },
+  awsPolly: { authType: 'apiKey', requiresSetup: false },
   replicate: { authType: 'apiKey', requiresSetup: false },
   huggingface: { authType: 'apiKey', requiresSetup: false },
+  fal: { authType: 'apiKey', requiresSetup: false },
+  minimax: { authType: 'apiKey', requiresSetup: false },
   imagen: { 
     authType: 'oauth', 
     requiresSetup: true,
     setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.'
-  },
+  }, 
   googleVeo: { 
     authType: 'oauth', 
     requiresSetup: true,
     setupInstructions: 'Google Cloud Vertex AI requires OAuth2 authentication with a service account. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.'
   },
+  runwayml: { authType: 'apiKey', requiresSetup: false },
+  pika: { authType: 'apiKey', requiresSetup: false },
   heygen: { authType: 'apiKey', requiresSetup: false },
   seedance: { authType: 'apiKey', requiresSetup: false },
   wan: { authType: 'apiKey', requiresSetup: false },

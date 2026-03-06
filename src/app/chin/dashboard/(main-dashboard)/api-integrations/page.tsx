@@ -25,17 +25,17 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
   {
     title: "Image Generation",
     icon: ImageIcon,
-    keys: ['replicate', 'imagen', 'stableDiffusion', 'dreamstudio', 'midjourney', 'dalle', 'leonardo', 'magnific', 'modelslab'],
+    keys: ['fal', 'replicate', 'imagen', 'stableDiffusion', 'dreamstudio', 'midjourney', 'dalle', 'leonardo', 'magnific', 'modelslab'],
   },
   {
     title: "Video Generation",
     icon: Video,
-    keys: ['googleVeo', 'seedance', 'wan', 'kling', 'sora', 'skyReels', 'pika', 'luma', 'synthesia', 'colossyan', 'runwayml', 'heygen', 'modelscope', 'stableVideo', 'animateDiff', 'videoFusion'],
+    keys: ['minimax', 'runwayml', 'pika', 'googleVeo', 'seedance', 'wan', 'kling', 'sora', 'skyReels', 'luma', 'synthesia', 'colossyan', 'heygen', 'modelscope', 'stableVideo', 'animateDiff', 'videoFusion'],
   },
   {
     title: "Audio / Speech",
     icon: MicVocal,
-    keys: ['minimax', 'elevenlabs', 'azureTts', 'myshell', 'coqui', 'assemblyai', 'deepgram', 'suno', 'udio', 'lalalai'],
+    keys: ['awsPolly', 'elevenlabs'],
   },
   {
     title: "Workflow & Automation",
@@ -77,6 +77,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   huggingface: 'HuggingFace API Key',
 
   // --- Image Generation ---
+  fal: 'Fal.ai API Key',
   dalle: 'DALL-E API Key',
   modelslab: 'ModelsLab API Key',
 
@@ -86,6 +87,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   skyReels: 'SkyReels API Key',
 
   // --- Audio / Speech ---
+  awsPolly: 'AWS Polly Credentials (JSON or Access Key)',
   elevenlabs: 'ElevenLabs API Key',
   azureTts: 'Azure TTS API Key',
   myshell: 'MyShell API Key',
