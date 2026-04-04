@@ -64,7 +64,7 @@ export default function VerifyPendingPage() {
                         <p className="text-muted-foreground">{session?.user?.email || 'your email address'}</p>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                        <p>Didn't receive the email? Check your spam folder or request a new verification link below.</p>
+                        <p>Didn&apos;t receive the email? Check your spam folder or request a new verification link below.</p>
                     </div>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-2">

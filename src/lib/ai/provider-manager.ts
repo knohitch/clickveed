@@ -23,74 +23,27 @@ import type {
 import { validateAIEnvironment } from './validate-env';
 import { getUnsupportedConfiguredProviders } from './provider-registry';
 
-// Circuit Breaker Implementation
+// Stateless tracker so provider availability does not diverge across instances.
 class CircuitBreaker {
-  private failures = new Map<string, number>();
-  private lastFailureTime = new Map<string, number>();
-  private openCircuits = new Set<string>();
-  private readonly threshold: number;
-  private readonly timeout: number;
-
-  constructor() {
-    this.threshold = parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || '5');
-    this.timeout = parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT || '60000');
-  }
-
-  shouldAttempt(provider: string): boolean {
-    if (this.openCircuits.has(provider)) {
-      const lastFailure = this.lastFailureTime.get(provider) || 0;
-      const timeSinceFailure = Date.now() - lastFailure;
-
-      if (timeSinceFailure >= this.timeout) {
-        console.log(`[CircuitBreaker] Closing circuit for ${provider} after ${timeSinceFailure}ms cooldown`);
-        this.openCircuits.delete(provider);
-        this.failures.set(provider, 0);
-        return true;
-      }
-
-      return false;
-    }
-
+  shouldAttempt(_provider: string): boolean {
     return true;
   }
 
   recordFailure(provider: string, error?: any): void {
-    const failures = (this.failures.get(provider) || 0) + 1;
-    this.failures.set(provider, failures);
-    this.lastFailureTime.set(provider, Date.now());
-
-    // Check for quota errors - immediately open circuit
-    const isQuotaError = error && (
-      error.status === 429 ||
-      error.message?.includes('quota') ||
-      error.message?.includes('insufficient_quota') ||
-      error.message?.includes('rate limit')
-    );
-
-    if (failures >= this.threshold || isQuotaError) {
-      console.warn(`[CircuitBreaker] Opening circuit for ${provider} (failures: ${failures}, quota: ${isQuotaError})`);
-      this.openCircuits.add(provider);
-    }
+    console.warn('[ProviderManager] Provider failure recorded', {
+      provider,
+      error: error instanceof Error ? error.message : error,
+    });
   }
 
-  recordSuccess(provider: string): void {
-    this.failures.delete(provider);
-    this.lastFailureTime.delete(provider);
-    this.openCircuits.delete(provider);
-  }
+  recordSuccess(_provider: string): void {}
 
-  getStatus(provider: string): { failures: number; isOpen: boolean } {
-    return {
-      failures: this.failures.get(provider) || 0,
-      isOpen: this.openCircuits.has(provider)
-    };
+  getStatus(_provider: string): { failures: number; isOpen: boolean } {
+    return { failures: 0, isOpen: false };
   }
 
   reset(): void {
-    this.failures.clear();
-    this.lastFailureTime.clear();
-    this.openCircuits.clear();
-    console.log('[ProviderManager CircuitBreaker] All circuits reset');
+    console.log('[ProviderManager] Stateless provider state reset requested');
   }
 }
 
@@ -209,48 +162,16 @@ class AIProviderManager {
 
   private getAvailableProviders(): ProviderConfig[] {
     return Array.from(this.providers.values())
-      .filter(p => {
-        if (!p.enabled || !p.apiKey) return false;
-        if (p.healthStatus === 'down') return false;
-        if (!circuitBreaker.shouldAttempt(p.name)) return false;
-        return true;
-      })
+      .filter(p => !!p.enabled && !!p.apiKey)
       .sort((a, b) => a.priority - b.priority);
   }
 
   private recordFailure(provider: AIProvider, error: any) {
-    const config = this.providers.get(provider);
-    if (!config) return;
-
-    config.failureCount++;
-    config.lastFailure = new Date();
     circuitBreaker.recordFailure(provider, error);
-
-    const isQuotaError =
-      error.status === 429 ||
-      error.message?.includes('quota') ||
-      error.message?.includes('insufficient_quota');
-
-    if (config.failureCount >= 5 || isQuotaError) {
-      config.healthStatus = 'down';
-      console.error(`[ProviderManager] Provider ${provider} marked as DOWN`);
-
-      // Auto-recover after timeout
-      setTimeout(() => {
-        config.healthStatus = 'healthy';
-        config.failureCount = 0;
-        console.log(`[ProviderManager] Provider ${provider} recovered`);
-      }, parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT || '60000'));
-    }
   }
 
   private recordSuccess(provider: AIProvider) {
-    const config = this.providers.get(provider);
-    if (config) {
-      config.failureCount = 0;
-      config.healthStatus = 'healthy';
-      circuitBreaker.recordSuccess(provider);
-    }
+    circuitBreaker.recordSuccess(provider);
   }
 
   private async generateWithOpenAI(

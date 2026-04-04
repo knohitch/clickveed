@@ -37,15 +37,15 @@ Current date is ${today}. Avoid outdated assumptions about the current year.`;
 
     // Format messages properly for Genkit
     const formattedHistory = (history || []).map(h => ({
-      role: h.role === 'assistant' ? 'model' as 'model' : 'user' as 'user',
+      role: h.role === 'assistant' ? ('model' as const) : ('user' as const),
       content: [{ text: h.content }]
     }));
 
     // Combine system prompt, history, and newest user message in chronological order
     const messages = [
-      { role: 'system' as 'user' | 'model', content: [{ text: supportChatSystemPrompt }] },
+      { role: 'system' as const, content: [{ text: supportChatSystemPrompt }] },
       ...formattedHistory,
-      { role: 'user' as 'user' | 'model', content: [{ text: message }] },
+      { role: 'user' as const, content: [{ text: message }] },
     ];
 
     const { stream, response } = await generateStreamWithProvider({

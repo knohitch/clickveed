@@ -1,9 +1,10 @@
-'use server';
-
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCustomerPortalSession as createStripeCustomerPortalSession } from '@/server/services/stripe-service';
 import { isStripeConfigured } from '@/server/services/stripe-service';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(req: Request) {
     try {

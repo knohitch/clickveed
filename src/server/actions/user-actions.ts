@@ -7,15 +7,38 @@ import type { User, Plan, UserUsage, PlanFeature } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { getBaseUrl } from '@/lib/utils';
 import type { UserRole, UserStatus, UserWithRole, BrandKit } from './user-types';
+import { syncUserRecord, type UserSyncData } from '@/server/services/user-sync-service';
 
 // Re-export types for consumers
 export type { UserRole, UserStatus, UserWithRole, BrandKit } from './user-types';
+
+function isAdminRole(role: string | null | undefined): boolean {
+    return !!role && ['ADMIN', 'SUPER_ADMIN'].includes(role);
+}
+
+async function requireAuthenticatedSession() {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new Error('Unauthorized');
+    }
+    return session;
+}
+
+async function requireAdminSession() {
+    const session = await requireAuthenticatedSession();
+    if (!isAdminRole(session.user.role)) {
+        throw new Error('Unauthorized: Administrator access required');
+    }
+    return session;
+}
 
 
 /**
  * Retrieves a list of all users.
  */
 export async function getUsers(): Promise<UserWithRole[]> {
+    await requireAdminSession();
+
     const users = await prisma.user.findMany({
         include: {
             plan: true
@@ -39,6 +62,11 @@ export async function getUsers(): Promise<UserWithRole[]> {
  * If the user doesn't have a plan assigned, automatically assigns the Free plan.
  */
 export async function getUserById(id: string): Promise<(User & { plan: Plan & { features: PlanFeature[] } | null }) & { usage: UserUsage | null } | null> {
+    const session = await requireAuthenticatedSession();
+    if (!isAdminRole(session.user.role) && session.user.id !== id) {
+        throw new Error('Unauthorized');
+    }
+
     let user = await prisma.user.findUnique({
         where: { id },
         include: {
@@ -117,6 +145,8 @@ export async function getUserUsageStats() {
  * Creates a pending user with the 'Admin' role.
  */
 export async function createPendingAdminUser(userData: { fullName: string; email: string; password?: string, role?: 'Admin' | 'User' }): Promise<UserWithRole> {
+    await requireAdminSession();
+
     const existingUser = await prisma.user.findUnique({
         where: { email: userData.email },
     });
@@ -173,45 +203,36 @@ export async function createPendingAdminUser(userData: { fullName: string; email
     };
 }
 
-type UpsertUserData = Partial<Pick<User, 'id' | 'email' | 'displayName' | 'avatarUrl' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'stripeSubscriptionStatus' | 'stripePriceId' | 'stripeCurrentPeriodEnd' | 'onboardingComplete' | 'planId'>> & {
-    onboardingData?: Record<string, any>;
-    name?: string; // For compatibility with external interfaces
-    image?: string; // For compatibility with external interfaces
-};
+type UpsertUserData = UserSyncData;
 
 /**
  * Creates or updates a user record.
  */
 export async function upsertUser(data: UpsertUserData) {
-    if (!data.id && !data.email) {
-        throw new Error("User ID or email is required to upsert user.");
+    const session = await requireAuthenticatedSession();
+    const isAdmin = isAdminRole(session.user.role);
+
+    if (!isAdmin) {
+        if (data.id && data.id !== session.user.id) {
+            throw new Error('Unauthorized');
+        }
+        if (data.email && session.user.email && data.email !== session.user.email) {
+            throw new Error('Unauthorized');
+        }
+
+        return syncUserRecord({
+            id: session.user.id,
+            email: session.user.email || data.email || undefined,
+            displayName: data.displayName,
+            avatarUrl: data.avatarUrl,
+            onboardingData: data.onboardingData,
+            onboardingComplete: data.onboardingComplete,
+            name: data.name,
+            image: data.image,
+        });
     }
 
-    // Map name and image to the correct field names if provided
-    const { onboardingData, name, image, ...userData } = data;
-
-    // Add the mapped fields back with correct names
-    if (name !== undefined) userData.displayName = name;
-    if (image !== undefined) userData.avatarUrl = image;
-
-    const finalUserData: any = { ...userData };
-    if (onboardingData) {
-        finalUserData.onboardingComplete = true;
-        finalUserData.onboardingData = onboardingData;
-    }
-
-    const whereClause = data.id ? { id: data.id } : { email: data.email! };
-
-    return await prisma.user.upsert({
-        where: whereClause,
-        update: finalUserData,
-        create: {
-            ...finalUserData,
-            email: data.email!, // Email is required for creation
-            role: 'USER',
-            status: 'Active',
-        },
-    });
+    return syncUserRecord(data);
 }
 
 
@@ -454,6 +475,11 @@ export async function updateUserPlan(
  * This function updates users who have a null or empty displayName field.
  */
 export async function fixUsersWithMissingDisplayName() {
+    const session = await auth();
+    if (!session?.user || session.user.role !== 'SUPER_ADMIN') {
+        throw new Error('Unauthorized');
+    }
+
     console.log('Starting to fix users with missing display names...');
 
     // Find users with null or empty displayName

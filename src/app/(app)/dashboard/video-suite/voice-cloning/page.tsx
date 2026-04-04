@@ -1,40 +1,24 @@
-'use client';
-
 import { VoiceCloningStudio } from '@/components/voice-cloning-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeatureGuard } from '@/components/feature-lock';
-import { useAuth } from '@/contexts/auth-context';
-import { LoadingSpinner } from '@/components/loading-spinner';
+import { FeatureLock } from '@/components/feature-lock';
+import { getFeaturePageAccess } from '@/lib/server-feature-page';
 
-export default function VoiceClippingPage() {
-    return <VoiceClippingContent />;
-}
+export default async function VoiceClippingPage() {
+    const access = await getFeaturePageAccess('voice-cloning');
 
-function VoiceClippingContent() {
-    const { subscriptionPlan, planFeatures, loading } = useAuth();
-
-    if (loading) {
-        return <VoiceClippingLoading />;
+    if (!access.canAccess) {
+        return (
+            <FeatureLock
+                featureId="voice-cloning"
+                planName={access.planName}
+                featureTier={access.featureTier}
+                planFeatures={access.planFeatures}
+                title="Feature Not Available"
+                description="This feature is not included in your current plan."
+            />
+        );
     }
 
-    return (
-        <FeatureGuard featureId="voice-cloning" planName={subscriptionPlan?.name || null} planFeatures={planFeatures}>
-            <Card>
-                <CardHeader>
-                    <CardTitle>AI Voice Cloning</CardTitle>
-                    <CardDescription>
-                        Create a digital clone of your voice by providing a few audio samples.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <VoiceCloningStudio />
-                </CardContent>
-            </Card>
-        </FeatureGuard>
-    );
-}
-
-function VoiceClippingLoading() {
     return (
         <Card>
             <CardHeader>
@@ -43,8 +27,8 @@ function VoiceClippingLoading() {
                     Create a digital clone of your voice by providing a few audio samples.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center justify-center py-8">
-                <LoadingSpinner />
+            <CardContent>
+                <VoiceCloningStudio />
             </CardContent>
         </Card>
     );

@@ -6,7 +6,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import prisma from '@lib/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
-import { upsertUser } from '@/server/actions/user-actions';
+import { syncUserRecord } from '@/server/services/user-sync-service';
 
 export async function POST(req: Request) {
     const body = await req.text();
@@ -41,10 +41,16 @@ export async function POST(req: Request) {
                 const session = event.data.object as Stripe.Checkout.Session;
                 if (session.mode === 'subscription' && session.metadata?.userId) {
                     const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+                    const customerEmail = session.customer_details?.email;
+
+                    if (!customerEmail) {
+                        console.error('Stripe checkout session is missing customer email:', session.id);
+                        break;
+                    }
                     
-                    await upsertUser({
+                    await syncUserRecord({
                         id: session.metadata.userId,
-                        email: session.customer_details?.email!,
+                        email: customerEmail,
                         stripeCustomerId: subscription.customer as string,
                         stripeSubscriptionId: subscription.id,
                         stripeSubscriptionStatus: subscription.status,
@@ -74,7 +80,7 @@ export async function POST(req: Request) {
                          }
                     });
 
-                     await upsertUser({
+                     await syncUserRecord({
                         id: user.id,
                         email: user.email!,
                         stripeSubscriptionStatus: subscription.status,
@@ -96,7 +102,7 @@ export async function POST(req: Request) {
                         where: { name: { equals: 'Creator', mode: 'insensitive' } }
                     });
 
-                     await upsertUser({
+                     await syncUserRecord({
                         id: user.id,
                         email: user.email!,
                         stripeSubscriptionStatus: subscription.status, // will be 'canceled'

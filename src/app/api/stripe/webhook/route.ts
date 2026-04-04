@@ -1,9 +1,10 @@
-'use server';
-
 import { Stripe } from 'stripe';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { handleStripeWebhookEvent } from '@/server/services/stripe-service';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(req: Request) {
     const body = await req.text();

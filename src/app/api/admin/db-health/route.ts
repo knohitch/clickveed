@@ -3,6 +3,16 @@ import prisma from '@/server/prisma';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import IORedis from 'ioredis';
 import { resolveRedisConnectionInfo } from '@/lib/redis-config';
+import { requireSuperAdminApi } from '@/lib/api-auth';
+import {
+  collectTableMetrics,
+  runPerformanceProbes,
+  runReferentialIntegrityCheck,
+} from '@/server/services/db-health-service';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 /**
  * Production Database Health Check Endpoint
@@ -14,6 +24,14 @@ import { resolveRedisConnectionInfo } from '@/lib/redis-config';
  */
 
 export async function GET(request: Request) {
+  const unauthorized = await requireSuperAdminApi({
+    route: '/api/admin/db-health',
+    method: 'GET',
+  });
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   const start = Date.now();
   const checks: Record<string, any> = {};
   let allHealthy = true;
@@ -110,13 +128,43 @@ export async function GET(request: Request) {
 
   // Check 6: User Count (for reference)
   try {
-    const userCount = await prisma.user.count();
-    checks.users = {
+    checks.tables = {
       status: 'healthy',
-      totalUsers: userCount,
+      metrics: await collectTableMetrics(),
     };
   } catch (error: any) {
-    checks.users = { status: 'error', error: error.message };
+    checks.tables = { status: 'error', error: error.message };
+  }
+
+  // Check 7: Referential integrity drift when relationMode="prisma"
+  try {
+    const integrity = await runReferentialIntegrityCheck();
+    checks.relations = integrity;
+    if (integrity.status === 'warning' || integrity.status === 'error') {
+      allHealthy = false;
+    }
+  } catch (error: any) {
+    checks.relations = { status: 'error', error: error.message, relationMode: 'prisma' };
+    allHealthy = false;
+  }
+
+  // Check 8: User-scoped query performance probes
+  try {
+    const probes = await runPerformanceProbes();
+    const probeStatuses = Object.values(probes).map((probe: any) => probe.status);
+    const hasUnhealthyProbe = probeStatuses.includes('error');
+    const hasWarningProbe = probeStatuses.includes('warning');
+
+    checks.performance = {
+      status: hasUnhealthyProbe ? 'error' : hasWarningProbe ? 'warning' : 'healthy',
+      probes,
+    };
+    if (hasUnhealthyProbe || hasWarningProbe) {
+      allHealthy = false;
+    }
+  } catch (error: any) {
+    checks.performance = { status: 'error', error: error.message };
+    allHealthy = false;
   }
 
   // Calculate overall health

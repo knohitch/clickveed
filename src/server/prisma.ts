@@ -30,8 +30,7 @@ function createPrismaClient(): PrismaClient {
 
   // Add connection retry logic with exponential backoff
   const originalConnect = client.$connect.bind(client);
-  // @ts-ignore - Prisma middleware type mismatch
-  client.$connect = async (params: any, next: any) => {
+  client.$connect = async () => {
     const maxRetries = 5;
     const baseDelay = 1000; // 1 second
 

@@ -4,6 +4,9 @@ import { handleOAuthCallback } from '@/server/services/connectionService';
 import { type PlatformConfig } from '@/server/services/connectionService';
 import { google } from 'googleapis';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const youtubeConfig: PlatformConfig = {
     platform: 'youtube',
     clientIdEnvVar: 'googleClientId',

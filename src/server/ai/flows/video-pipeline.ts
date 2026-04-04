@@ -10,6 +10,7 @@ import { generateTtsWithProvider, generateStructuredOutput, generateImageWithPro
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
+import { buildPipelineVisualPrompt, extractPipelineVoiceOverText } from '@/server/ai/workflow-contract-helpers';
 import {
   GeneratePipelineScriptInputSchema,
   GeneratePipelineScriptOutputSchema,
@@ -78,7 +79,7 @@ async function toWav(
       bitDepth: sampleWidth * 8,
     });
 
-    let bufs = [] as any[];
+    const bufs: Buffer[] = [];
     writer.on('error', reject);
     writer.on('data', function (d) {
       bufs.push(d);
@@ -99,27 +100,42 @@ export async function generatePipelineVoiceOver(input: GeneratePipelineVoiceOver
     throw new Error("User must be authenticated to generate audio.");
   }
 
-  // We extract only the spoken parts from the script for the TTS model.
-  const voiceOverText = input.script.match(/Voiceover:|VO:|Narrator:|Dialogue:/g)
-    ? input.script.split(/Voiceover:|VO:|Narrator:|Dialogue:/).slice(1).join(' ').replace(/\[.*?\]/g, '')
-    : input.script; // Fallback to using the whole script if no cues are found.
-
-  const ttsResponse: any = await generateTtsWithProvider({
-    messages: [{ role: 'user' as const, content: [{ text: voiceOverText }] }],
+  return runPipelineVoiceOverWorkflow(input, {
+    userId: session.user.id,
+    generateTts: async (voiceOverText, voiceId) =>
+      generateTtsWithProvider({
+        messages: [{ role: 'user' as const, content: [{ text: voiceOverText }] }],
+        voiceId,
+      }),
+    uploadAudio: async (dataUri) => uploadToWasabi(dataUri, 'audio'),
+    createMediaAsset: async (asset) => prisma.mediaAsset.create({ data: asset }),
   });
+}
+
+export async function runPipelineVoiceOverWorkflow(
+  input: GeneratePipelineVoiceOverInput,
+  deps: {
+    userId: string;
+    generateTts: (voiceOverText: string, voiceId: string) => Promise<any>;
+    uploadAudio: (dataUri: string) => Promise<{ publicUrl: string; sizeMB: number }>;
+    createMediaAsset: (asset: { name: string; type: 'AUDIO'; url: string; size: number; userId: string }) => Promise<unknown>;
+  }
+): Promise<GeneratePipelineVoiceOverOutput> {
+  const voiceOverText = extractPipelineVoiceOverText(input.script);
+
+  const ttsResponse: any = await deps.generateTts(voiceOverText, input.voice);
 
   const responseText = ttsResponse?.result?.content?.[0]?.text || '';
   let publicUrl = responseText.replace('Speech generated: ', '').trim() || ttsResponse?.audioUrl || '';
   let sizeMB = 0;
 
-  // If a provider returned raw audio media instead of URL, upload it.
   if (!publicUrl && ttsResponse?.media?.url) {
     const audioPcmBuffer = Buffer.from(
       ttsResponse.media.url.substring(ttsResponse.media.url.indexOf(',') + 1),
       'base64'
     );
     const audioDataUri = 'data:audio/wav;base64,' + (await toWav(audioPcmBuffer));
-    const uploadResult = await uploadToWasabi(audioDataUri, 'audio');
+    const uploadResult = await deps.uploadAudio(audioDataUri);
     publicUrl = uploadResult.publicUrl;
     sizeMB = uploadResult.sizeMB;
   }
@@ -128,18 +144,15 @@ export async function generatePipelineVoiceOver(input: GeneratePipelineVoiceOver
     throw new Error('Audio generation failed. No media was returned.');
   }
 
-  // Extract the original prompt from the script for better naming
   const originalPromptMatch = input.script.match(/Core Idea: (.*?)\n/);
   const assetName = originalPromptMatch ? originalPromptMatch[1] : `Pipeline Voice Over: ${input.script.substring(0, 30)}...`;
 
-  await prisma.mediaAsset.create({
-    data: {
-      name: assetName,
-      type: 'AUDIO',
-      url: publicUrl,
-      size: sizeMB,
-      userId: session.user.id,
-    }
+  await deps.createMediaAsset({
+    name: assetName,
+    type: 'AUDIO',
+    url: publicUrl,
+    size: sizeMB,
+    userId: deps.userId,
   });
 
   return {
@@ -158,62 +171,71 @@ export async function generatePipelineVideo(input: GeneratePipelineVideoInput): 
       throw new Error("User must be authenticated to generate media.");
     }
 
-    // Extract scene descriptions from the script to create a visual prompt
-    const sceneDescriptions = input.script.match(/\[SCENE:.*?\]/g) || [];
-    const visualPrompt = sceneDescriptions.length > 0
-      ? sceneDescriptions.join(' ').replace(/\[SCENE:/g, '').replace(/\]/g, '')
-      : input.script.substring(0, 200); // Fallback to first 200 characters
-
-    // Generate placeholder scene image through provider manager to avoid model/provider mismatch.
-    const imageResponse: any = await generateImageWithProvider({
-      messages: [{ role: 'user' as const, content: [{ text: visualPrompt.substring(0, 500) }] }],
+    return runPipelineVideoWorkflow(input, {
+      userId: session.user.id,
+      generateImage: async (visualPrompt) =>
+        generateImageWithProvider({
+          messages: [{ role: 'user' as const, content: [{ text: visualPrompt.substring(0, 500) }] }],
+        }),
+      generateVideo: async (prompt) =>
+        generateVideoWithProvider({
+          messages: [{ role: 'user' as const, content: [{ text: prompt }] }],
+        }),
+      createMediaAsset: async (asset) => prisma.mediaAsset.create({ data: asset }),
     });
-
-    let placeholderImageUrl = '';
-    const media = imageResponse?.media;
-    if (typeof media?.url === 'string') {
-      placeholderImageUrl = media.url;
-    } else if (Array.isArray(media) && typeof media[0]?.url === 'string') {
-      placeholderImageUrl = media[0].url;
-    } else {
-      const text = imageResponse?.result?.content?.[0]?.text || '';
-      if (typeof text === 'string' && text.startsWith('Image generated: ')) {
-        placeholderImageUrl = text.replace('Image generated: ', '').trim();
-      }
-    }
-
-    if (!placeholderImageUrl) {
-      throw new Error('Image generation failed for video pipeline scene.');
-    }
-
-
-    // Generate video through provider router (VEO first based on provider-registry priority).
-    // Do not invoke TTS here; voice generation is handled in Step 2.
-    const videoResponse: any = await generateVideoWithProvider({
-      messages: [{ role: 'user' as const, content: [{ text: `${visualPrompt}\nImage: ${placeholderImageUrl}` }] }],
-    });
-
-    const videoText = videoResponse?.result?.content?.[0]?.text || '';
-    const videoUrl = videoText.replace('Video generated: ', '').trim();
-    if (!videoUrl) {
-      throw new Error('Video generation failed. No video URL was returned.');
-    }
-
-    await prisma.mediaAsset.create({
-      data: {
-        name: `Pipeline Video: ${visualPrompt.substring(0, 30)}...`,
-        type: 'VIDEO',
-        url: videoUrl,
-        size: 0,
-        userId: session.user.id,
-      },
-    });
-
-    return {
-      videoUrl,
-    };
   } catch (error) {
     console.error('Pipeline video generation failed:', error);
     throw new Error(`Pipeline video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+export async function runPipelineVideoWorkflow(
+  input: GeneratePipelineVideoInput,
+  deps: {
+    userId: string;
+    generateImage: (visualPrompt: string) => Promise<any>;
+    generateVideo: (prompt: string) => Promise<any>;
+    createMediaAsset: (asset: { name: string; type: 'VIDEO'; url: string; size: number; userId: string }) => Promise<unknown>;
+  }
+): Promise<GeneratePipelineVideoOutput> {
+  const visualPrompt = buildPipelineVisualPrompt(input.script);
+
+  const imageResponse: any = await deps.generateImage(visualPrompt);
+
+  let placeholderImageUrl = '';
+  const media = imageResponse?.media;
+  if (typeof media?.url === 'string') {
+    placeholderImageUrl = media.url;
+  } else if (Array.isArray(media) && typeof media[0]?.url === 'string') {
+    placeholderImageUrl = media[0].url;
+  } else {
+    const text = imageResponse?.result?.content?.[0]?.text || '';
+    if (typeof text === 'string' && text.startsWith('Image generated: ')) {
+      placeholderImageUrl = text.replace('Image generated: ', '').trim();
+    }
+  }
+
+  if (!placeholderImageUrl) {
+    throw new Error('Image generation failed for video pipeline scene.');
+  }
+
+  const videoResponse: any = await deps.generateVideo(`${visualPrompt}\nImage: ${placeholderImageUrl}`);
+
+  const videoText = videoResponse?.result?.content?.[0]?.text || '';
+  const videoUrl = videoText.replace('Video generated: ', '').trim();
+  if (!videoUrl) {
+    throw new Error('Video generation failed. No video URL was returned.');
+  }
+
+  await deps.createMediaAsset({
+    name: `Pipeline Video: ${visualPrompt.substring(0, 30)}...`,
+    type: 'VIDEO',
+    url: videoUrl,
+    size: 0,
+    userId: deps.userId,
+  });
+
+  return {
+    videoUrl,
+  };
 }

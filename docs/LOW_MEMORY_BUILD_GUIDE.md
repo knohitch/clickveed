@@ -103,7 +103,7 @@ Comment out unused features in your codebase temporarily
 Add this to your Dockerfile to see memory usage:
 ```dockerfile
 RUN free -m && df -h
-RUN npm run build -- --no-lint
+RUN npm run build
 RUN free -m
 ```
 

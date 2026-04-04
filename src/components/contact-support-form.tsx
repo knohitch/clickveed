@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { createTicket } from "@/lib/support-actions";
 
-export const ContactSupportForm = ({ user, closeDialog }: { user: any, closeDialog: () => void }) => {
+export const ContactSupportForm = ({ closeDialog }: { closeDialog: () => void }) => {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
@@ -25,9 +25,6 @@ export const ContactSupportForm = ({ user, closeDialog }: { user: any, closeDial
 
         try {
             await createTicket({
-                userName: user.displayName || 'User',
-                userEmail: user.email || 'No email provided',
-                userAvatar: user.avatarUrl || '',
                 subject,
                 initialMessage
             });

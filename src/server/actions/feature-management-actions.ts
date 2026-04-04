@@ -1,5 +1,6 @@
 'use server';
 
+import { auth } from '@/auth';
 import prismaClient from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { FEATURE_CONFIG, DEFAULT_FREE_PLAN_FEATURES, DEFAULT_STARTER_PLAN_FEATURES, DEFAULT_PRO_PLAN_FEATURES, DEFAULT_ENTERPRISE_PLAN_FEATURES } from '@/lib/feature-config';
@@ -7,6 +8,21 @@ import { FEATURE_CONFIG, DEFAULT_FREE_PLAN_FEATURES, DEFAULT_STARTER_PLAN_FEATUR
 // Cast prisma to any to support new models before `prisma generate` is run
 // After running `prisma generate`, you can remove this cast and use typed queries
 const prisma = prismaClient as any;
+
+async function requireAdminSession(): Promise<void> {
+    const session = await auth();
+    if (!session?.user?.role || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+        throw new Error('Administrator access required');
+    }
+}
+
+async function requireAuthenticatedSession() {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new Error('Unauthorized');
+    }
+    return session;
+}
 
 export interface FeatureDefinitionData {
     id?: string;
@@ -26,6 +42,8 @@ export interface PlanFeatureAccessData {
  * Get all feature definitions
  */
 export async function getAllFeatures() {
+    await requireAdminSession();
+
     try {
         const features = await prisma.featureDefinition.findMany({
             orderBy: [{ category: 'asc' }, { displayName: 'asc' }],
@@ -50,6 +68,8 @@ export async function getAllFeatures() {
  * Get features for a specific plan
  */
 export async function getPlanFeatures(planId: string): Promise<string[]> {
+    await requireAdminSession();
+
     try {
         const planFeatures = await prisma.planFeatureAccess.findMany({
             where: { planId },
@@ -67,8 +87,12 @@ export async function getPlanFeatures(planId: string): Promise<string[]> {
  */
 export async function getUserPlanFeatures(userId: string): Promise<string[]> {
     try {
+        const session = await requireAuthenticatedSession();
+        const effectiveUserId =
+            ['ADMIN', 'SUPER_ADMIN'].includes(session.user.role || '') ? userId : session.user.id;
+
         const user = await prisma.user.findUnique({
-            where: { id: userId },
+            where: { id: effectiveUserId },
             include: {
                 plan: {
                     include: {
@@ -117,6 +141,8 @@ export async function getUserPlanFeatures(userId: string): Promise<string[]> {
  * Create or update a feature definition
  */
 export async function upsertFeature(data: FeatureDefinitionData) {
+    await requireAdminSession();
+
     try {
         const feature = await prisma.featureDefinition.upsert({
             where: { featureId: data.featureId },
@@ -147,6 +173,8 @@ export async function upsertFeature(data: FeatureDefinitionData) {
  * Delete a feature definition
  */
 export async function deleteFeature(featureId: string) {
+    await requireAdminSession();
+
     try {
         await prisma.featureDefinition.delete({
             where: { featureId }
@@ -164,6 +192,8 @@ export async function deleteFeature(featureId: string) {
  * Update feature access for a plan
  */
 export async function updatePlanFeatureAccess(planId: string, featureIds: string[]) {
+    await requireAdminSession();
+
     try {
         // Delete all existing access for this plan
         await prisma.planFeatureAccess.deleteMany({
@@ -193,6 +223,8 @@ export async function updatePlanFeatureAccess(planId: string, featureIds: string
  * Seed default features from the feature config
  */
 export async function seedDefaultFeatures() {
+    await requireAdminSession();
+
     try {
         const existingFeatures = await prisma.featureDefinition.count();
 

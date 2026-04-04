@@ -17,6 +17,7 @@ import type { Plan, PlanFeature } from '@prisma/client';
 import prisma from '@/server/prisma';
 import { checkFeatureAccess } from '@/lib/feature-access';
 import { getFeatureDisplayName, matchFeatureKeywords } from '@/lib/feature-config';
+import { auth } from '@/auth';
 
 type PlanWithFeatures = Plan & { features: PlanFeature[] };
 
@@ -101,6 +102,13 @@ export async function checkFeatureAccessWithPlan(
  * This fetches the user's plan from the database
  */
 export async function checkUserFeatureAccess(userId: string, featureId: string): Promise<FeatureAccess> {
-   // Use the centralized service
-   return hasFeatureAccess(userId, featureId);
+   const session = await auth();
+   if (!session?.user?.id) {
+      throw new Error('Unauthorized');
+   }
+
+   const effectiveUserId =
+      ['ADMIN', 'SUPER_ADMIN'].includes(session.user.role || '') ? userId : session.user.id;
+
+   return hasFeatureAccess(effectiveUserId, featureId);
 }

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clickveed_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d clickveed_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      CI: true
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/clickveed_ci?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/clickveed_ci?schema=public
+      AUTH_SECRET: ci-auth-secret-not-for-production
+      NEXTAUTH_SECRET: ci-nextauth-secret-not-for-production
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+
+      - name: Apply migrations to CI database
+        run: npx prisma migrate deploy
+
+      - name: Check migration status
+        run: npm run prisma:migrate:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Workflow contracts
+        run: npm run workflow:contracts
+
+      - name: Production build
+        run: npm run build
+
+      - name: Auth integration tests
+        run: npm run test:integration:auth
+
+      - name: AI workflow E2E tests
+        run: npm run test:e2e:ai
+
+      - name: Route auth integration tests
+        run: npm run test:integration:routes

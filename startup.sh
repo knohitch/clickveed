@@ -8,7 +8,10 @@ PRISMA_BIN="./node_modules/.bin/prisma"
 # Run database migrations when Prisma CLI exists in runtime image
 if [ -x "$PRISMA_BIN" ]; then
     echo "Running database migrations..."
-    $PRISMA_BIN migrate deploy || echo "Warning: Migration failed or no migrations to run. Continuing..."
+    if ! $PRISMA_BIN migrate deploy; then
+        echo "{\"event\":\"startup_migration_failed\",\"severity\":\"critical\",\"message\":\"Prisma migrate deploy failed during container startup.\"}" >&2
+        exit 1
+    fi
 else
     echo "Prisma CLI not found in runtime image. Skipping migrations."
 fi

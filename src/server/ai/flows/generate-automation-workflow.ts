@@ -8,6 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { generateWithProvider } from '@/lib/ai/api-service-manager';
+import { parseWorkflowJson, validateAutomationWorkflow } from '@/lib/automation-workflow-validator';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import {
     GenerateAutomationWorkflowInput,
@@ -117,18 +118,17 @@ const generateAutomationWorkflowFlow = ai.defineFlow(
         }
 
         try {
-            // Parse the JSON response to get the workflow object
-            // If content is already a stringified object, we parse it
-            // If it's a JSON string from the AI, we also parse it
-            const workflow = typeof content === 'string' ? JSON.parse(content) : content;
+            const workflow = typeof content === 'string' ? parseWorkflowJson(content) : content;
+            const validation = validateAutomationWorkflow(platform, workflow);
 
-            if (!workflow) {
-                throw new Error('Failed to generate a valid workflow from the prompt.');
+            if (!validation.ok) {
+                throw new Error(`Generated ${platform} workflow failed validation: ${validation.errors.join(' ')}`);
             }
 
-            return { workflow };
+            return { workflow: validation.workflow };
         } catch (error) {
-            throw new Error('Failed to parse the generated workflow JSON.');
+            const message = error instanceof Error ? error.message : 'Failed to parse the generated workflow JSON.';
+            throw new Error(message);
         }
     }
 );

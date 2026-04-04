@@ -5,6 +5,9 @@ import prisma from '@/server/prisma';
 import { logError } from '@/lib/error-handler';
 import { validateFile, sanitizeFilename } from '@/lib/file-upload-security';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const MAX_FILE_SIZE_MB = 100; // Limit upload to 100MB
 
 export async function POST(request: NextRequest) {

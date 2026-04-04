@@ -6,6 +6,9 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { getBaseUrl } from '@/lib/utils';
 import { createRateLimit } from '@/lib/rate-limit';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
 // This fixes build errors from crypto not supported in Edge Runtime
 export const runtime = 'nodejs';
@@ -24,25 +27,20 @@ export async function POST(request: Request) {
     return rateLimitResult;
   }
     try {
-        console.log('[resend-verification] Request received');
         const { email } = await request.json();
 
         if (!email) {
-            console.log('[resend-verification] No email provided');
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
         const user = await prisma.user.findUnique({ where: { email } });
-        console.log('[resend-verification] User found:', !!user);
 
         if (!user) {
             // Return success to prevent user enumeration
-            console.log('[resend-verification] User not found, returning success');
             return NextResponse.json({ success: true });
         }
 
         if (user.emailVerified && user.status === 'Active') {
-            console.log('[resend-verification] User already verified');
             return NextResponse.json({ error: 'Email is already verified' }, { status: 400 });
         }
 
@@ -69,8 +67,6 @@ export async function POST(request: Request) {
         // Use getBaseUrl utility for proper URL handling
         const baseUrl = getBaseUrl(request);
         const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
-        
-        console.log('[resend-verification] Verification URL generated:', verificationUrl.substring(0, 80) + '...');
 
         try {
             await sendEmail({
@@ -82,7 +78,6 @@ export async function POST(request: Request) {
                     verificationLink: verificationUrl,
                 }
             });
-            console.log('[resend-verification] Verification email sent to:', email);
         } catch (emailError: any) {
             console.error('Failed to send verification email:', emailError.message);
             return NextResponse.json(

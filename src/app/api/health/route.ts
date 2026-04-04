@@ -2,11 +2,18 @@ import { NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
 import IORedis from 'ioredis';
 import { resolveRedisConnectionInfo } from '@/lib/redis-config';
+import { auth } from '@/auth';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 /**
  * Health check endpoint for monitoring application status
  */
 export async function GET() {
+  const session = await auth();
+  const isAdmin = !!session?.user?.role && ['ADMIN', 'SUPER_ADMIN'].includes(session.user.role);
   const checks: {
     timestamp: string;
     status: 'healthy' | 'unhealthy';
@@ -122,6 +129,15 @@ export async function GET() {
 
   if (!isHealthy) {
     checks.status = 'unhealthy';
+  }
+
+  if (!isAdmin) {
+    return NextResponse.json({
+      timestamp: checks.timestamp,
+      status: checks.status,
+    }, {
+      status: isHealthy ? 200 : 503,
+    });
   }
 
   return NextResponse.json(checks, {

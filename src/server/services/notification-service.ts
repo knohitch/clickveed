@@ -75,15 +75,23 @@ export async function getUserNotifications(userId: string, options?: { unreadOnl
 /**
  * Mark notification as read
  */
-export async function markNotificationAsRead(notificationId: string) {
+export async function markNotificationAsRead(userId: string, notificationId: string) {
   try {
-    await prisma.notification.update({
-      where: { id: notificationId },
+    const result = await prisma.notification.updateMany({
+      where: {
+        id: notificationId,
+        userId,
+      },
       data: {
         isRead: true,
         readAt: new Date(),
       },
     });
+
+    if (result.count === 0) {
+      throw new Error('Notification not found');
+    }
+
     return { success: true };
   } catch (error) {
     console.error('[Notifications] Failed to mark notification as read:', error);

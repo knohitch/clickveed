@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import IORedis from 'ioredis';
 import { getRedisUrl } from '@/lib/redis-config';
+import { requireProductionRouteFlag, requireSuperAdminApi } from '@/lib/api-auth';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Redis connection for rate limiting (server-side only)
 const redisUrl = getRedisUrl();
@@ -67,6 +71,24 @@ async function isRateLimited(
 }
 
 export async function POST(request: NextRequest) {
+  const blockedInProduction = await requireProductionRouteFlag({
+    route: '/api/rate-limit',
+    method: 'POST',
+    envFlag: 'ENABLE_PROD_DEBUG_ROUTES',
+    description: 'Manual rate-limit inspection endpoint',
+  });
+  if (blockedInProduction) {
+    return blockedInProduction;
+  }
+
+  const unauthorized = await requireSuperAdminApi({
+    route: '/api/rate-limit',
+    method: 'POST',
+  });
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   try {
     const { key, windowMs, maxRequests } = await request.json();
     

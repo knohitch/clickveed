@@ -14,9 +14,24 @@
  */
 
 import prisma from '@/server/prisma';
+import { auth } from '@/auth';
 import type { FeatureAccess } from '@/lib/feature-access';
 import { checkFeatureAccess, getFeatureDisplayName } from '@/lib/feature-access';
 import { ALWAYS_ACCESSIBLE_FEATURES, matchFeatureKeywords } from '@/lib/feature-config';
+
+async function resolveEffectiveUserId(requestedUserId: string): Promise<string> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error('Unauthorized');
+  }
+
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(session.user.role || '');
+  if (!isAdmin && session.user.id !== requestedUserId) {
+    throw new Error('Forbidden');
+  }
+
+  return isAdmin ? requestedUserId : session.user.id;
+}
 
 /**
  * Check if a user has access to a specific feature.
@@ -27,10 +42,12 @@ import { ALWAYS_ACCESSIBLE_FEATURES, matchFeatureKeywords } from '@/lib/feature-
  * @returns Promise<FeatureAccess> - Access result
  */
 export async function hasFeatureAccess(userId: string, featureId: string): Promise<FeatureAccess> {
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+
   try {
     // Fetch user with their plan and plan features
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: effectiveUserId },
       include: {
         plan: {
           include: {
@@ -41,7 +58,7 @@ export async function hasFeatureAccess(userId: string, featureId: string): Promi
     });
 
     if (!user) {
-      console.error('[FeatureAccess] User not found:', userId);
+      console.error('[FeatureAccess] User not found:', effectiveUserId);
       return {
         canAccess: false,
         requiresUpgrade: true,
@@ -60,7 +77,7 @@ export async function hasFeatureAccess(userId: string, featureId: string): Promi
     const featureTier = user.plan?.featureTier || 'free';
     
     console.log('[FeatureAccess] No database features found, using tier-based check:', {
-      userId,
+      userId: effectiveUserId,
       featureId,
       planName,
       featureTier

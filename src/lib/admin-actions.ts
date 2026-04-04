@@ -1,7 +1,15 @@
 'use server';
 
 import type { Plan, Promotion, ApiKeys, EmailSettings, EmailTemplates } from '@/contexts/admin-settings-context';
+import { auth } from '@/auth';
 import prisma from './prisma';
+
+async function requireAdminSession(): Promise<void> {
+    const session = await auth();
+    if (!session?.user?.role || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+        throw new Error('Administrator access required');
+    }
+}
 
 /**
  * Retrieves all admin settings from the production database.
@@ -183,6 +191,8 @@ export async function updateEmailTemplates(templates: EmailTemplates) {
  * Fetches dashboard overview statistics with performance optimizations
  */
 export async function getDashboardStats() {
+    await requireAdminSession();
+
     try {
         // Use a timeout for the entire operation
         const timeoutPromise = new Promise((_, reject) =>
@@ -285,6 +295,8 @@ export async function getDashboardStats() {
  * Fetches real analytics data for the dashboard
  */
 export async function getAnalyticsData() {
+    await requireAdminSession();
+
     // Get all users with their plans
     const allUsers = await prisma.user.findMany({ 
         include: { 

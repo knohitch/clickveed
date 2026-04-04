@@ -15,12 +15,7 @@ import type { Message } from '@/lib/types';
 import { ChatMessage } from './chat-message';
 import { ScrollArea } from './ui/scroll-area';
 import { createTicket } from '@/lib/support-actions';
-import type { User } from 'next-auth';
 import { Progress } from './ui/progress';
-
-interface SupportChatWidgetProps {
-  user: User;
-}
 
 const initialState = {
     stream: null,
@@ -29,7 +24,7 @@ const initialState = {
     errors: {}
 }
 
-export function SupportChatWidget({ user }: SupportChatWidgetProps) {
+export function SupportChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const { isSupportOnline } = useAdminSettings();
   const { toast } = useToast();
@@ -69,10 +64,7 @@ export function SupportChatWidget({ user }: SupportChatWidgetProps) {
     if (!userInput.trim()) return;
 
     if (!hasCreatedTicket.current) {
-        createTicket({
-            userName: user.name || 'User',
-            userEmail: user.email || 'No email provided',
-            userAvatar: '', // next-auth User type doesn't have avatarUrl
+        void createTicket({
             subject: `Chat: ${userInput.substring(0, 50)}...`,
             initialMessage: userInput,
         });

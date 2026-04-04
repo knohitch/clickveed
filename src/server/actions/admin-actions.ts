@@ -2,6 +2,7 @@
 'use server';
 
 import type { Plan, Promotion, ApiKeys, EmailSettings, EmailTemplates } from '@/contexts/admin-settings-context';
+import { auth } from '@/auth';
 import prisma from '@/server/prisma';
 import { sendEmail } from '@/server/services/email-service';
 import { revalidatePath } from 'next/cache';
@@ -61,6 +62,13 @@ const defaultEmailTemplates: EmailTemplates = {
     userTicketStatusChange: { subject: 'Ticket Status Updated', body: 'Your ticket {{ticketId}} status is now {{newStatus}}.' },
     adminNewTicket: { subject: 'New Support Ticket', body: 'New ticket from {{userName}}.' },
 };
+
+async function requireAdminSession(): Promise<void> {
+    const session = await auth();
+    if (!session?.user?.role || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+        throw new Error('Administrator access required');
+    }
+}
 
 /**
  * Retrieves all admin settings from the production database.
@@ -196,6 +204,8 @@ function getDefaultSettings() {
  * Updates a general admin setting in the production database.
  */
 export async function updateAdminSettings(data: { [key: string]: any }) {
+    await requireAdminSession();
+
     for (const [key, value] of Object.entries(data)) {
         const valueStr = value === null ? 'null' : String(value);
         await prisma.setting.upsert({
@@ -211,6 +221,8 @@ export async function updateAdminSettings(data: { [key: string]: any }) {
  * Updates the subscription plans in the production database.
  */
 export async function updatePlans(plans: Plan[]) {
+    await requireAdminSession();
+
     // Get existing plans to identify which ones to delete
     const existingPlans = await prisma.plan.findMany();
     const existingPlanIds = existingPlans.map(p => p.id);
@@ -272,6 +284,8 @@ export async function updatePlans(plans: Plan[]) {
  * Deletes a specific plan from the database.
  */
 export async function deletePlan(planId: string) {
+    await requireAdminSession();
+
     try {
         // Check if plan exists and has users
         const plan = await prisma.plan.findUnique({
@@ -307,6 +321,8 @@ export async function deletePlan(planId: string) {
  * Updates promotions in the production database.
  */
 export async function updatePromotions(promotions: Promotion[]) {
+    await requireAdminSession();
+
     for (const promo of promotions) {
         const { applicablePlanIds, ...promoData } = promo;
         await prisma.promotion.upsert({
@@ -331,6 +347,8 @@ export async function updatePromotions(promotions: Promotion[]) {
  * Updates API keys in production database.
  */
 export async function updateApiKeys(keys: ApiKeys) {
+    await requireAdminSession();
+
     // Log only non-sensitive key names, not values
     console.log('[updateApiKeys] Updating keys:', Object.keys(keys).join(', '));
     
@@ -398,6 +416,8 @@ export async function updateApiKeys(keys: ApiKeys) {
  * Updates email settings in the production database.
  */
 export async function updateEmailSettings(settings: EmailSettings) {
+    await requireAdminSession();
+
     const { id, ...settingsData } = settings;
     await prisma.emailSettings.upsert({
         where: { id: 1 },
@@ -410,6 +430,8 @@ export async function updateEmailSettings(settings: EmailSettings) {
  * Updates email templates in the production database.
  */
 export async function updateEmailTemplates(templates: EmailTemplates) {
+    await requireAdminSession();
+
     for (const [key, template] of Object.entries(templates)) {
         await prisma.emailTemplate.upsert({
             where: { key },
@@ -423,6 +445,8 @@ export async function updateEmailTemplates(templates: EmailTemplates) {
  * A server action to test the database connection.
  */
 export async function testDbConnection() {
+    await requireAdminSession();
+
     try {
         await prisma.$queryRaw`SELECT 1`;
         return { success: true, message: 'Successfully connected to the database.' };
@@ -435,6 +459,8 @@ export async function testDbConnection() {
  * Test SMTP email configuration by sending a test email
  */
 export async function sendTestEmail(testEmail: string) {
+    await requireAdminSession();
+
     try {
         const { emailSettings, appName } = await getAdminSettings();
 
@@ -483,6 +509,8 @@ export async function sendTestEmail(testEmail: string) {
  * Get cron job settings from the database
  */
 export async function getCronJobSettings(): Promise<Record<string, boolean>> {
+    await requireAdminSession();
+
     try {
         const setting = await prisma.setting.findUnique({
             where: { key: 'cronJobSettings' }
@@ -518,6 +546,8 @@ export async function getCronJobSettings(): Promise<Record<string, boolean>> {
  * Save cron job settings to the database
  */
 export async function saveCronJobSettings(settings: Record<string, boolean>): Promise<{ success: boolean; message: string }> {
+    await requireAdminSession();
+
     try {
         await prisma.setting.upsert({
             where: { key: 'cronJobSettings' },
@@ -536,6 +566,8 @@ export async function saveCronJobSettings(settings: Record<string, boolean>): Pr
  * Toggle a single cron job setting
  */
 export async function toggleCronJob(commandSlug: string, isActive: boolean): Promise<{ success: boolean; message: string }> {
+    await requireAdminSession();
+
     try {
         const currentSettings = await getCronJobSettings();
         currentSettings[commandSlug] = isActive;

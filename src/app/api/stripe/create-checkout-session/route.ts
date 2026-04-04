@@ -5,6 +5,9 @@ import { auth } from '@/auth';
 import { getBaseUrl } from '@/lib/utils';
 import { isStripeConfigured } from '@/server/services/stripe-service';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * Creates a new Stripe instance using ONLY environment variables.
  * No database calls, no caching - simple and safe.
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'User not found.' }, { status: 404 });
         }
 
-        let plan = await prisma.plan.findUnique({
+        const plan = await prisma.plan.findUnique({
             where: { id: planId },
         });
 

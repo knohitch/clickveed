@@ -1,41 +1,22 @@
-'use client';
-
 import { MagicClipsGenerator } from '@/components/magic-clips-generator';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeatureGuard } from '@/components/feature-lock';
-import { useAuth } from '@/contexts/auth-context';
-import { LoadingSpinner } from '@/components/loading-spinner';
+import { FeatureLock } from '@/components/feature-lock';
+import { getFeaturePageAccess } from '@/lib/server-feature-page';
 
-export default function MagicClipsPage() {
-    return <MagicClipsContent />;
-}
+export default async function MagicClipsPage() {
+    const access = await getFeaturePageAccess('magic-clips');
 
-function MagicClipsContent() {
-    const { subscriptionPlan, planFeatures, loading } = useAuth();
-
-    if (loading) {
-        return <MagicClipsLoading />;
+    if (!access.canAccess) {
+        return (
+            <FeatureLock
+                featureId="magic-clips"
+                planName={access.planName}
+                featureTier={access.featureTier}
+                planFeatures={access.planFeatures}
+                title="Feature Not Available"
+                description="This feature is not included in your current plan."
+            />
+        );
     }
 
-    return (
-        <FeatureGuard featureId="magic-clips" planName={subscriptionPlan?.name || null} planFeatures={planFeatures}>
-            <MagicClipsGenerator />
-        </FeatureGuard>
-    );
-}
-
-function MagicClipsLoading() {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Magic Clips Generator</CardTitle>
-                <CardDescription>
-                    Upload a long-form video and let our AI find the most engaging, viral-worthy short clips for you.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center justify-center py-8">
-                <LoadingSpinner />
-            </CardContent>
-        </Card>
-    );
+    return <MagicClipsGenerator />;
 }

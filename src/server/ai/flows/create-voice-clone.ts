@@ -7,6 +7,7 @@ import { ai } from '@/ai/genkit';
 import { addVoice, VoiceCloneResponse } from '@/lib/elevenlabs-client';
 import { auth } from '@/auth';
 import prisma from '@/server/prisma';
+import { resolveOwnedVoiceSampleUrls } from '@/server/ai/workflow-contract-helpers';
 import {
   CreateVoiceCloneInputSchema,
   CreateVoiceCloneOutputSchema,
@@ -44,6 +45,52 @@ export async function createVoiceClone(
   return createVoiceCloneFlow(input);
 }
 
+export async function runVoiceCloneWorkflow(
+  input: CreateVoiceCloneInput,
+  deps: {
+    userId: string;
+    userEmail?: string | null;
+    resolveSamples: (fileUrls: string[], userId: string) => Promise<{ sampleKeys: string[]; sampleUrls: string[] }>;
+    addVoiceClone: (
+      voiceName: string,
+      sampleUrls: string[],
+      metadata: { description: string }
+    ) => Promise<VoiceCloneResponse>;
+    createVoiceCloneRecord: (record: {
+      voiceId: string;
+      name: string;
+      userId: string;
+      status: string;
+      provider: string;
+      sampleUrls: string[];
+    }) => Promise<unknown>;
+  }
+): Promise<CreateVoiceCloneOutput> {
+  const { sampleKeys, sampleUrls } = await deps.resolveSamples(input.fileUrls, deps.userId);
+
+  const voiceCloneResponse = await deps.addVoiceClone(
+    input.voiceName,
+    sampleUrls,
+    {
+      description: `Voice clone created by ${deps.userEmail || deps.userId} on ${new Date().toISOString()}`,
+    }
+  );
+
+  await deps.createVoiceCloneRecord({
+    voiceId: voiceCloneResponse.voiceId,
+    name: input.voiceName,
+    userId: deps.userId,
+    status: 'completed',
+    provider: 'elevenlabs',
+    sampleUrls: sampleKeys,
+  });
+
+  return {
+    voiceId: voiceCloneResponse.voiceId,
+    message: `Voice cloning for "${input.voiceName}" has been successfully created with ID ${voiceCloneResponse.voiceId}.`,
+  };
+}
+
 const createVoiceCloneFlow = ai.defineFlow(
   {
     name: 'createVoiceCloneFlow',
@@ -63,33 +110,16 @@ const createVoiceCloneFlow = ai.defineFlow(
         throw new Error("User must be authenticated to create a voice clone.");
       }
 
-      // Call the ElevenLabs API to create a voice clone
-      const voiceCloneResponse: VoiceCloneResponse = await addVoice(
-        input.voiceName,
-        input.fileUrls,
-        {
-          description: `Voice clone created by ${session.user.email || userId} on ${new Date().toISOString()}`
-        }
-      );
-
-      // Store the voice clone details in the database for future reference
-      // Use type assertion to work around TypeScript issues with Prisma Accelerate extension
-      await (prisma as any).voiceClone.create({
-        data: {
-          voiceId: voiceCloneResponse.voiceId,
-          name: input.voiceName,
-          userId,
-          status: 'completed',
-          provider: 'elevenlabs',
-          sampleUrls: input.fileUrls, // Store the URLs of the audio samples used
-        }
+      return runVoiceCloneWorkflow(input, {
+        userId,
+        userEmail: session.user.email,
+        resolveSamples: resolveOwnedVoiceSampleUrls,
+        addVoiceClone: addVoice,
+        createVoiceCloneRecord: async (record) =>
+          (prisma as any).voiceClone.create({
+            data: record,
+          }),
       });
-
-      // Return the response to the client
-      return {
-        voiceId: voiceCloneResponse.voiceId,
-        message: `Voice cloning for "${input.voiceName}" has been successfully created with ID ${voiceCloneResponse.voiceId}.`,
-      };
     } catch (error) {
       console.error('Error creating voice clone:', error);
 

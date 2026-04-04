@@ -48,12 +48,12 @@ export function VoiceCloningStudio() {
 
         const formData = new FormData(event.currentTarget);
 
-        // Upload audio files as multipart FormData to /api/upload
-        // (The old presigned-URL pattern was incompatible with the actual endpoint)
+        // Upload audio files to the user-scoped storage API and pass storage keys
+        // back to the server action instead of arbitrary public URLs.
         const uploadPromises = files.map(async file => {
             const uploadFormData = new FormData();
             uploadFormData.append('file', file);
-            const uploadResponse = await fetch('/api/upload', {
+            const uploadResponse = await fetch('/api/storage/upload', {
                 method: 'POST',
                 body: uploadFormData, // multipart - browser sets Content-Type with boundary
             });
@@ -61,12 +61,18 @@ export function VoiceCloningStudio() {
                 const errData = await uploadResponse.json().catch(() => ({}));
                 throw new Error(errData.error || `Upload failed: ${uploadResponse.statusText}`);
             }
-            const { url } = await uploadResponse.json();
-            return url as string;
+            const payload = await uploadResponse.json();
+            const key = payload?.data?.key;
+
+            if (!payload?.success || !key) {
+                throw new Error(payload?.error || 'Upload did not return a storage key.');
+            }
+
+            return key as string;
         });
 
-        const fileUrls = await Promise.all(uploadPromises);
-        fileUrls.forEach(url => formData.append('fileUrls', url));
+        const fileKeys = await Promise.all(uploadPromises);
+        fileKeys.forEach(key => formData.append('fileUrls', key));
 
         formAction(formData);
     };

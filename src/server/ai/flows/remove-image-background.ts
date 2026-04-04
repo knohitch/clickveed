@@ -5,6 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { generateImageEditWithProvider } from '@/lib/ai/api-service-manager';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
@@ -17,6 +18,8 @@ import {
 
 // Re-export types for consumers
 export type { RemoveImageBackgroundInput, RemoveImageBackgroundOutput } from './types';
+
+const SOURCE_IMAGE_FETCH_TIMEOUT_MS = 15000;
 
 export async function removeImageBackground(
   input: RemoveImageBackgroundInput
@@ -175,7 +178,12 @@ const removeImageBackgroundFlow = ai.defineFlow(
     }
 
     // We need to fetch the image data first to pass it as a data URI to the model
-    const imageResponse = await fetch(input.imageUrl);
+    const imageResponse = await fetchWithTimeout(
+      input.imageUrl,
+      { cache: 'no-store' },
+      SOURCE_IMAGE_FETCH_TIMEOUT_MS,
+      `Source image download timed out after ${SOURCE_IMAGE_FETCH_TIMEOUT_MS}ms.`
+    );
     const imageBuffer = await imageResponse.arrayBuffer();
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
     const dataUri = `data:${contentType};base64,${Buffer.from(imageBuffer).toString('base64')}`;

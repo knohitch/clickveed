@@ -16,14 +16,6 @@ const nextConfig = {
         unoptimized: false, // Keep optimization but with fewer sizes
     },
     
-    // Disable expensive features for builds
-    typescript: {
-        ignoreBuildErrors: true
-    },
-    eslint: {
-        ignoreDuringBuilds: true,
-    },
-    
     // Reduce build overhead
     productionBrowserSourceMaps: false,
     swcMinify: true,

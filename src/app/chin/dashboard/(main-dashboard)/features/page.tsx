@@ -287,7 +287,7 @@ export default function FeaturesManagementPage() {
                         <Database className="h-12 w-12 text-muted-foreground mb-4" />
                         <h3 className="text-lg font-semibold mb-2">No Features Found</h3>
                         <p className="text-muted-foreground text-center mb-4">
-                            Click "Seed Defaults" to populate the database with the default features, or add features manually.
+                            Click &quot;Seed Defaults&quot; to populate the database with the default features, or add features manually.
                         </p>
                         <Button onClick={handleSeedFeatures} disabled={seeding}>
                             {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
@@ -474,7 +474,7 @@ export default function FeaturesManagementPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Feature?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete the "{featureToDelete?.displayName}" feature and remove it from all plans.
+                            This will permanently delete the &quot;{featureToDelete?.displayName}&quot; feature and remove it from all plans.
                             This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

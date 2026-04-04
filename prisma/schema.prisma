@@ -48,9 +48,14 @@ model User {
   brandKit              BrandKit?
   usage                 UserUsage?
   voiceClones           VoiceClone[]    // Added
+  personaAvatarJobs     PersonaAvatarJob[]
   planId                String?
   plan                  Plan?           @relation(fields: [planId], references: [id])
   notifications         Notification[]
+
+  @@index([planId])
+  @@index([createdAt])
+  @@index([stripeSubscriptionStatus, stripeCurrentPeriodEnd])
 }
 
 model Account {
@@ -70,6 +75,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -78,6 +84,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -121,6 +129,8 @@ model PlanFeature {
   text   String
   plan   Plan   @relation(fields: [planId], references: [id])
   planId String
+
+  @@index([planId])
 }
 
 model Promotion {
@@ -143,6 +153,7 @@ model PromotionOnPlan {
   assignedBy  String    @default("Admin")
 
   @@id([planId, promotionId])
+  @@index([promotionId])
 }
 
 model ApplicablePromotionPlan {
@@ -153,6 +164,7 @@ model ApplicablePromotionPlan {
   createdAt   DateTime  @default(now())
 
   @@id([planId, promotionId])
+  @@index([promotionId])
 }
 
 model Project {
@@ -166,6 +178,8 @@ model Project {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   videos        Video[]
+
+  @@index([userId, updatedAt])
 }
 
 model Video {
@@ -178,6 +192,8 @@ model Video {
   transcript  Transcript?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  @@index([projectId])
 }
 
 model Transcript {
@@ -201,6 +217,8 @@ model MediaAsset {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model Agent {
@@ -213,6 +231,8 @@ model Agent {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model SocialConnection {
@@ -228,6 +248,7 @@ model SocialConnection {
   updatedAt    DateTime  @updatedAt
 
   @@unique([userId, platform])
+  @@index([userId, createdAt])
 }
 
 // Voice Clone model for storing voice cloning results
@@ -242,6 +263,28 @@ model VoiceClone {
   sampleUrls  String[] // URLs to the original audio samples used
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model PersonaAvatarJob {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personaName    String
+  script         String   @db.Text
+  avatarImageUrl String
+  status         String   @default("queued") // queued, processing, completed, failed
+  videoUrl       String?
+  errorMessage   String?  @db.Text
+  attempts       Int      @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 // ==================================
@@ -289,6 +332,9 @@ model SupportTicket {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model BrandKit {

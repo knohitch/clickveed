@@ -13,10 +13,9 @@ import { Logo } from '@/components/logo';
 import { Separator } from '@/components/ui/separator';
 import { GoogleIcon } from '@/components/icons/google-icon';
 import { SignupForm } from '@/components/auth/signup-form';
-import { getAdminSettings } from '@/server/actions/admin-actions';
 
 export async function generateMetadata() {
-  const { appName } = await getAdminSettings();
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AI Video Creator';
   return {
     title: `Sign Up | ${appName}`,
   };

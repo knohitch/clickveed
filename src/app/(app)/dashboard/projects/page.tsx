@@ -192,7 +192,7 @@ function ProjectsPageContent() {
                  <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-md col-span-full">
                     <FolderSearch className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-semibold">No Projects Found</h3>
-                    <p className="mt-1 text-sm">There are no projects with the status "{filter}". Try a different filter or create a new project.</p>
+                    <p className="mt-1 text-sm">There are no projects with the status &quot;{filter}&quot;. Try a different filter or create a new project.</p>
                 </div>
             )}
 

@@ -13,11 +13,10 @@ import { Logo } from '@/components/logo';
 import { Separator } from '@/components/ui/separator';
 import { GoogleIcon } from '@/components/icons/google-icon';
 import { LoginForm } from '@/components/auth/login-form';
-import { getAdminSettings } from '@/server/actions/admin-actions';
 import { Suspense } from 'react';
 
 export async function generateMetadata() {
-  const { appName } = await getAdminSettings();
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AI Video Creator';
   return {
     title: `Login | ${appName}`,
   };
@@ -61,7 +60,7 @@ export default async function LoginPage() {
             </form>
 
           <div className="mt-4 text-center text-sm">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/signup" className="underline">
               Sign up
             </Link>

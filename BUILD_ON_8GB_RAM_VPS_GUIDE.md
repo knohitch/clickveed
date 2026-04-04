@@ -161,7 +161,7 @@ Or modify `package.json` build script:
 ```json
 {
   "scripts": {
-    "build": "prisma generate && cross-env NODE_OPTIONS='--max-old-space-size=6144' next build --no-lint"
+    "build": "prisma generate && cross-env NODE_OPTIONS='--max-old-space-size=6144' next build"
   }
 }
 ```

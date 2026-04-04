@@ -2,11 +2,24 @@ import { NextResponse } from 'next/server';
 import { getBackupStatus } from '@/lib/backup-manager';
 import { getResourceStatus } from '@/lib/resource-monitor';
 import { initSentry } from '@/lib/sentry.server.config';
+import { requireSuperAdminApi } from '@/lib/api-auth';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 /**
  * Monitoring endpoint for comprehensive application status
  */
 export async function GET() {
+  const unauthorized = await requireSuperAdminApi({
+    route: '/api/monitoring',
+    method: 'GET',
+  });
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   const startTime = Date.now();
   
   try {

@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 /**
  * @fileOverview Manages and rotates through available AI service providers.
@@ -11,6 +11,7 @@
  * - Health tracking for all providers
  */
 import { createGenkitInstance } from '@/ai/genkit';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import { type Tool } from 'genkit';
 import { z } from 'zod';
 import { searchPexelsTool } from '@/server/ai/tools/pexels-tool';
@@ -21,90 +22,44 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { createProviderClient, providerSupportsCapability } from './provider-clients';
 import { MODEL_CONSTANTS, getProvidersForCapability, type AICapability } from './provider-registry';
 import { getProviderMetadata } from '@/lib/database-config-service';
+import { sendOperationalAlert } from '@/lib/monitoring/alerts';
 
 /**
- * Circuit Breaker Implementation
- * Prevents repeated calls to failing providers
+ * Stateless provider tracker.
+ *
+ * We intentionally avoid process-local circuit-breaker or health state here.
+ * In multi-instance production that state becomes inconsistent across nodes and
+ * leads to hard-to-debug behavior where one instance skips a provider while
+ * another still uses it. Requests already fall back across providers in-order,
+ * so we keep observability logs without persisting cross-request state.
  */
-class CircuitBreaker {
-  private failures = new Map<string, number>();
-  private lastFailureTime = new Map<string, number>();
-  private openCircuits = new Set<string>();
-  private readonly threshold = 5; // Max failures before opening circuit
-  private readonly timeout = 60000; // 1 minute cooldown
-
-  shouldAttempt(provider: string): boolean {
-    // If circuit is open, check if cooldown has passed
-    if (this.openCircuits.has(provider)) {
-      const lastFailure = this.lastFailureTime.get(provider) || 0;
-      const timeSinceFailure = Date.now() - lastFailure;
-
-      if (timeSinceFailure >= this.timeout) {
-        // Try to close the circuit (half-open state)
-        console.log(`[CircuitBreaker] Attempted to close circuit for ${provider} after ${timeSinceFailure}ms cooldown`);
-        this.openCircuits.delete(provider);
-        this.failures.set(provider, 0);
-        return true;
-      }
-
-      console.log(`[CircuitBreaker] Circuit open for ${provider}, skipping (${this.timeout - timeSinceFailure}ms remaining)`);
-      return false;
-    }
-
+class ProviderStateTracker {
+  shouldAttempt(_provider: string): boolean {
     return true;
   }
 
   recordFailure(provider: string): void {
-    const failures = (this.failures.get(provider) || 0) + 1;
-    this.failures.set(provider, failures);
-    this.lastFailureTime.set(provider, Date.now());
-
-    if (failures >= this.threshold) {
-      console.warn(`[CircuitBreaker] Opening circuit for ${provider} after ${failures} failures`);
-      this.openCircuits.add(provider);
-    } else {
-      console.log(`[CircuitBreaker] Provider ${provider} has ${failures}/${this.threshold} failures`);
-    }
+    console.warn(`[ProviderStateTracker] Provider failure recorded for ${provider}`);
   }
 
-  recordSuccess(provider: string): void {
-    // Reset failure count on success
-    if (this.failures.get(provider)) {
-      console.log(`[CircuitBreaker] Resetting failure count for ${provider}`);
-    }
-    this.failures.delete(provider);
-    this.lastFailureTime.delete(provider);
-    this.openCircuits.delete(provider);
-  }
+  recordSuccess(_provider: string): void {}
 
-  getStatus(provider: string): { failures: number; isOpen: boolean } {
-    return {
-      failures: this.failures.get(provider) || 0,
-      isOpen: this.openCircuits.has(provider)
-    };
+  getStatus(_provider: string): { failures: number; isOpen: boolean } {
+    return { failures: 0, isOpen: false };
   }
 
   reset(): void {
-    this.failures.clear();
-    this.lastFailureTime.clear();
-    this.openCircuits.clear();
-    console.log('[CircuitBreaker] All circuits reset');
+    console.log('[ProviderStateTracker] Stateless provider state reset requested');
   }
 }
 
-// Global circuit breaker instance
-const circuitBreaker = new CircuitBreaker();
+const circuitBreaker = new ProviderStateTracker();
 
-/**
- * Provider Health Tracking
- */
 interface ProviderHealth {
   lastChecked: number;
   isHealthy: boolean;
   lastError?: string;
 }
-
-const providerHealth = new Map<string, ProviderHealth>();
 
 /**
  * Reset all provider health and circuit breaker state.
@@ -112,28 +67,28 @@ const providerHealth = new Map<string, ProviderHealth>();
  * by stale failure data from previous keys.
  */
 export async function resetProviderStates(): Promise<void> {
-  providerHealth.clear();
   circuitBreaker.reset();
-  console.log('[APIServiceManager] All provider states and circuit breakers reset');
+  console.log('[APIServiceManager] Provider state reset completed');
 }
 
-function markProviderHealthy(provider: string): void {
-  providerHealth.set(provider, {
-    lastChecked: Date.now(),
-    isHealthy: true
-  });
-}
+function markProviderHealthy(_provider: string): void {}
 
 function markProviderUnhealthy(provider: string, error: string): void {
-  providerHealth.set(provider, {
-    lastChecked: Date.now(),
-    isHealthy: false,
-    lastError: error
+  console.warn(`[APIServiceManager] Provider marked unhealthy for request`, { provider, error });
+  void sendOperationalAlert({
+    category: 'ai',
+    severity: 'warning',
+    event: 'provider_marked_unhealthy',
+    message: `AI provider ${provider} failed and was marked unhealthy for the current request.`,
+    metadata: {
+      provider,
+      error,
+    },
   });
 }
 
-function getProviderHealth(provider: string): ProviderHealth | undefined {
-  return providerHealth.get(provider);
+function getProviderHealth(_provider: string): ProviderHealth | undefined {
+  return undefined;
 }
 
 // Define request types locally as they are no longer exported from genkit
@@ -181,6 +136,17 @@ function logProviderSelection(feature: AICapability, provider: string): void {
 
 function logFallback(feature: AICapability, provider: string, reason: string): void {
   console.warn(JSON.stringify({ event: 'provider_fallback', feature, provider, reason, at: new Date().toISOString() }));
+  void sendOperationalAlert({
+    category: 'ai',
+    severity: 'warning',
+    event: 'provider_fallback',
+    message: `AI provider fallback triggered for ${feature}.`,
+    metadata: {
+      provider,
+      feature,
+      reason,
+    },
+  });
 }
 
 function hasGoogleVertexRuntimeSetup(apiKeys: Record<string, string>): boolean {
@@ -368,6 +334,7 @@ function isMinimaxAuthError(error: unknown): boolean {
 const geminiImageModelCache = new Map<string, { expiresAt: number; models: string[] }>();
 const GEMINI_IMAGE_MODEL_CACHE_TTL_MS = 30 * 60 * 1000;
 const GEMINI_LIST_MODELS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_DISCOVERY_TIMEOUT_MS = 10000;
 
 function normalizeGoogleAiModel(model: string): string {
   const value = model.trim();
@@ -426,10 +393,15 @@ async function discoverGeminiImageModels(apiKey: string): Promise<string[]> {
   }
 
   try {
-    const response = await fetch(`${GEMINI_LIST_MODELS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
-      method: 'GET',
-      cache: 'no-store',
-    });
+    const response = await fetchWithTimeout(
+      `${GEMINI_LIST_MODELS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'GET',
+        cache: 'no-store',
+      },
+      GEMINI_DISCOVERY_TIMEOUT_MS,
+      `Gemini model discovery timed out after ${GEMINI_DISCOVERY_TIMEOUT_MS}ms.`
+    );
 
     if (!response.ok) {
       throw new Error(`Gemini ListModels failed with status ${response.status}`);
@@ -1004,7 +976,7 @@ export async function generateVideoWithProvider(req: Omit<GenerateRequest, 'mode
   throw lastError || new Error('All configured video providers failed.');
 }
 
-export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'>) {
+export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'> & { voiceId?: string }) {
   const { apiKeys } = await getAdminSettings();
   const text = req.messages.map(msg => {
     if (Array.isArray(msg.content)) {
@@ -1016,7 +988,7 @@ export async function generateTtsWithProvider(req: Omit<GenerateRequest, 'model'
   const callCustomTtsProvider = async (provider: 'awsPolly' | 'elevenlabs') => {
     const providerInfo = getProvidersForCapability('tts').find((p) => p.name === provider);
     const client = await createProviderClient(provider);
-    const response = await client.generateSpeech(text, undefined, providerInfo?.model);
+    const response = await client.generateSpeech(text, req.voiceId, providerInfo?.model);
 
     circuitBreaker.recordSuccess(provider);
     markProviderHealthy(provider);

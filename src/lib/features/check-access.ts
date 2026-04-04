@@ -7,6 +7,7 @@
 
 /// <reference types="node" />
 
+import { auth } from '@/auth';
 import prisma from '@/server/prisma';
 import { getFeatureDisplayName, ALWAYS_ACCESSIBLE_FEATURES } from '@/lib/feature-config';
 
@@ -40,6 +41,30 @@ export interface FeatureAccessResult {
   planId?: string;
 }
 
+function isAdminRole(role?: string | null): boolean {
+  return !!role && ['ADMIN', 'SUPER_ADMIN'].includes(role);
+}
+
+async function requireAuthenticatedSession() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error('Unauthorized');
+  }
+  return session;
+}
+
+async function resolveEffectiveUserId(requestedUserId: string): Promise<string> {
+  const session = await requireAuthenticatedSession();
+  return isAdminRole(session.user.role) ? requestedUserId : session.user.id;
+}
+
+async function requireAdminSession(): Promise<void> {
+  const session = await requireAuthenticatedSession();
+  if (!isAdminRole(session.user.role)) {
+    throw new Error('Administrator access required');
+  }
+}
+
 /**
  * Check if a user has access to a specific feature
  * This checks the PlanFeatureAccess table in the database
@@ -49,7 +74,8 @@ export async function checkFeatureAccess(
   featureId: string
 ): Promise<FeatureAccessResult> {
   try {
-    console.log(`[FeatureAccess] Checking ${featureId} for user ${userId}`);
+    const effectiveUserId = await resolveEffectiveUserId(userId);
+    console.log(`[FeatureAccess] Checking ${featureId} for user ${effectiveUserId}`);
     
     // Always allow basic features
     if ((ALWAYS_ACCESSIBLE_FEATURES as readonly string[]).includes(featureId)) {
@@ -62,7 +88,7 @@ export async function checkFeatureAccess(
     
     // Get user with plan and feature access
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: effectiveUserId },
       include: {
         plan: {
           include: {
@@ -78,7 +104,7 @@ export async function checkFeatureAccess(
     });
 
     if (!user) {
-      console.error(`[FeatureAccess] User ${userId} not found`);
+      console.error(`[FeatureAccess] User ${effectiveUserId} not found`);
       return {
         canAccess: false,
         requiresUpgrade: true,
@@ -87,7 +113,7 @@ export async function checkFeatureAccess(
     }
 
     if (!user.plan) {
-      console.log(`[FeatureAccess] User ${userId} has no plan assigned, checking free tier`);
+      console.log(`[FeatureAccess] User ${effectiveUserId} has no plan assigned, checking free tier`);
       // Check if feature is in free tier
       const freePlan = await prisma.plan.findFirst({
         where: { 
@@ -141,7 +167,7 @@ export async function checkFeatureAccess(
     const hasFeature = hasFeatureAccess || hasLegacyFeature;
     
     console.log(`[FeatureAccess] Result for ${featureId}:`, {
-      userId,
+      userId: effectiveUserId,
       planId: user.plan.id,
       planName: user.plan.name,
       hasFeature,
@@ -171,8 +197,9 @@ export async function checkFeatureAccess(
  */
 export async function getUserPlanFeatures(userId: string): Promise<string[]> {
   try {
+    const effectiveUserId = await resolveEffectiveUserId(userId);
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: effectiveUserId },
       include: {
         plan: {
           include: {
@@ -204,6 +231,7 @@ export async function addFeatureToPlan(
   featureId: string
 ): Promise<boolean> {
   try {
+    await requireAdminSession();
     // First ensure the feature definition exists
     let feature = await prisma.featureDefinition.findUnique({
       where: { featureId },
@@ -253,6 +281,7 @@ export async function removeFeatureFromPlan(
   featureId: string
 ): Promise<boolean> {
   try {
+    await requireAdminSession();
     await prisma.planFeatureAccess.delete({
       where: {
         planId_featureId: {
@@ -275,6 +304,7 @@ export async function removeFeatureFromPlan(
  */
 export async function getAllPlansWithFeatures() {
   try {
+    await requireAdminSession();
     const plans = await prisma.plan.findMany({
       include: {
         featureAccess: {

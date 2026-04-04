@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { clearAllAppCaches, getCacheStatus } from '@/server/services/cache-service';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user || session.user.role !== 'SUPER_ADMIN') {

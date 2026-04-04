@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { checkFeatureAccess, getUserPlanFeatures } from '@/lib/features/check-access';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * POST /api/features/check
  * Check if the current user has access to a specific feature

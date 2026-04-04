@@ -2,11 +2,13 @@
 
 'use server';
 
+import { Prisma } from '@prisma/client';
 import prisma from './prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { formatDistanceToNow } from 'date-fns';
 import { getAdminSettings } from '@/server/actions/admin-actions';
+import { validateDetectedAutomationWorkflow } from '@/lib/automation-workflow-validator';
 
 export interface Agent {
     id: number;
@@ -46,9 +48,14 @@ export async function createAgent(data: { name: string, workflowJson: any }): Pr
     if (!session?.user?.id) {
         throw new Error("You must be logged in to create an agent.");
     }
+
+    const validation = validateDetectedAutomationWorkflow(data.workflowJson);
+    if (!validation.ok) {
+        throw new Error(`Workflow JSON is not a valid importable blueprint: ${validation.errors.join(' ')}`);
+    }
     
     // Determine platform and trigger from the workflow JSON
-    const platform = data.workflowJson.nodes ? 'n8n' : 'Make.com';
+    const platform = validation.platform;
     const { appName } = await getAdminSettings();
     const trigger = `${appName || 'AI Video Creator'} Trigger`;
 
@@ -57,7 +64,7 @@ export async function createAgent(data: { name: string, workflowJson: any }): Pr
             name: data.name,
             platform,
             trigger,
-            workflowJson: data.workflowJson,
+            workflowJson: validation.workflow as Prisma.InputJsonValue,
             userId: session.user.id,
         },
     });

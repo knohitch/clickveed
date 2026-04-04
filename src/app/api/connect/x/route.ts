@@ -1,6 +1,9 @@
 
 import { handleOAuthCallback, type PlatformConfig } from '@/server/services/connectionService';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const xConfig: PlatformConfig = {
     platform: 'x',
     clientIdEnvVar: 'xClientId',

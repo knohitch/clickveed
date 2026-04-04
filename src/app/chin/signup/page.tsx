@@ -38,7 +38,7 @@ export default function ChinSignUpPage() {
         const data = await response.json();
         
         // If there are existing users, redirect to login
-        if (data.count > 0) {
+        if (data.hasUsers) {
           router.push('/chin/login');
         }
       } catch (err) {

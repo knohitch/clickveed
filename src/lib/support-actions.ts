@@ -23,7 +23,7 @@ export async function getTickets(): Promise<SupportTicket[]> {
     return getTicketsServer();
 }
 
-export async function createTicket(data: Omit<SupportTicket, 'id' | 'status' | 'lastUpdate' | 'preview' | 'conversation' | 'createdAt' | 'updatedAt' | 'userId'> & { initialMessage: string }): Promise<SupportTicket> {
+export async function createTicket(data: { subject: string; initialMessage: string }): Promise<SupportTicket> {
     return createTicketServer(data);
 }
 

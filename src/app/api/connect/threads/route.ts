@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { upsertConnection } from '@/server/actions/social-actions';
 import { auth } from '@/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * Handles the final step of the OAuth 2.0 flow for Threads.
  * Meta/Instagram redirects the user here after they authorize the app.

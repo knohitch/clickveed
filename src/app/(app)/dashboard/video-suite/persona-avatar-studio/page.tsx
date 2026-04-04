@@ -1,50 +1,34 @@
-'use client';
-
 import { PersonaAvatarStudio } from '@/components/persona-avatar-studio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeatureGuard } from '@/components/feature-lock';
-import { useAuth } from '@/contexts/auth-context';
-import { LoadingSpinner } from '@/components/loading-spinner';
+import { FeatureLock } from '@/components/feature-lock';
+import { getFeaturePageAccess } from '@/lib/server-feature-page';
 
-export default function PersonaAvatarStudioPage() {
-    return <PersonaAvatarStudioContent />;
-}
+export default async function PersonaAvatarStudioPage() {
+    const access = await getFeaturePageAccess('persona-studio');
 
-function PersonaAvatarStudioContent() {
-    const { subscriptionPlan, planFeatures, loading } = useAuth();
-
-    if (loading) {
-        return <PersonaAvatarStudioLoading />;
+    if (!access.canAccess) {
+        return (
+            <FeatureLock
+                featureId="persona-studio"
+                planName={access.planName}
+                featureTier={access.featureTier}
+                planFeatures={access.planFeatures}
+                title="Feature Not Available"
+                description="This feature is not included in your current plan."
+            />
+        );
     }
 
-    return (
-        <FeatureGuard featureId="persona-studio" planName={subscriptionPlan?.name || null} planFeatures={planFeatures}>
-            <Card>
-                <CardHeader>
-                    <CardTitle>AI Persona & Avatar Studio</CardTitle>
-                    <CardDescription>
-                        Define personality and generate visual appearance of your AI influencer.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <PersonaAvatarStudio />
-                </CardContent>
-            </Card>
-        </FeatureGuard>
-    );
-}
-
-function PersonaAvatarStudioLoading() {
     return (
         <Card>
             <CardHeader>
                 <CardTitle>AI Persona & Avatar Studio</CardTitle>
                 <CardDescription>
-                    Define the personality and generate the visual appearance of your AI influencer.
+                    Define personality and generate visual appearance of your AI influencer.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center justify-center py-8">
-                <LoadingSpinner />
+            <CardContent>
+                <PersonaAvatarStudio />
             </CardContent>
         </Card>
     );

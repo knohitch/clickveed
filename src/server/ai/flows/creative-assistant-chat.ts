@@ -41,15 +41,15 @@ Current date is ${today}. Do not assume older years like 2024 unless explicitly 
 
     // Format messages properly for Genkit
     const formattedHistory = (history || []).map(h => ({
-      role: h.role === 'assistant' ? 'model' as 'model' : 'user' as 'user',
+      role: h.role === 'assistant' ? ('model' as const) : ('user' as const),
       content: [{ text: h.content }]
     }));
 
     // Combine system prompt, history, and newest user message in chronological order
     const messages = [
-      { role: 'system' as 'user' | 'model', content: [{ text: creativeAssistantSystemPrompt }] },
+      { role: 'system' as const, content: [{ text: creativeAssistantSystemPrompt }] },
       ...formattedHistory,
-      { role: 'user' as 'user' | 'model', content: [{ text: message }] },
+      { role: 'user' as const, content: [{ text: message }] },
     ];
 
     const { stream, response } = await generateStreamWithProvider({

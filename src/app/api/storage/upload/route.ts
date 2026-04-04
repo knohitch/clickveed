@@ -8,6 +8,9 @@ import {
   createSuccessResponse
 } from '@/lib/error-response';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   try {
     // Fix Bug #9: Add proper authentication check

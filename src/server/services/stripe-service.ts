@@ -2,7 +2,7 @@
 
 import { Stripe } from 'stripe';
 import prisma from '@lib/prisma';
-import { upsertUser } from '@/server/actions/user-actions';
+import { syncUserRecord } from '@/server/services/user-sync-service';
 import { sendEmail } from './email-service';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { getBaseUrl } from '@/lib/utils';
@@ -133,17 +133,18 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
             
              if (session.mode === 'subscription' && session.metadata?.userId) {
                 const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-                
+                const customerEmail = session.customer_details?.email;
+                 
                 // Safety check for subscription items
-                if (!subscription.items?.data?.[0]?.price?.id) {
+                if (!subscription.items?.data?.[0]?.price?.id || !customerEmail) {
                     console.error('[StripeWebhook] Invalid subscription data:', subscription);
                     break;
                 }
 
                 // First, update the user with the new plan
-                await upsertUser({
+                await syncUserRecord({
                     id: session.metadata.userId,
-                    email: session.customer_details?.email!,
+                    email: customerEmail,
                     stripeCustomerId: subscription.customer as string,
                     stripeSubscriptionId: subscription.id,
                     stripeSubscriptionStatus: subscription.status,
@@ -260,7 +261,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                     });
                 }
 
-                 await upsertUser({
+                 await syncUserRecord({
                     id: user.id,
                     email: user.email!,
                     stripeSubscriptionStatus: subscription.status,
@@ -319,7 +320,7 @@ export async function handleStripeWebhookEvent(event: Stripe.Event) {
                     }
                 });
                 
-                 await upsertUser({
+                 await syncUserRecord({
                     id: user.id,
                     email: user.email!,
                     stripeSubscriptionStatus: subscription.status,

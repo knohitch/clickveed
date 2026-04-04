@@ -42,8 +42,8 @@ export type AnalyzeThumbnailsOutput = z.infer<typeof AnalyzeThumbnailsOutputSche
 export const CreateVoiceCloneInputSchema = z.object({
     voiceName: z.string().describe('The name for the new cloned voice.'),
     fileUrls: z
-        .array(z.string().url())
-        .describe("An array of public URLs to the audio samples."),
+        .array(z.string().min(1))
+        .describe("An array of user-owned storage keys for the uploaded audio samples."),
 });
 export type CreateVoiceCloneInput = z.infer<typeof CreateVoiceCloneInputSchema>;
 
@@ -119,8 +119,11 @@ export const GeneratePersonaAvatarInputSchema = z.object({
 export type GeneratePersonaAvatarInput = z.infer<typeof GeneratePersonaAvatarInputSchema>;
 
 export const GeneratePersonaAvatarOutputSchema = z.object({
+    jobId: z.string().describe('The durable job ID for the avatar video render.'),
+    jobStatus: z.enum(['queued', 'processing', 'completed', 'failed']).describe('The current render state of the avatar video job.'),
     avatarImageUrl: z.string().url().describe('The public URL of the generated avatar image.'),
-    videoStatus: z.string().describe("A status message about the video generation process.")
+    videoStatus: z.string().describe("A status message about the video generation process."),
+    videoUrl: z.string().url().nullable().describe('The public URL of the generated avatar video when available.'),
 });
 export type GeneratePersonaAvatarOutput = z.infer<typeof GeneratePersonaAvatarOutputSchema>;
 

@@ -272,7 +272,7 @@ export default function AIAgentsPage() {
                                             <AlertDialogHeader>
                                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                 <AlertDialogDescription>
-                                                    This will permanently delete the "{agent.name}" agent. This action cannot be undone.
+                                                    This will permanently delete the &quot;{agent.name}&quot; agent. This action cannot be undone.
                                                 </AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>

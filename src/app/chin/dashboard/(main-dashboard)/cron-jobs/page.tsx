@@ -196,8 +196,8 @@ export default function CronJobsPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Setup Instructions</AlertTitle>
                 <AlertDescription>
-                   To automate these tasks, use the commands below in your hosting environment's scheduler (e.g., a Linux server's crontab or Coolify's 'Scheduled Tasks'). 
-                   The commands are dynamically generated based on your application's URL. You must replace <strong>YOUR_CRON_SECRET</strong> with the secret key from your environment variables to protect the endpoints.
+                   To automate these tasks, use the commands below in your hosting environment&apos;s scheduler (e.g., a Linux server&apos;s crontab or Coolify&apos;s &apos;Scheduled Tasks&apos;). 
+                   The commands are dynamically generated based on your application&apos;s URL. You must replace <strong>YOUR_CRON_SECRET</strong> with the secret key from your environment variables to protect the endpoints.
                 </AlertDescription>
             </Alert>
             

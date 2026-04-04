@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { sendSubscriptionRenewalReminders } from '@/server/services/subscription-service';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: Request) {
-    const authHeader = headers().get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+        console.error('[Cron] CRON_SECRET is not configured for subscription renewal reminders');
+        return NextResponse.json({ error: 'Cron is not configured' }, { status: 503 });
+    }
+
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

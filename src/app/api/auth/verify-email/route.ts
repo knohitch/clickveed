@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
 import { createHash } from 'crypto';
+import { createRateLimit } from '@/lib/rate-limit';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
 // This fixes build errors from crypto not supported in Edge Runtime
 export const runtime = 'nodejs';
+
+const verifyEmailRateLimit = createRateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 30,
+  message: 'Too many verification attempts. Please try again later.',
+});
 
 // Get base URL for redirects - ALWAYS use production URL, never request.url
 function getProductionBaseUrl(request: Request): string {
@@ -41,37 +51,27 @@ function getProductionBaseUrl(request: Request): string {
 }
 
 export async function GET(request: Request) {
+  const rateLimitResult = verifyEmailRateLimit(request);
+  if (rateLimitResult) {
+    return rateLimitResult;
+  }
+
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
   
   // Use production URL for all redirects
   const baseUrl = getProductionBaseUrl(request);
-  
-  console.log('[verify-email] Received verification request');
-  console.log('[verify-email] Token present:', !!token);
-  console.log('[verify-email] Base URL for redirects:', baseUrl);
-  console.log('[verify-email] Current server time:', new Date().toISOString());
 
   if (!token) {
-    console.log('[verify-email] No token provided in URL');
     return NextResponse.redirect(`${baseUrl}/login?error=invalid_token`);
   }
 
   const hashedToken = createHash('sha256').update(token).digest('hex');
-  console.log('[verify-email] Hashed token prefix:', hashedToken.substring(0, 16) + '...');
 
   try {
-    // CRITICAL FIX: First check if the token exists at all
     const existingToken = await prisma.verificationToken.findFirst({
       where: { token: hashedToken },
     });
-    
-    console.log('[verify-email] Token found in DB:', !!existingToken);
-    if (existingToken) {
-      console.log('[verify-email] Token expires at:', existingToken.expires);
-      console.log('[verify-email] Token identifier (email):', existingToken.identifier);
-      console.log('[verify-email] Is token expired:', new Date() > existingToken.expires);
-    }
 
     // Check if user is already verified (before checking token validity)
     if (existingToken) {
@@ -81,7 +81,6 @@ export async function GET(request: Request) {
       });
       
       if (user?.emailVerified === true) {
-        console.log('[verify-email] User already verified, cleaning up token');
         // Clean up the token since user is already verified
         try {
           await prisma.verificationToken.delete({
@@ -99,8 +98,6 @@ export async function GET(request: Request) {
     const now = new Date();
     const currentUtcTime = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds()));
     
-    console.log('[verify-email] Current UTC time:', currentUtcTime.toISOString());
-    
     const verificationToken = await prisma.verificationToken.findFirst({
       where: {
         token: hashedToken,
@@ -109,44 +106,26 @@ export async function GET(request: Request) {
     });
 
     if (!verificationToken) {
-      console.log('[verify-email] Token not found or expired');
-      
-      if (existingToken) {
-        // Token exists but is expired
-        console.log('[verify-email] Token exists but expired at:', existingToken.expires);
-        console.log('[verify-email] Time difference (minutes):', 
-          Math.round((new Date().getTime() - existingToken.expires.getTime()) / 60000));
-      } else {
-        console.log('[verify-email] Token not found in database at all');
-      }
-      
       return NextResponse.redirect(`${baseUrl}/login?error=expired_token`);
     }
 
-    console.log('[verify-email] Token valid for user:', verificationToken.identifier);
-
     // Update user to verified
-    const updatedUser = await prisma.user.update({
+    await prisma.user.update({
       where: { email: verificationToken.identifier },
       data: { 
         emailVerified: true,
         status: 'Active'
       },
     });
-    
-    console.log('[verify-email] User updated:', updatedUser.email, 'emailVerified:', updatedUser.emailVerified);
 
     // Delete the used token
     try {
       await prisma.verificationToken.delete({
         where: { identifier_token: { identifier: verificationToken.identifier, token: hashedToken } },
       });
-      console.log('[verify-email] Token deleted successfully');
     } catch (deleteError) {
       console.warn('[verify-email] Failed to delete token (non-critical):', deleteError);
     }
-
-    console.log('[verify-email] Email verified successfully for:', verificationToken.identifier);
     
     // Redirect to login with success message
     return NextResponse.redirect(`${baseUrl}/login?verified=true`);

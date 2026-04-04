@@ -1,6 +1,7 @@
 
 'use server';
 
+import { auth } from '@/auth';
 import prisma from '@/server/prisma';
 import { sendEmail } from './email-service';
 import { revalidatePath } from 'next/cache';
@@ -29,30 +30,75 @@ export interface SupportTicket {
     updatedAt: Date;
 }
 
+function isAdminRole(role?: string | null): boolean {
+    return !!role && ['ADMIN', 'SUPER_ADMIN'].includes(role);
+}
+
+async function requireAuthenticatedSession() {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new Error('Unauthorized');
+    }
+    return session;
+}
+
+async function requireAdminSession() {
+    const session = await requireAuthenticatedSession();
+    if (!isAdminRole(session.user.role)) {
+        throw new Error('Administrator access required');
+    }
+    return session;
+}
 
 /**
  * Creates a new support ticket and sends notifications.
  * This is a server-only function.
  */
 export async function createTicket(
-  data: Omit<SupportTicket, 'id' | 'status' | 'lastUpdate' | 'preview' | 'conversation' | 'createdAt' | 'updatedAt' | 'userId'> & { initialMessage: string }
+  data: { subject: string; initialMessage: string }
 ): Promise<SupportTicket> {
+  const session = await requireAuthenticatedSession();
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      displayName: true,
+      email: true,
+      avatarUrl: true,
+    },
+  });
+
+  const userName = user?.displayName?.trim() || session.user.name?.trim() || 'User';
+  const userEmail = user?.email || session.user.email || '';
+  if (!userEmail) {
+    throw new Error('Unable to create support ticket without an email address.');
+  }
+
+  const subject = data.subject.trim();
+  const initialMessage = data.initialMessage.trim();
+  if (!subject || !initialMessage) {
+    throw new Error('Subject and message are required.');
+  }
+
+  const preview =
+    initialMessage.length > 100 ? `${initialMessage.substring(0, 100)}...` : initialMessage;
 
   const newTicketData = {
-    userName: data.userName,
-    userEmail: data.userEmail,
-    userAvatar: data.userAvatar,
-    subject: data.subject,
-    preview: data.initialMessage.substring(0, 100) + '...',
+    userId: session.user.id,
+    userName,
+    userEmail,
+    userAvatar: user?.avatarUrl || session.user.image || null,
+    subject,
+    preview,
     status: 'Open',
     conversation: [
       {
         sender: 'user' as const,
-        text: data.initialMessage,
+        text: initialMessage,
         timestamp: new Date().toISOString(),
       },
     ],
-    // In a real DB schema, you'd associate this with a user ID.
   };
 
   const newTicket = await prisma.supportTicket.create({
@@ -63,12 +109,12 @@ export async function createTicket(
 
   // Send notifications after creating the ticket
   await sendEmail({
-    to: data.userEmail,
+    to: userEmail,
     templateKey: 'userNewTicket',
     data: {
-      userName: data.userName,
+      userName,
       ticketId: newTicket.id,
-      ticketSubject: data.subject,
+      ticketSubject: subject,
     }
   });
 
@@ -76,10 +122,10 @@ export async function createTicket(
     to: 'admin',
     templateKey: 'adminNewTicket',
     data: {
-      userName: data.userName,
-      userEmail: data.userEmail,
+      userName,
+      userEmail,
       ticketId: newTicket.id,
-      ticketSubject: data.subject,
+      ticketSubject: subject,
     }
   });
 
@@ -92,6 +138,8 @@ export async function createTicket(
 }
 
 export async function getTickets(): Promise<SupportTicket[]> {
+    await requireAdminSession();
+
     const dbTickets = await prisma.supportTicket.findMany({
         orderBy: { createdAt: 'desc' },
     });
@@ -105,6 +153,8 @@ export async function getTickets(): Promise<SupportTicket[]> {
 }
 
 export async function updateTicket(ticketId: string, updates: Partial<SupportTicket>): Promise<SupportTicket> {
+    await requireAdminSession();
+
     const existingTicket = await prisma.supportTicket.findUnique({
         where: { id: ticketId }
     });

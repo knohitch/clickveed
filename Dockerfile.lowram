@@ -37,7 +37,7 @@ COPY components ./components
 COPY lib ./lib
 
 # Build with memory constraints
-RUN npm run build -- --no-lint
+RUN npm run build
 
 # Production stage
 FROM node:18-alpine AS runner

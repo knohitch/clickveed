@@ -36,6 +36,15 @@ export async function getConnections(): Promise<SocialConnection[]> {
  * Creates or updates a social media connection for a user.
  */
 export async function upsertConnection(data: Omit<SocialConnection, 'id' | 'createdAt'>): Promise<void> {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new Error("User is not authenticated.");
+    }
+
+    if (data.userId !== session.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role || '')) {
+        throw new Error("Forbidden");
+    }
+
     await prisma.socialConnection.upsert({
         where: {
             userId_platform: {

@@ -1,7 +1,7 @@
 'use server';
 
 import { removeImageBackground } from '@/server/ai/flows/remove-image-background';
-import { generateWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
+import { generateVideoWithProvider } from '@/lib/ai/api-service-manager';
 import { creativeAssistantChat } from '@/server/ai/flows/creative-assistant-chat';
 import { generateTimedTranscript } from '@/server/ai/flows/generate-timed-transcript';
 import { generateVideoFromImage } from '@/server/ai/flows/generate-video-from-image';
@@ -10,6 +10,7 @@ import { generateVideoScript } from '@/server/ai/flows/generate-video-script';
 import { supportChat } from '@/server/ai/flows/support-chat';
 import { researchVideoTopic } from '@/server/ai/flows/research-video-topic';
 import { createVoiceClone } from '@/server/ai/flows/create-voice-clone';
+import { generateAutomationWorkflow } from '@/server/ai/flows/generate-automation-workflow';
 import { generateVoiceOver } from '@/server/ai/flows/generate-voice-over';
 import { analyzeThumbnails } from '@/server/ai/flows/analyze-thumbnails';
 import { generateStockMedia } from '@/server/ai/flows/generate-stock-media';
@@ -18,9 +19,11 @@ import { generatePipelineScript, generatePipelineVoiceOver, generatePipelineVide
 import type { Message } from '@/lib/types';
 import { z } from 'zod';
 import { auth } from '@/auth';
-import prisma from '@/server/prisma';
 import { checkUserFeatureAccess } from '@/server/actions/feature-access-actions';
 import { consumeAICredits } from '@/server/actions/ai-credits-actions';
+import { getRedisUrl } from '@/lib/redis-config';
+import { validateAutomationWorkflow } from '@/lib/automation-workflow-validator';
+import IORedis from 'ioredis';
 
 /**
  * Helper function to verify feature access for the current user
@@ -40,7 +43,133 @@ async function verifyFeatureAccess(featureId: string): Promise<void> {
     }
 }
 
-export const findViralClips = findViralClipsFlow;
+async function requireAuthenticatedUserId(): Promise<string> {
+    const session = await auth();
+    if (!session?.user?.id) {
+        throw new Error('Authentication required');
+    }
+
+    return session.user.id;
+}
+
+const aiRateLimitFallbackStore = new Map<string, { count: number; resetTime: number }>();
+const aiRateLimitRedisUrl = getRedisUrl();
+const aiRateLimitRedis = aiRateLimitRedisUrl
+    ? new IORedis(aiRateLimitRedisUrl, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
+        connectTimeout: 5000,
+    })
+    : null;
+
+type AIRateLimitConfig = {
+    maxRequests: number;
+    windowMs: number;
+    message: string;
+};
+
+const DEFAULT_AI_RATE_LIMIT: AIRateLimitConfig = {
+    maxRequests: 8,
+    windowMs: 60 * 1000,
+    message: 'Too many AI requests. Please wait a minute and try again.',
+};
+
+const AI_ACTION_PRICING = {
+    'automation-workflow': 2,
+    'background-remover': 1,
+    'creative-assistant': 1,
+    'magic-clips': 1,
+    'support-chat': 1,
+    'timed-transcript': 2,
+    'image-to-video': 3,
+    'text-to-video': 4,
+    'persona-avatar': 5,
+    'script-generator': 1,
+    'topic-research': 1,
+    'voice-clone': 3,
+    'voice-over': 1,
+    'thumbnail-analysis': 1,
+    'stock-media': 2,
+    'pipeline-script': 1,
+    'pipeline-voice-over': 1,
+    'pipeline-video': 4,
+} as const;
+
+export async function findViralClips(input: Parameters<typeof findViralClipsFlow>[0]) {
+    const userId = await requireAuthenticatedUserId();
+    await verifyFeatureAccess('magic-clips');
+    await enforceAIUsageControls(userId, 'magic-clips');
+    return findViralClipsFlow(input);
+}
+
+async function enforceAIRateLimit(
+    userId: string,
+    scope: string,
+    config: Partial<AIRateLimitConfig> = {}
+): Promise<void> {
+    const { maxRequests, windowMs, message } = {
+        ...DEFAULT_AI_RATE_LIMIT,
+        ...config,
+    };
+    const key = `rate:${scope}:${userId}`;
+    const now = Date.now();
+
+    if (aiRateLimitRedis) {
+        try {
+            if (aiRateLimitRedis.status === 'wait') {
+                await aiRateLimitRedis.connect();
+            }
+
+            const windowStart = now - windowMs;
+            const pipeline = aiRateLimitRedis.pipeline();
+            pipeline.zremrangebyscore(key, 0, windowStart);
+            pipeline.zcard(key);
+            pipeline.zadd(key, now, `${now}-${Math.random().toString(36).slice(2, 8)}`);
+            pipeline.expire(key, Math.ceil(windowMs / 1000));
+
+            const results = await pipeline.exec();
+            const requestCount = typeof results?.[1]?.[1] === 'number' ? results[1][1] : 0;
+
+            if (requestCount >= maxRequests) {
+                throw new Error(message);
+            }
+
+            return;
+        } catch (error) {
+            console.error(`Redis rate limit failed for ${scope}, falling back to memory store:`, error);
+        }
+    }
+
+    const existing = aiRateLimitFallbackStore.get(key);
+    if (!existing || now > existing.resetTime) {
+        aiRateLimitFallbackStore.set(key, {
+            count: 1,
+            resetTime: now + windowMs,
+        });
+        return;
+    }
+
+    if (existing.count >= maxRequests) {
+        throw new Error(message);
+    }
+
+    existing.count += 1;
+}
+
+async function enforceAIUsageControls(
+    userId: string,
+    scope: keyof typeof AI_ACTION_PRICING,
+    config: Partial<AIRateLimitConfig> = {}
+): Promise<void> {
+    await enforceAIRateLimit(userId, scope, config);
+
+    const creditCost = AI_ACTION_PRICING[scope];
+    const creditResult = await consumeAICredits(creditCost);
+    if (!creditResult.success) {
+        throw new Error(creditResult.error || 'Insufficient AI credits');
+    }
+}
 
 async function readTextFromStream(stream: ReadableStream<any>): Promise<string> {
     const reader = stream.getReader();
@@ -87,45 +216,27 @@ export async function generateAutomationWorkflowAction(prevState: any, formData:
     const { prompt, platform } = validatedFields.data;
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for AI agents
         await verifyFeatureAccess('ai-agents');
+        await enforceAIUsageControls(userId, 'automation-workflow');
+        const result = await generateAutomationWorkflow({ prompt, platform });
+        const validation = validateAutomationWorkflow(platform, result.workflow);
 
-        // Consume AI credits
-        const creditResult = await consumeAICredits(2); // AI agents cost 2 credits
-        if (!creditResult.success) {
-            return { message: creditResult.error, workflow: null, errors: {} };
-        }
-        const systemPrompt = `You are an expert automation engineer specializing in ${platform}.
-    Create a JSON representation of a workflow that accomplishes the following task: "${prompt}".
-    Return ONLY validity JSON code for the workflow. Do not include any markdown formatting, explanations, or code blocks.
-    The JSON should be directly importable into ${platform}.`;
-
-        const response = await generateWithProvider({
-            messages: [
-                { role: 'system', content: [{ text: systemPrompt }] },
-                { role: 'user', content: [{ text: prompt }] }
-            ]
-        });
-
-        const responseAny = response as any;
-        const content = responseAny.result?.content?.[0]?.text || responseAny.text?.();
-
-        if (!content) {
-            return { message: 'Failed to generate workflow: No content returned', workflow: null, errors: {} };
-        }
-
-        let workflow;
-        try {
-            // clean up potential markdown code blocks if the LLM ignores instructions
-            const cleanJson = content.replace(/```json\n?|\n?```/g, '').trim();
-            workflow = JSON.parse(cleanJson);
-        } catch (e) {
-            return { message: 'Failed to parse generated workflow JSON', workflow: null, errors: {} };
+        if (!validation.ok) {
+            return {
+                message: `Generated ${platform} workflow is not importable yet: ${validation.errors.join(' ')}`,
+                workflow: null,
+                errors: {
+                    workflow: validation.errors,
+                }
+            };
         }
 
         return {
             message: 'success',
-            workflow: workflow,
+            workflow: validation.workflow,
             errors: {}
         };
 
@@ -157,8 +268,11 @@ export async function removeImageBackgroundAction(prevState: any, formData: Form
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for background remover
         await verifyFeatureAccess('background-remover');
+        await enforceAIUsageControls(userId, 'background-remover');
 
         const result = await removeImageBackground({
             imageUrl: validatedFields.data.imageUrl
@@ -202,6 +316,14 @@ export async function creativeAssistantChatAction(prevState: any, formData: Form
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
+        await verifyFeatureAccess('creative-assistant');
+        await enforceAIUsageControls(userId, 'creative-assistant', {
+            maxRequests: 12,
+            message: 'Too many AI chat requests. Please wait a minute and try again.',
+        });
+
         const stream = await creativeAssistantChat({
             message,
             history
@@ -243,6 +365,9 @@ export async function generateTimedTranscriptAction(prevState: any, formData: Fo
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+        await enforceAIUsageControls(userId, 'timed-transcript');
+
         const result = await generateTimedTranscript({
             videoUrl: validatedFields.data.videoUrl
         });
@@ -274,14 +399,11 @@ export async function generateVideoAction(prevState: any, formData: FormData) {
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for image-to-video
         await verifyFeatureAccess('image-to-video');
-
-        // Consume AI credits (image-to-video costs 3 credits)
-        const creditResult = await consumeAICredits(3);
-        if (!creditResult.success) {
-            return { message: creditResult.error, videoUrl: null, audioUrl: null, errors: {} };
-        }
+        await enforceAIUsageControls(userId, 'image-to-video', { maxRequests: 4 });
 
         const result = await generateVideoFromImage(input);
         return {
@@ -313,14 +435,11 @@ export async function generateVideoGeneratorAction(prevState: any, formData: For
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Dedicated generator still follows plan-based video access
         await verifyFeatureAccess('video-suite');
-
-        // Text-to-video generation is high cost
-        const creditResult = await consumeAICredits(4);
-        if (!creditResult.success) {
-            return { message: creditResult.error, videoUrl: null, errors: {} };
-        }
+        await enforceAIUsageControls(userId, 'text-to-video', { maxRequests: 4 });
 
         const enrichedPrompt = [
             `Create a high-quality cinematic video with this concept: ${prompt}`,
@@ -374,25 +493,34 @@ export async function generatePersonaAvatarAction(prevState: any, formData: Form
 
     // Basic validation
     if (!input.personaName || !input.personaDescription || !input.avatarDescription || !input.script) {
-        return { message: 'All fields are required', avatarImageUrl: null, videoStatus: null, errors: {} };
+        return { message: 'All fields are required', avatarImageUrl: null, jobId: null, jobStatus: null, videoStatus: null, videoUrl: null, errors: {} };
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for persona studio
         await verifyFeatureAccess('persona-studio');
+        await enforceAIUsageControls(userId, 'persona-avatar', { maxRequests: 3 });
 
         const result = await generatePersonaAvatar(input);
         return {
             message: 'success',
             avatarImageUrl: result.avatarImageUrl,
+            jobId: result.jobId,
+            jobStatus: result.jobStatus,
             videoStatus: result.videoStatus,
+            videoUrl: result.videoUrl,
             errors: {}
         };
     } catch (error) {
         return {
             message: error instanceof Error ? error.message : 'Failed to generate avatar',
             avatarImageUrl: null,
+            jobId: null,
+            jobStatus: null,
             videoStatus: null,
+            videoUrl: null,
             errors: {}
         };
     }
@@ -415,8 +543,11 @@ export async function generateScriptAction(prevState: any, formData: FormData) {
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for script generator
         await verifyFeatureAccess('script-generator');
+        await enforceAIUsageControls(userId, 'script-generator');
 
         const result = await generateVideoScript(input);
         return {
@@ -461,6 +592,14 @@ export async function supportChatAction(prevState: any, formData: FormData) {
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
+        await verifyFeatureAccess('ai-assistant');
+        await enforceAIUsageControls(userId, 'support-chat', {
+            maxRequests: 12,
+            message: 'Too many AI chat requests. Please wait a minute and try again.',
+        });
+
         const stream = await supportChat({
             message,
             history
@@ -494,8 +633,11 @@ export async function researchVideoTopicAction(prevState: any, formData: FormDat
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for topic researcher
         await verifyFeatureAccess('topic-researcher');
+        await enforceAIUsageControls(userId, 'topic-research');
 
         const result = await researchVideoTopic({ topic, platform, audience });
         return {
@@ -520,8 +662,11 @@ export async function createVoiceCloneAction(prevState: any, formData: FormData)
     if (!fileUrls.length) return { message: 'Audio samples required', result: null, errors: { fileUrls: ['Required'] } };
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for voice cloning (Enterprise only)
         await verifyFeatureAccess('voice-cloning');
+        await enforceAIUsageControls(userId, 'voice-clone', { maxRequests: 4 });
 
         const result = await createVoiceClone({ voiceName, fileUrls });
         return {
@@ -550,8 +695,8 @@ export async function generateVoiceOverAction(prevState: any, formData: FormData
         if (speakersJson) {
             const parsed = JSON.parse(speakersJson);
             // Map frontend speaker shape to backend expected shape if needed
-            speakers = parsed.map((s: any) => ({
-                speakerId: `Speaker${s.id}`,
+            speakers = parsed.map((s: any, index: number) => ({
+                speakerId: `Speaker${index + 1}`,
                 voice: s.voice
             }));
         } else if (voice) {
@@ -562,8 +707,11 @@ export async function generateVoiceOverAction(prevState: any, formData: FormData
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for voice over
         await verifyFeatureAccess('voice-over');
+        await enforceAIUsageControls(userId, 'voice-over', { maxRequests: 10 });
 
         const result = await generateVoiceOver({ script, speakers });
         return {
@@ -609,8 +757,11 @@ export async function analyzeThumbnailsAction(prevState: any, formData: FormData
     }
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for thumbnail tester
         await verifyFeatureAccess('thumbnail-tester');
+        await enforceAIUsageControls(userId, 'thumbnail-analysis');
 
         // Helper to convert File to Data URI
         const fileToDataUri = async (file: File) => {
@@ -648,8 +799,11 @@ export async function generateStockMediaAction(prevState: any, formData: FormDat
     if (!prompt) return { message: 'Prompt required', images: [], errors: { prompt: ['Required'] } };
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for stock media
         await verifyFeatureAccess('stock-media');
+        await enforceAIUsageControls(userId, 'stock-media', { maxRequests: 6 });
 
         const result = await generateStockMedia({ prompt });
         return {
@@ -677,8 +831,11 @@ export async function generatePipelineScriptAction(prevState: any, formData: For
     if (!input.prompt) return { message: 'Prompt required', script: null, errors: {} };
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for video pipeline
         await verifyFeatureAccess('video-pipeline');
+        await enforceAIUsageControls(userId, 'pipeline-script');
 
         const result = await generatePipelineScript(input);
         return {
@@ -702,8 +859,11 @@ export async function generatePipelineVoiceOverAction(prevState: any, formData: 
     if (!script) return { message: 'Script required', audio: null, errors: {} };
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for voice over
         await verifyFeatureAccess('voice-over');
+        await enforceAIUsageControls(userId, 'pipeline-voice-over', { maxRequests: 10 });
 
         const result = await generatePipelineVoiceOver({ script, voice });
         return {
@@ -726,8 +886,11 @@ export async function generatePipelineVideoAction(prevState: any, formData: Form
     if (!script) return { message: 'Script required', video: null, errors: {} };
 
     try {
+        const userId = await requireAuthenticatedUserId();
+
         // Check feature access for video pipeline
         await verifyFeatureAccess('video-pipeline');
+        await enforceAIUsageControls(userId, 'pipeline-video', { maxRequests: 4 });
 
         const result = await generatePipelineVideo({ script });
         return {

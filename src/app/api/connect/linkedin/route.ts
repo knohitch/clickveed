@@ -2,6 +2,9 @@
 
 import { handleOAuthCallback, type PlatformConfig } from '@/server/services/connectionService';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const linkedinConfig: PlatformConfig = {
     platform: 'linkedin',
     clientIdEnvVar: 'linkedinClientId',

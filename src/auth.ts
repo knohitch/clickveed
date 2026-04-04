@@ -3,6 +3,7 @@ import { z } from 'zod';
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
+import { buildJwtToken, buildSessionFromToken, syncOAuthUserToDatabase } from '@/lib/auth-callbacks';
 
 // CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
 // This fixes build errors from bcryptjs, crypto, and process APIs not supported in Edge Runtime
@@ -76,6 +77,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     
     async signIn({ user, account }) {
+      if (account?.provider && account.provider !== 'credentials') {
+        try {
+          await syncOAuthUserToDatabase(user, account);
+        } catch (error) {
+          console.error('OAuth sign-in sync failed:', error);
+          return false;
+        }
+      }
+
       return true;
     },
     
@@ -93,33 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // The JWT callback is used to enrich the token with custom data
     async jwt({ token, user, trigger, session }) {
       try {
-        // On initial sign-in, add user details to the token
-        if (user && user.id) {
-          token.id = user.id;
-          token.role = user.role || 'USER';
-          token.onboardingComplete = user.onboardingComplete || false;
-          token.status = user.status || 'Active';
-          token.emailVerified = typeof user.emailVerified === 'boolean' ? user.emailVerified : !!user.emailVerified;
-        }
-
-        // If the session is updated (e.g., name change, onboarding completion),
-        // update the token as well.
-        if (trigger === "update" && session) {
-          if (session.name) {
-            token.name = session.name;
-          }
-          if (session.onboardingComplete !== undefined) {
-            token.onboardingComplete = session.onboardingComplete;
-          }
-          if (session.status !== undefined) {
-            token.status = session.status;
-          }
-          if (session.emailVerified !== undefined) {
-            token.emailVerified = session.emailVerified;
-          }
-        }
-
-        return token;
+        return await buildJwtToken({ token, user, trigger, session });
       } catch (error) {
         // JWT callback error - log silently
         return token;
@@ -130,21 +114,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // The session callback uses the token data to populate the session object
     async session({ session, token }) {
       try {
-        if (token.id) {
-          session.user.id = token.id as string;
-        }
-        if (token.role) {
-          session.user.role = token.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-        }
-        if (token.onboardingComplete !== undefined) {
-          session.user.onboardingComplete = token.onboardingComplete as boolean;
-        }
-        if (token.status !== undefined) {
-          session.user.status = token.status as string;
-        }
-        // Note: emailVerified is handled by NextAuth's default Session type (Date | null)
-        // For credentials auth, we don't need to expose it in session
-        return session;
+        return await buildSessionFromToken({ session: session as any, token });
       } catch (error) {
         console.error('Session callback error:', error);
         // Return session even if there's an error to prevent auth failures

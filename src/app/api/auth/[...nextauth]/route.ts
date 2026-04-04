@@ -2,6 +2,9 @@
 // bcryptjs is not compatible with Edge Runtime as it uses Node.js APIs
 import { handlers } from "@/auth";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Explicitly set runtime to 'nodejs' to avoid Edge Runtime issues with bcryptjs
 export const runtime = 'nodejs';
 

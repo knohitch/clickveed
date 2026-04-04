@@ -11,10 +11,9 @@ import {
 import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
-import { getAdminSettings } from '@/server/actions/admin-actions';
 
 export async function generateMetadata() {
-  const { appName } = await getAdminSettings();
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AI Video Creator';
   return {
     title: `Forgot Password | ${appName}`,
   };
@@ -29,7 +28,7 @@ export default async function ForgotPasswordPage() {
         </div>
         <CardTitle className="text-2xl">Forgot Your Password?</CardTitle>
         <CardDescription>
-          No problem. Enter your email below and we'll send you a link to reset
+          No problem. Enter your email below and we&apos;ll send you a link to reset
           it.
         </CardDescription>
       </CardHeader>

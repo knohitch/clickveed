@@ -25,14 +25,20 @@ type Errors = {
 type State = {
     message: string;
     avatarImageUrl: string | null;
+    jobId: string | null;
+    jobStatus: 'queued' | 'processing' | 'completed' | 'failed' | null;
     videoStatus: string | null;
+    videoUrl: string | null;
     errors: Errors | {};
 };
 
 const initialState: State = {
     message: '',
     avatarImageUrl: null,
+    jobId: null,
+    jobStatus: null,
     videoStatus: null,
+    videoUrl: null,
     errors: {}
 };
 
@@ -55,7 +61,17 @@ function SubmitButton() {
   );
 }
 
-function AvatarDisplay({ imageUrl, videoStatus, pending }: { imageUrl: string | null, videoStatus: string | null, pending: boolean }) {
+function AvatarDisplay({
+    imageUrl,
+    videoStatus,
+    videoUrl,
+    pending
+}: {
+    imageUrl: string | null,
+    videoStatus: string | null,
+    videoUrl: string | null,
+    pending: boolean
+}) {
     return (
         <Card>
             <CardHeader>
@@ -69,7 +85,7 @@ function AvatarDisplay({ imageUrl, videoStatus, pending }: { imageUrl: string | 
                         </Button>
                     )}
                 </CardTitle>
-                <CardDescription>The static image of your avatar appears here first. The video will be processed in the background.</CardDescription>
+                <CardDescription>The image appears first, then the video job is tracked until it finishes or fails.</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-center">
                 {pending ? (
@@ -77,12 +93,23 @@ function AvatarDisplay({ imageUrl, videoStatus, pending }: { imageUrl: string | 
                         <Skeleton className="h-full w-full rounded-md" />
                     </div>
                 ) : imageUrl ? (
-                     <div className="space-y-4">
+                     <div className="space-y-4 w-full">
                         <Image src={imageUrl} alt="Generated Avatar" width={400} height={400} className="rounded-md object-cover aspect-square w-full bg-muted" data-ai-hint="avatar user" />
                          {videoStatus && (
                             <div className="flex items-center gap-3 p-3 rounded-md bg-muted text-muted-foreground">
-                                <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+                                <Loader2 className={`h-5 w-5 flex-shrink-0 ${videoUrl ? '' : 'animate-spin'}`} />
                                 <p className="text-sm">{videoStatus}</p>
+                            </div>
+                         )}
+                         {videoUrl && (
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm font-medium">
+                                    <Video className="h-4 w-4" />
+                                    Generated Avatar Video
+                                </div>
+                                <video controls className="w-full rounded-md bg-black" src={videoUrl}>
+                                    Your browser does not support the video tag.
+                                </video>
                             </div>
                          )}
                      </div>
@@ -101,6 +128,14 @@ export function PersonaAvatarStudio() {
     const { toast } = useToast();
     const formRef = useRef<HTMLFormElement>(null);
     const [state, formAction] = useFormState(generatePersonaAvatarAction, initialState);
+    const [currentJob, setCurrentJob] = useState({
+        jobId: null as string | null,
+        jobStatus: null as State['jobStatus'],
+        videoStatus: null as string | null,
+        videoUrl: null as string | null,
+        errorMessage: null as string | null,
+    });
+    const lastTerminalToastRef = useRef<string | null>(null);
 
     const handleFormSubmit = (formData: FormData) => {
         formAction(formData);
@@ -108,6 +143,13 @@ export function PersonaAvatarStudio() {
 
     useEffect(() => {
         if (state.message === 'success' && state.avatarImageUrl) {
+            setCurrentJob({
+                jobId: state.jobId,
+                jobStatus: state.jobStatus,
+                videoStatus: state.videoStatus,
+                videoUrl: state.videoUrl,
+                errorMessage: null,
+            });
             toast({ title: 'Avatar Image Generated!', description: state.videoStatus || "Video generation started." });
         } else if (state.message && state.message !== 'success' && state.message !== 'Validation failed') {
             toast({
@@ -117,6 +159,67 @@ export function PersonaAvatarStudio() {
             });
         }
     }, [state, toast]);
+
+    useEffect(() => {
+        if (!currentJob.jobId || !currentJob.jobStatus) return;
+        if (currentJob.jobStatus === 'completed' || currentJob.jobStatus === 'failed') return;
+
+        let cancelled = false;
+
+        const pollJob = async () => {
+            try {
+                const response = await fetch(`/api/persona-avatar-jobs/${currentJob.jobId}`, { cache: 'no-store' });
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = await response.json();
+                if (!payload?.success || !payload?.job || cancelled) {
+                    return;
+                }
+
+                setCurrentJob({
+                    jobId: payload.job.id,
+                    jobStatus: payload.job.jobStatus,
+                    videoStatus: payload.job.videoStatus,
+                    videoUrl: payload.job.videoUrl,
+                    errorMessage: payload.job.errorMessage,
+                });
+            } catch (error) {
+                console.warn('Failed to poll persona avatar job status', error);
+            }
+        };
+
+        pollJob();
+        const intervalId = window.setInterval(pollJob, 5000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+        };
+    }, [currentJob.jobId, currentJob.jobStatus]);
+
+    useEffect(() => {
+        if (!currentJob.jobId) return;
+        if (lastTerminalToastRef.current === currentJob.jobId) return;
+
+        if (currentJob.jobStatus === 'completed') {
+            lastTerminalToastRef.current = currentJob.jobId;
+            toast({
+                title: 'Avatar Video Ready',
+                description: currentJob.videoStatus || 'Your avatar video finished rendering.',
+            });
+        }
+
+        if (currentJob.jobStatus === 'failed') {
+            lastTerminalToastRef.current = currentJob.jobId;
+            toast({
+                variant: 'destructive',
+                title: 'Avatar Video Failed',
+                description: currentJob.errorMessage || currentJob.videoStatus || 'The avatar video could not be rendered.',
+            });
+        }
+    }, [currentJob, toast]);
   
     return (
         <div className="grid md:grid-cols-2 gap-8 items-start">
@@ -165,7 +268,12 @@ export function PersonaAvatarStudio() {
                 </Card>
             </form>
             <div className="sticky top-8">
-                <AvatarDisplay imageUrl={state.avatarImageUrl} videoStatus={state.videoStatus} pending={false} />
+                <AvatarDisplay
+                    imageUrl={state.avatarImageUrl}
+                    videoStatus={currentJob.videoStatus || state.videoStatus}
+                    videoUrl={currentJob.videoUrl || state.videoUrl}
+                    pending={false}
+                />
             </div>
         </div>
     );

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/server/services/email-service';
 import { auth } from '@/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication - admins and super admins can test emails

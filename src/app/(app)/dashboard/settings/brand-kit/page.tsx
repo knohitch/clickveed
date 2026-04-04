@@ -103,7 +103,7 @@ export default function BrandKitPage() {
             <CardHeader>
                 <CardTitle>Brand Kit</CardTitle>
                 <CardDescription>
-                    Define your brand's visual identity. Your logo, colors, and fonts will be available in the video editor.
+                    Define your brand&apos;s visual identity. Your logo, colors, and fonts will be available in the video editor.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">

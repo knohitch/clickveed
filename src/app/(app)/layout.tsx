@@ -31,7 +31,6 @@ import { ThemeSwitcher } from '../../components/theme-switcher';
 import Link from 'next/link';
 import { SupportChatWidget } from '../../components/support-chat-widget';
 import { useSession, signOut } from 'next-auth/react';
-import type { User } from 'next-auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession({
@@ -155,7 +154,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </header>
 
           <main className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 min-h-0">{children}</main>
-          {session.user && <SupportChatWidget user={session.user as User} />}
+          {session.user && <SupportChatWidget />}
         </SidebarInset>
       </div>
     </SidebarProvider>

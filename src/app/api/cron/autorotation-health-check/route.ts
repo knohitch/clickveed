@@ -1,12 +1,20 @@
 
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { getAvailableTextGenerator, getAvailableImageGenerator, getAvailableVideoGenerator, getAvailableTTSProvider } from '@/lib/ai/api-service-manager';
 import { createProviderClient } from '@/lib/ai/provider-clients';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: Request) {
-    const authHeader = headers().get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+        console.error('[Cron] CRON_SECRET is not configured for autorotation health check');
+        return NextResponse.json({ error: 'Cron is not configured' }, { status: 503 });
+    }
+
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

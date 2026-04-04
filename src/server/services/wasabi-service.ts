@@ -1,5 +1,4 @@
-
-'use server';
+import 'server-only';
 
 /**
  * @fileOverview Enhanced Wasabi S3 storage service with robust error handling
@@ -16,6 +15,7 @@
 import { S3Client, PutObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import { getAdminSettings } from '@/server/actions/admin-actions';
 import { randomUUID } from 'crypto';
+import { sendOperationalAlert } from '@/lib/monitoring/alerts';
 
 interface WasabiCredentials {
     endpoint: string;
@@ -112,6 +112,13 @@ async function getWasabiCredentials(): Promise<WasabiCredentials> {
         };
     } catch (error) {
         console.error('[WasabiService] Error fetching credentials:', error);
+        await sendOperationalAlert({
+            category: 'storage',
+            severity: 'critical',
+            event: 'wasabi_credentials_unavailable',
+            message: 'Failed to load Wasabi credentials from admin settings or environment.',
+            error: error instanceof Error ? error : new Error('Unknown Wasabi credential failure'),
+        });
         throw new Error('Failed to retrieve Wasabi credentials. Please check admin settings.');
     }
 }
@@ -339,6 +346,17 @@ export async function uploadToWasabi(
         return { publicUrl, sizeMB, key };
     } catch (error) {
         console.error(`[WasabiService][${requestId}] Upload failed:`, error);
+        await sendOperationalAlert({
+            category: 'storage',
+            severity: 'critical',
+            event: 'wasabi_upload_failed',
+            message: `Wasabi upload failed for ${folder}.`,
+            metadata: {
+                folder,
+                requestId,
+            },
+            error: error instanceof Error ? error : new Error('Unknown Wasabi upload failure'),
+        });
 
         // Provide specific error messages
         if (error instanceof Error) {
@@ -390,6 +408,17 @@ export async function deleteFromWasabi(key: string): Promise<void> {
         console.log(`[WasabiService][${requestId}] Delete successful: ${key}`);
     } catch (error) {
         console.error(`[WasabiService][${requestId}] Delete failed:`, error);
+        await sendOperationalAlert({
+            category: 'storage',
+            severity: 'warning',
+            event: 'wasabi_delete_failed',
+            message: `Wasabi delete failed for key ${key}.`,
+            metadata: {
+                key,
+                requestId,
+            },
+            error: error instanceof Error ? error : new Error('Unknown Wasabi delete failure'),
+        });
         throw new Error(
             `Failed to delete file from Wasabi. ` +
             `Key: ${key}. ` +

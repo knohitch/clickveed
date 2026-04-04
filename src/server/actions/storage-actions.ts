@@ -1,8 +1,11 @@
 'use server';
 
+import { getUserOwnedStorageKey } from '@/lib/storage-key-utils';
 import { storageManager } from '@/lib/storage';
 import { getAdminSettings, updateAdminSettings } from '@/server/actions/admin-actions';
 import { revalidatePath } from 'next/cache';
+import { auth } from '@/auth';
+import { logAuditEvent } from '@/lib/monitoring/audit';
 
 export interface StorageSettings {
   wasabiEndpoint: string;
@@ -11,6 +14,18 @@ export interface StorageSettings {
   bunnyCdnUrl: string;
   wasabiAccessKey: string;
   wasabiSecretKey: string;
+}
+
+async function requireAdminSession(): Promise<{ id: string; role?: string | null }> {
+  const session = await auth();
+  if (!session?.user?.role || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+    throw new Error('Administrator access required');
+  }
+
+  return {
+    id: session.user.id,
+    role: session.user.role,
+  };
 }
 
 function stripInvisibleChars(value: string): string {
@@ -30,40 +45,21 @@ function sanitizeStorageField(name: keyof StorageSettings, value: string): strin
   return cleaned.trim();
 }
 
-function normalizeStorageKey(keyOrUrl: string): string {
-  const cleaned = stripInvisibleChars(keyOrUrl || '').trim();
-  if (!cleaned) return '';
-
-  // Accept full URL input and convert to key path.
-  if (/^https?:\/\//i.test(cleaned)) {
-    try {
-      const parsed = new URL(cleaned);
-      const segments = parsed.pathname.split('/').filter(Boolean);
-      if (segments.length === 0) return '';
-
-      const knownRoots = new Set(['media', 'images', 'videos', 'audio']);
-      const rootIndex = segments.findIndex((segment) => knownRoots.has(segment.toLowerCase()));
-      if (rootIndex >= 0) {
-        return segments.slice(rootIndex).join('/');
-      }
-      if (segments.length >= 2 && knownRoots.has(segments[1].toLowerCase())) {
-        return segments.slice(1).join('/');
-      }
-      return segments.join('/');
-    } catch {
-      return '';
-    }
-  }
-
-  return cleaned.replace(/^\/+/, '');
-}
-
 /**
  * Get current storage configuration
  */
 export async function getStorageSettings(): Promise<StorageSettings> {
+  const actor = await requireAdminSession();
+
   try {
     const adminSettings = await getAdminSettings();
+    logAuditEvent({
+      action: 'storage_settings_read',
+      outcome: 'success',
+      actorId: actor.id,
+      actorRole: actor.role,
+      targetType: 'storage_settings',
+    });
 
     return {
       wasabiEndpoint: sanitizeStorageField('wasabiEndpoint', adminSettings.apiKeys.wasabiEndpoint || adminSettings.storageSettings?.wasabiEndpoint || process.env.WASABI_ENDPOINT || ''),
@@ -75,6 +71,16 @@ export async function getStorageSettings(): Promise<StorageSettings> {
     };
   } catch (error) {
     console.error('Failed to get storage settings:', error);
+    logAuditEvent({
+      action: 'storage_settings_read',
+      outcome: 'failure',
+      actorId: actor.id,
+      actorRole: actor.role,
+      targetType: 'storage_settings',
+      metadata: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
     throw new Error('Failed to retrieve storage configuration');
   }
 }
@@ -83,6 +89,8 @@ export async function getStorageSettings(): Promise<StorageSettings> {
  * Update storage configuration
  */
 export async function updateStorageSettings(settings: StorageSettings): Promise<{ success: boolean; message: string }> {
+  const actor = await requireAdminSession();
+
   try {
     const sanitizedSettings: StorageSettings = {
       wasabiEndpoint: sanitizeStorageField('wasabiEndpoint', settings.wasabiEndpoint),
@@ -127,12 +135,33 @@ export async function updateStorageSettings(settings: StorageSettings): Promise<
     revalidatePath('/dashboard/settings', 'page');
 
     console.log('[Storage] Settings updated and UI revalidated');
+    logAuditEvent({
+      action: 'storage_settings_update',
+      outcome: 'success',
+      actorId: actor.id,
+      actorRole: actor.role,
+      targetType: 'storage_settings',
+      metadata: {
+        bucket: sanitizedSettings.wasabiBucket,
+        region: sanitizedSettings.wasabiRegion,
+      },
+    });
     return {
       success: true,
       message: 'Storage configuration updated successfully'
     };
   } catch (error) {
     console.error('Failed to update storage settings:', error);
+    logAuditEvent({
+      action: 'storage_settings_update',
+      outcome: 'failure',
+      actorId: actor.id,
+      actorRole: actor.role,
+      targetType: 'storage_settings',
+      metadata: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Failed to update storage configuration'
@@ -144,8 +173,20 @@ export async function updateStorageSettings(settings: StorageSettings): Promise<
  * Test storage connection
  */
 export async function testStorageConnection(): Promise<{ success: boolean; message: string }> {
+  const actor = await requireAdminSession();
+
   try {
     if (!storageManager.isConfigured()) {
+      logAuditEvent({
+        action: 'storage_connection_test',
+        outcome: 'failure',
+        actorId: actor.id,
+        actorRole: actor.role,
+        targetType: 'storage_settings',
+        metadata: {
+          reason: 'not_configured',
+        },
+      });
       return {
         success: false,
         message: 'Storage not configured. Please configure Wasabi credentials first.'
@@ -164,11 +205,28 @@ export async function testStorageConnection(): Promise<{ success: boolean; messa
     );
 
     if (isConfigured) {
+      logAuditEvent({
+        action: 'storage_connection_test',
+        outcome: 'success',
+        actorId: actor.id,
+        actorRole: actor.role,
+        targetType: 'storage_settings',
+      });
       return {
         success: true,
         message: 'Storage connection test successful'
       };
     } else {
+      logAuditEvent({
+        action: 'storage_connection_test',
+        outcome: 'failure',
+        actorId: actor.id,
+        actorRole: actor.role,
+        targetType: 'storage_settings',
+        metadata: {
+          reason: 'configuration_incomplete',
+        },
+      });
       return {
         success: false,
         message: 'Storage configuration incomplete'
@@ -176,6 +234,16 @@ export async function testStorageConnection(): Promise<{ success: boolean; messa
     }
   } catch (error) {
     console.error('Storage connection test failed:', error);
+    logAuditEvent({
+      action: 'storage_connection_test',
+      outcome: 'failure',
+      actorId: actor.id,
+      actorRole: actor.role,
+      targetType: 'storage_settings',
+      metadata: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Storage connection test failed'
@@ -260,12 +328,33 @@ export async function uploadToStorage(
     }
 
     console.log('[Storage] Upload successful:', result.storageUrl);
+    logAuditEvent({
+      action: 'storage_file_upload',
+      outcome: 'success',
+      actorId: userId,
+      targetType: 'storage_file',
+      targetId: key,
+      metadata: {
+        fileName: file.name,
+        contentType: options?.contentType || file.type,
+      },
+    });
     return {
       success: true,
       data: result
     };
   } catch (error) {
     console.error('Upload to storage failed:', error);
+    logAuditEvent({
+      action: 'storage_file_upload',
+      outcome: 'failure',
+      actorId: userId,
+      targetType: 'storage_file',
+      metadata: {
+        fileName: file.name,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Upload failed'
@@ -276,13 +365,20 @@ export async function uploadToStorage(
 /**
  * Delete file from storage
  */
-export async function deleteFromStorage(key: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteFromStorage(key: string, userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const normalizedKey = normalizeStorageKey(key);
-    if (!normalizedKey) {
+    const ownedKey = getUserOwnedStorageKey(key, userId);
+    if (!ownedKey) {
+      logAuditEvent({
+        action: 'storage_file_delete',
+        outcome: 'denied',
+        actorId: userId,
+        targetType: 'storage_file',
+        targetId: key,
+      });
       return {
         success: false,
-        error: 'Invalid storage key'
+        error: 'Forbidden'
       };
     }
 
@@ -294,11 +390,28 @@ export async function deleteFromStorage(key: string): Promise<{ success: boolean
       };
     }
 
-    await storageManager.deleteFile(normalizedKey);
+    await storageManager.deleteFile(ownedKey);
+    logAuditEvent({
+      action: 'storage_file_delete',
+      outcome: 'success',
+      actorId: userId,
+      targetType: 'storage_file',
+      targetId: ownedKey,
+    });
 
     return { success: true };
   } catch (error) {
     console.error('Delete from storage failed:', error);
+    logAuditEvent({
+      action: 'storage_file_delete',
+      outcome: 'failure',
+      actorId: userId,
+      targetType: 'storage_file',
+      targetId: key,
+      metadata: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Delete failed'

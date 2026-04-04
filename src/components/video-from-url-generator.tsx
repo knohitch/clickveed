@@ -84,15 +84,10 @@ export function VideoFromUrlGenerator() {
     setState(prev => ({ ...prev, message: 'Generating script...' }));
 
     try {
-      // Get session token for authentication
-      const sessionResponse = await fetch('/api/auth/session');
-      const session = await sessionResponse.json();
-      
       const response = await fetch('/api/video/generate-from-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.accessToken || 'temp-token'}`, // Use session token or temp token
         },
         body: JSON.stringify({ url, topic }),
       });

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import prisma from '@/server/prisma';
 import { createRateLimit } from '@/lib/rate-limit';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // This endpoint is intentionally public for the super admin signup page
 // to check if super admin already exists. It only returns a count, 
 // which is not sensitive information.
@@ -22,7 +25,7 @@ export async function GET(request: Request) {
 
   try {
     const count = await prisma.user.count();
-    return NextResponse.json({ count }, { status: 200 });
+    return NextResponse.json({ hasUsers: count > 0 }, { status: 200 });
   } catch (error) {
     console.error('Error counting users:', error);
     return NextResponse.json(

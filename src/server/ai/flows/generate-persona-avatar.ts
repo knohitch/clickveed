@@ -4,10 +4,12 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { generateImageWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
+import { generateImageWithProvider } from '@/lib/ai/api-service-manager';
 import { uploadToWasabi } from '@/server/services/wasabi-service';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
+import { createPersonaAvatarJob, enqueuePersonaAvatarVideoJob } from '@/server/services/persona-avatar-job-service';
+import { extractAvatarImageUrl } from '@/server/ai/workflow-contract-helpers';
 import {
   GeneratePersonaAvatarInputSchema,
   GeneratePersonaAvatarOutputSchema,
@@ -27,88 +29,61 @@ export type { GeneratePersonaAvatarInput, GeneratePersonaAvatarOutput } from './
  *  - Genkit/Gemini     → message.content[N].inlineData.data  (base64)
  *  - Raw Google API    → custom.candidates[0].content.parts[N].inlineData.data
  */
-function extractAvatarImageUrl(imageResponse: unknown): string {
-  const payload = imageResponse as any;
-
-  // Custom providers return "Image generated: <url>"
-  const text = payload?.result?.content?.[0]?.text;
-  if (typeof text === 'string' && text.startsWith('Image generated: ')) {
-    return text.replace('Image generated: ', '').trim();
-  }
-
-  // Genkit GenerateResponse: response.media.url (single object, NOT array)
-  if (typeof payload?.media?.url === 'string' && payload.media.url.length > 0) {
-    return payload.media.url;
-  }
-
-  // Backward-compat: response.media as array
-  if (Array.isArray(payload?.media) && typeof payload.media[0]?.url === 'string') {
-    return payload.media[0].url;
-  }
-
-  // Message content parts (URL or inline base64)
-  const messageParts = payload?.message?.content;
-  if (Array.isArray(messageParts)) {
-    for (const part of messageParts) {
-      if (typeof part?.media?.url === 'string' && part.media.url.length > 0) {
-        return part.media.url;
-      }
-      if (typeof part?.inlineData?.data === 'string' && part.inlineData.data.length > 0) {
-        const mime = part.inlineData.mimeType || 'image/png';
-        return `data:${mime};base64,${part.inlineData.data.replace(/\s+/g, '')}`;
-      }
-    }
-  }
-
-  // Raw Google API nested response (custom.candidates[0].content.parts)
-  const customParts = payload?.custom?.candidates?.[0]?.content?.parts;
-  if (Array.isArray(customParts)) {
-    for (const part of customParts) {
-      if (typeof part?.inlineData?.data === 'string' && part.inlineData.data.length > 0) {
-        const mime = part.inlineData.mimeType || 'image/png';
-        return `data:${mime};base64,${part.inlineData.data.replace(/\s+/g, '')}`;
-      }
-      if (typeof part?.fileData?.fileUri === 'string' && part.fileData.fileUri.length > 0) {
-        return part.fileData.fileUri;
-      }
-    }
-  }
-
-  return '';
-}
-
 export async function generatePersonaAvatar(
   input: GeneratePersonaAvatarInput
 ): Promise<GeneratePersonaAvatarOutput> {
   return generatePersonaAvatarFlow(input);
 }
 
-async function generateVideoInBackground(userId: string, personaName: string, avatarImageDataUri: string, script: string) {
-  try {
-    const response: any = await generateVideoWithProvider({
-      messages: [{ role: 'user', content: [{ text: `Animate this avatar to speak naturally. Script: "${script}". Avatar: ${avatarImageDataUri}` }] }],
-    });
-    const responseText = response?.result?.content?.[0]?.text || '';
-    const generatedVideoUrl = responseText.replace('Video generated: ', '').trim();
-    if (!generatedVideoUrl) {
-      throw new Error('Video generation failed. No video URL returned by provider.');
-    }
-
-    const { publicUrl, sizeMB } = await uploadToWasabi(generatedVideoUrl, 'videos');
-
-    await prisma.mediaAsset.create({
-      data: {
-        name: `Avatar Video: ${personaName}`,
-        type: 'VIDEO',
-        url: publicUrl,
-        size: sizeMB,
-        userId: userId,
-      }
-    });
-    console.log(`Successfully generated and saved video for persona ${personaName}`);
-  } catch (error) {
-    console.error(`Background video generation failed for ${personaName}:`, error);
+export async function runPersonaAvatarWorkflow(
+  input: GeneratePersonaAvatarInput,
+  deps: {
+    userId: string;
+    generateImage: (messages: Array<{ role: 'user'; content: Array<{ text: string }> }>) => Promise<unknown>;
+    uploadImage: (dataUri: string) => Promise<{ publicUrl: string; sizeMB: number }>;
+    createMediaAsset: (asset: { name: string; type: 'IMAGE'; url: string; size: number; userId: string }) => Promise<unknown>;
+    createJob: (job: { userId: string; personaName: string; script: string; avatarImageUrl: string }) => Promise<{ id: string }>;
+    enqueueJob: (jobId: string) => Promise<{ jobStatus: GeneratePersonaAvatarOutput['jobStatus']; videoStatus: string }>;
   }
+): Promise<GeneratePersonaAvatarOutput> {
+  const imageMessages = [{ role: 'user' as const, content: [{ text: input.avatarDescription }] }];
+  const imageResponse = await deps.generateImage(imageMessages);
+
+  const avatarImageDataUri = extractAvatarImageUrl(imageResponse);
+
+  if (!avatarImageDataUri) {
+    const provider = (imageResponse as any)?.provider || 'unknown';
+    const model = (imageResponse as any)?.model || 'unknown';
+    throw new Error(
+      `Failed to generate the initial avatar image. No media returned by provider=${provider} model=${model}. ` +
+      `Ensure a valid image provider (Gemini API key or Imagen/Replicate credentials) is configured in admin settings.`
+    );
+  }
+
+  const { publicUrl: avatarImageUrl, sizeMB: avatarImageSize } = await deps.uploadImage(avatarImageDataUri);
+  await deps.createMediaAsset({
+    name: `Avatar Image: ${input.personaName}`,
+    type: 'IMAGE',
+    url: avatarImageUrl,
+    size: avatarImageSize,
+    userId: deps.userId,
+  });
+
+  const personaJob = await deps.createJob({
+    userId: deps.userId,
+    personaName: input.personaName,
+    script: input.script,
+    avatarImageUrl,
+  });
+  const queueResult = await deps.enqueueJob(personaJob.id);
+
+  return {
+    jobId: personaJob.id,
+    jobStatus: queueResult.jobStatus,
+    avatarImageUrl,
+    videoStatus: queueResult.videoStatus,
+    videoUrl: null,
+  };
 }
 
 const generatePersonaAvatarFlow = ai.defineFlow(
@@ -123,44 +98,13 @@ const generatePersonaAvatarFlow = ai.defineFlow(
     if (!session?.user?.id) {
       throw new Error("User must be authenticated to generate an avatar.");
     }
-
-    // Step 1: Generate the static avatar image first and return it immediately.
-    // Use generateImageWithProvider() which creates a properly configured Genkit
-    // instance with API keys loaded from the database, avoiding the plugin-less
-    // default ai instance which causes "Model not found" errors.
-    const imageMessages = [{ role: 'user' as const, content: [{ text: input.avatarDescription }] }];
-    const imageResponse = await generateImageWithProvider({ messages: imageMessages });
-
-    // Extract image URL/data-URI from response using the robust multi-shape extractor.
-    const avatarImageDataUri = extractAvatarImageUrl(imageResponse);
-
-    if (!avatarImageDataUri) {
-      const provider = (imageResponse as any)?.provider || 'unknown';
-      const model = (imageResponse as any)?.model || 'unknown';
-      throw new Error(
-        `Failed to generate the initial avatar image. No media returned by provider=${provider} model=${model}. ` +
-        `Ensure a valid image provider (Gemini API key or Imagen/Replicate credentials) is configured in admin settings.`
-      );
-    }
-
-    // Sequential upload and DB write to prevent orphaned files
-    const { publicUrl: avatarImageUrl, sizeMB: avatarImageSize } = await uploadToWasabi(avatarImageDataUri, 'images');
-    await prisma.mediaAsset.create({
-      data: {
-        name: `Avatar Image: ${input.personaName}`,
-        type: 'IMAGE',
-        url: avatarImageUrl,
-        size: avatarImageSize,
-        userId: session.user.id,
-      }
+    return runPersonaAvatarWorkflow(input, {
+      userId: session.user.id,
+      generateImage: async (messages) => generateImageWithProvider({ messages }),
+      uploadImage: async (dataUri) => uploadToWasabi(dataUri, 'images'),
+      createMediaAsset: async (asset) => prisma.mediaAsset.create({ data: asset }),
+      createJob: createPersonaAvatarJob,
+      enqueueJob: enqueuePersonaAvatarVideoJob,
     });
-
-    // Step 2: Trigger the video generation in the background without waiting for it.
-    generateVideoInBackground(session.user.id, input.personaName, avatarImageDataUri, input.script);
-
-    return {
-      avatarImageUrl,
-      videoStatus: 'Video generation has started.',
-    };
   }
 );

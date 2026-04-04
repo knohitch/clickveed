@@ -1,3 +1,6 @@
+import { logger } from '@/lib/monitoring/logger';
+import { captureServerError } from '@/lib/sentry.server.config';
+
 /**
  * Log an error with context
  */
@@ -11,8 +14,13 @@ export function logError(error: Error, context: string = ''): void {
     name: error.name
   };
 
-  // In production, send to logging service
-  // For now, we'll log to console
+  logger.error(context || error.message, {
+    event: 'application_error',
+    operation: context,
+    error,
+    metadata: errorInfo as Record<string, unknown>,
+  });
+  void captureServerError(error, { errorInfo });
   console.error('[ERROR]', JSON.stringify(errorInfo));
 }
 

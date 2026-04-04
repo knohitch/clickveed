@@ -242,7 +242,7 @@ export default function BillingPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Plans & Pricing</CardTitle>
-                    <CardDescription>Choose the plan that's right for you.</CardDescription>
+                    <CardDescription>Choose the plan that&apos;s right for you.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                    {sortedPlans.map(plan => {

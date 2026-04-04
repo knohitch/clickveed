@@ -4,6 +4,11 @@ import { getAdminSettings } from '@/server/actions/admin-actions';
 import { storageManager } from '@/lib/storage';
 import IORedis from 'ioredis';
 import { resolveRedisConnectionInfo } from '@/lib/redis-config';
+import { requireSuperAdminApi } from '@/lib/api-auth';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 /**
  * Comprehensive Diagnostic Endpoint
@@ -16,10 +21,17 @@ import { resolveRedisConnectionInfo } from '@/lib/redis-config';
  * - Authentication setup
  * 
  * GET /api/diagnostics
- * Add ?secret=YOUR_AUTH_SECRET for full details
  */
 
 export async function GET(request: Request) {
+  const unauthorized = await requireSuperAdminApi({
+    route: '/api/diagnostics',
+    method: 'GET',
+  });
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get('secret');
   

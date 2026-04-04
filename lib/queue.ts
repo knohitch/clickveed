@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import IORedis from 'ioredis';
 import { Queue, Worker, Job } from 'bullmq';
@@ -53,6 +53,11 @@ if (redisUrl && redisConnection) {
         const { generatePipelineVideo } = await import('@/server/ai/flows/video-pipeline');
         const result = await generatePipelineVideo(data.input);
         return result;
+      }
+
+      if (name === 'generate-persona-avatar-video') {
+        const { processPersonaAvatarVideoJob } = await import('@/server/services/persona-avatar-job-service');
+        return processPersonaAvatarVideoJob(data.jobId);
       }
 
       // Add other task types as needed (e.g., 'generate-voice', 'repurpose-content')

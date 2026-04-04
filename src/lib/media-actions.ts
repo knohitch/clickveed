@@ -165,7 +165,7 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
             const storageKey = extractStorageKeyFromUrl(asset.url);
             if (storageKey) {
                 const { deleteFromStorage } = await import('@/server/actions/storage-actions');
-                const storageResult = await deleteFromStorage(storageKey);
+                const storageResult = await deleteFromStorage(storageKey, session.user.id);
                 if (!storageResult.success) {
                     console.warn('Failed to delete from storage:', storageResult.error);
                 }

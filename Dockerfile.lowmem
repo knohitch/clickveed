@@ -29,9 +29,9 @@ ENV PRISMA_CLI_BINARY_TARGETS="linux-musl-openssl-3.0.x"
 RUN npx prisma generate
 
 # Build with minimal output and swap if needed
-RUN npm run build -- --no-lint || \
+RUN npm run build || \
     (echo "Build failed, retrying with even lower memory..." && \
-     NODE_OPTIONS="--max-old-space-size=2560" npm run build -- --no-lint)
+     NODE_OPTIONS="--max-old-space-size=2560" npm run build)
 
 # Production runtime stage
 FROM base AS runner

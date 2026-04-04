@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/server/services/notification-service';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -33,7 +36,7 @@ export async function PATCH(request: Request) {
     }
 
     if (notificationId) {
-      await markNotificationAsRead(notificationId);
+      await markNotificationAsRead(session.user.id, notificationId);
       return NextResponse.json({ success: true, message: 'Notification marked as read' });
     }
 

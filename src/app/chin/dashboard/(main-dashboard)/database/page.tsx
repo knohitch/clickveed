@@ -93,7 +93,7 @@ export default function DatabasePage() {
             <div>
                 <h1 className="text-3xl font-bold font-headline">Database Connection</h1>
                 <p className="text-muted-foreground">
-                    Check the status of the application's database connection via Prisma Accelerate.
+                    Check the status of the application&apos;s database connection via Prisma Accelerate.
                 </p>
             </div>
 
