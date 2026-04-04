@@ -11,7 +11,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit --no-fund --cache /tmp/.npm
 
 FROM base AS builder
-ARG BUILD_MAX_OLD_SPACE_SIZE=3072
+ARG BUILD_MAX_OLD_SPACE_SIZE=1536
 ARG NEXT_DISABLE_SWC_WORKER=1
 ARG NEXT_PRIVATE_BUILD_WORKER=0
 
@@ -25,6 +25,8 @@ ENV NODE_OPTIONS=--max-old-space-size=${BUILD_MAX_OLD_SPACE_SIZE}
 ENV NEXT_DISABLE_SWC_WORKER=${NEXT_DISABLE_SWC_WORKER}
 ENV NEXT_PRIVATE_BUILD_WORKER=${NEXT_PRIVATE_BUILD_WORKER}
 ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_SKIP_VALIDATE_ESLINT=1
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -32,7 +34,7 @@ COPY . .
 RUN ./node_modules/.bin/prisma generate
 RUN ./node_modules/.bin/next build || \
     (echo "Retrying build with stricter memory settings..." && \
-     NODE_OPTIONS=--max-old-space-size=2560 NEXT_DISABLE_SWC_WORKER=1 NEXT_PRIVATE_BUILD_WORKER=0 ./node_modules/.bin/next build)
+     NODE_OPTIONS=--max-old-space-size=1024 NEXT_DISABLE_SWC_WORKER=1 NEXT_PRIVATE_BUILD_WORKER=0 ./node_modules/.bin/next build)
 RUN test -f /app/.next/standalone/server.js
 
 FROM node:20-bookworm-slim AS runner

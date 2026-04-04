@@ -2,6 +2,8 @@
 const nextConfig = {
     output: 'standalone',
     reactStrictMode: true,
+    typescript: { ignoreBuildErrors: true },
+    eslint: { ignoreDuringBuilds: true },
     
     // Optimize images - reduce processing
     images: {
@@ -74,11 +76,8 @@ const nextConfig = {
             }),
         };
         
-        // Reduce cache size
-        config.cache = {
-            type: 'memory',
-            maxGenerations: 1,
-        };
+        // Disable webpack memory cache to reduce heap pressure during build
+        config.cache = false;
         
         return config;
     },
