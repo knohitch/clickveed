@@ -27,9 +27,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 RUN ./node_modules/.bin/prisma generate
-RUN npm run build:docker || \
+RUN ./node_modules/.bin/next build || \
     (echo "Retrying build with stricter memory settings..." && \
-     NODE_OPTIONS=--max-old-space-size=2560 NEXT_DISABLE_SWC_WORKER=1 NEXT_PRIVATE_BUILD_WORKER=0 npm run build:docker)
+     NODE_OPTIONS=--max-old-space-size=2560 NEXT_DISABLE_SWC_WORKER=1 NEXT_PRIVATE_BUILD_WORKER=0 ./node_modules/.bin/next build)
 RUN test -f /app/.next/standalone/server.js
 
 FROM node:20-bookworm-slim AS runner
