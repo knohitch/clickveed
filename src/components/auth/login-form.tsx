@@ -1,18 +1,15 @@
 'use client';
 
 import React from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { login } from '@/server/actions/auth-actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CheckCircle2, Mail, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
-function LoginButton() {
-  const { pending } = useFormStatus();
+function LoginButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" className="w-full text-lg py-6" disabled={pending}>
       {pending ? (
@@ -30,6 +27,7 @@ function LoginButton() {
 const initialState = {
   error: '',
   success: false,
+  redirectUrl: '',
 };
 
 // Component to display verification status messages
@@ -87,7 +85,8 @@ function VerificationMessage() {
 }
 
 export function LoginForm() {
-  const [state, formAction] = useFormState(login, initialState as any);
+  const [state, setState] = React.useState(initialState);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Handle redirect after successful login
   React.useEffect(() => {
@@ -99,8 +98,43 @@ export function LoginForm() {
     }
   }, [state?.success, state?.redirectUrl]);
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get('email') || '').trim();
+    const password = String(formData.get('password') || '');
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        cache: 'no-store',
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result = await response.json();
+      setState({
+        error: result?.error || '',
+        success: !!result?.success,
+        redirectUrl: result?.redirectUrl || '',
+      });
+    } catch {
+      setState({
+        error: 'Unable to reach the login service. Please try again.',
+        success: false,
+        redirectUrl: '',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="grid gap-4">
+    <form onSubmit={handleSubmit} className="grid gap-4">
       {/* Show verification status messages */}
       <React.Suspense fallback={null}>
         <VerificationMessage />
@@ -144,7 +178,7 @@ export function LoginForm() {
         </Alert>
       )}
       
-      <LoginButton />
+      <LoginButton pending={isSubmitting} />
     </form>
   );
 }

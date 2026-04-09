@@ -4,9 +4,8 @@ import { afterEach, describe, mock, test } from 'node:test';
 import { hashSync } from 'bcryptjs';
 import * as prismaRuntimeModule from '../../src/server/prisma';
 import { authorizeCredentials, authorizeUserRecord } from '@/lib/auth-credentials';
+import { buildJwtToken, buildSessionFromToken } from '@/lib/auth-session-callbacks';
 import {
-  buildJwtToken,
-  buildSessionFromToken,
   syncOAuthUserToDatabase,
 } from '@/lib/auth-callbacks';
 

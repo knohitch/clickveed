@@ -3,7 +3,8 @@ import { z } from 'zod';
 import authConfig from './auth.config';
 import type { DefaultSession, User as DefaultUser } from 'next-auth';
 import type { JWT } from "next-auth/jwt"
-import { buildJwtToken, buildSessionFromToken, syncOAuthUserToDatabase } from '@/lib/auth-callbacks';
+import { syncOAuthUserToDatabase } from '@/lib/auth-callbacks';
+import { buildJwtToken, buildSessionFromToken } from '@/lib/auth-session-callbacks';
 
 // CRITICAL: Explicitly set runtime to Node.js to prevent Edge Runtime analysis
 // This fixes build errors from bcryptjs, crypto, and process APIs not supported in Edge Runtime
