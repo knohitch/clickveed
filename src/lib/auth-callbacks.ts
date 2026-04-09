@@ -1,5 +1,3 @@
-import 'server-only';
-
 import prisma from '@/server/prisma';
 
 type OAuthUser = {
