@@ -3,6 +3,7 @@ import { Nunito, Poppins } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import ClientLayout from '@/components/client-layout';
+import { auth } from '@/auth';
 
 const nunito = Nunito({
   subsets: ['latin'],
@@ -29,15 +30,17 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn("font-body antialiased", nunito.variable, poppins.variable)}>
-        <ClientLayout>
+        <ClientLayout session={session}>
           {children}
         </ClientLayout>
       </body>

@@ -1,15 +1,17 @@
+import { redirect } from 'next/navigation';
 
-'use client';
+import { auth } from '@/auth';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export default async function ChinRedirect() {
+  const session = await auth();
 
-export default function ChinRedirect() {
-  const router = useRouter();
+  if (!session?.user) {
+    redirect('/login');
+  }
 
-  useEffect(() => {
-    router.replace('/login');
-  }, [router]);
+  if (session.user.role === 'SUPER_ADMIN') {
+    redirect('/chin/dashboard');
+  }
 
-  return null;
+  redirect('/dashboard');
 }

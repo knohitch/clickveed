@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { getUserById } from '@/server/actions/user-actions';
 import { getUserPlanFeatures } from '@/server/actions/feature-management-actions';
@@ -39,6 +39,15 @@ interface UserWithPlan {
   plan: Plan | null;
 }
 
+type HydrationCacheEntry = {
+  currentUser: UserWithPlan | null;
+  accessibleFeatures: string[];
+  loadedAt: number;
+};
+
+const AUTH_HYDRATION_TTL_MS = 5 * 60 * 1000;
+const authHydrationCache = new Map<string, HydrationCacheEntry>();
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function useAuth() {
@@ -57,57 +66,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessibleFeatures, setAccessibleFeatures] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const lastLoadedUserIdRef = useRef<string | null>(null);
 
-  const loadUserAndPlan = useCallback(async (userId: string) => {
+  const applyUserState = useCallback((userDetails: UserWithPlan | null, features: string[]) => {
+    setCurrentUser(userDetails);
+    setAccessibleFeatures(features);
+
+    if ((userDetails as any)?.plan) {
+      const planWithFeatures = (userDetails as any).plan;
+      setSubscriptionPlan(planWithFeatures);
+      setPlanFeatures(planWithFeatures.features || []);
+    } else {
+      setSubscriptionPlan(null);
+      setPlanFeatures([]);
+    }
+  }, []);
+
+  const loadUserAndPlan = useCallback(async (userId: string, options?: { force?: boolean }) => {
     try {
-      console.log('[AuthContext] Loading user data for:', userId);
-      const userDetails = await getUserById(userId);
-      console.log('[AuthContext] Loaded user details:', userDetails ? { id: userDetails.id, plan: userDetails.plan?.name, planId: userDetails.planId } : 'null');
-      setCurrentUser(userDetails);
-
-      // Load dynamic feature access
-      const features = await getUserPlanFeatures(userId);
-      setAccessibleFeatures(features);
-      console.log('[AuthContext] Loaded accessible features:', features.length);
-
-      if (userDetails?.plan) {
-        setSubscriptionPlan(userDetails.plan);
-        setPlanFeatures(userDetails.plan.features || []);
-        console.log('[AuthContext] Set subscription plan:', userDetails.plan.name);
-        console.log('[AuthContext] Plan features count:', userDetails.plan.features?.length || 0);
-      } else {
-        console.log('[AuthContext] No plan found for user, setting to null');
-        setSubscriptionPlan(null);
-        setPlanFeatures([]);
+      const useCache = !options?.force;
+      if (useCache) {
+        const cacheEntry = authHydrationCache.get(userId);
+        const cacheIsFresh =
+          !!cacheEntry && Date.now() - cacheEntry.loadedAt < AUTH_HYDRATION_TTL_MS;
+        if (cacheEntry && cacheIsFresh) {
+          applyUserState(cacheEntry.currentUser, cacheEntry.accessibleFeatures);
+          lastLoadedUserIdRef.current = userId;
+          return cacheEntry.currentUser;
+        }
       }
+
+      const [userDetails, features] = await Promise.all([
+        getUserById(userId) as Promise<UserWithPlan | null>,
+        getUserPlanFeatures(userId),
+      ]);
+
+      applyUserState(userDetails, features);
+      authHydrationCache.set(userId, {
+        currentUser: userDetails,
+        accessibleFeatures: features,
+        loadedAt: Date.now(),
+      });
+      lastLoadedUserIdRef.current = userId;
       return userDetails;
     } catch (error) {
       console.error('[AuthContext] Error loading user:', error);
+      applyUserState(null, []);
       return null;
     }
-  }, []);
+  }, [applyUserState]);
 
   useEffect(() => {
     async function initializeUser() {
       if (status === 'authenticated' && session?.user?.id) {
-        console.log('[AuthContext] Initializing user for:', session.user.id);
+        const userId = session.user.id;
+
+        if (lastLoadedUserIdRef.current === userId) {
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
-        await loadUserAndPlan(session.user.id);
+        await loadUserAndPlan(userId);
         setLoading(false);
-        console.log('[AuthContext] User initialized successfully');
       } else if (status !== 'loading') {
-        console.log('[AuthContext] Status:', status, '- Setting loading to false');
+        setCurrentUser(null);
+        setSubscriptionPlan(null);
+        setPlanFeatures([]);
+        setAccessibleFeatures([]);
+        lastLoadedUserIdRef.current = null;
         setLoading(false);
       }
     }
     initializeUser();
-  }, [session, status, loadUserAndPlan]);
+  }, [session?.user?.id, status, loadUserAndPlan]);
 
   // Add timeout to prevent infinite loading state
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (loading) {
-        console.warn('[AuthContext] Loading timeout exceeded, forcing loading to false');
         setLoading(false);
       }
     }, 10000); // 10 second timeout
@@ -120,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session?.user?.id) return;
     setRefreshing(true);
     try {
-      await loadUserAndPlan(session.user.id);
+      await loadUserAndPlan(session.user.id, { force: true });
     } finally {
       setRefreshing(false);
     }

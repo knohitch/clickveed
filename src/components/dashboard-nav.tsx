@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     Settings,
@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/auth-context";
@@ -132,51 +132,39 @@ export function DashboardNav() {
     const planName = subscriptionPlan?.name || null;
     const featureTier = (subscriptionPlan as any)?.featureTier || null;
 
-    // Debug logging for troubleshooting free tier issues (only in development)
-    if (process.env.NODE_ENV === 'development') {
-        console.log('[DashboardNav] Auth loading:', authLoading);
-        console.log('[DashboardNav] Subscription plan:', subscriptionPlan);
-        console.log('[DashboardNav] Plan name:', planName);
-        console.log('[DashboardNav] Feature tier:', featureTier);
-    }
-
     // IMPORTANT: If still loading OR no plan data, show all free-tier features
     // This ensures users can access the dashboard while plan data is being fetched
     // or if they somehow don't have a plan assigned yet.
     const shouldShowAllFreeFeatures = authLoading || (!planName && !featureTier);
 
-    const filteredMenuSections = menuSections.filter(section => {
-        if (!section.featureId) return true; // Always show sections without featureId
-        if (shouldShowAllFreeFeatures) {
-            // When loading or no plan, show sections that are part of free tier
-            const featureAccess = checkFeatureAccess(null, section.featureId, 'free');
-            return featureAccess.canAccess;
-        }
-        // Use dynamic feature access from auth context if available
-        if (accessibleFeatures && accessibleFeatures.length > 0) {
-            return accessibleFeatures.includes(section.featureId);
-        }
-        // Fall back to hardcoded feature access
-        const featureAccess = checkFeatureAccess(planName, section.featureId, featureTier);
-        return featureAccess.canAccess;
-    }).map(section => ({
-        ...section,
-        items: section.items.filter(item => {
-            if (!item.featureId) return true; // Always show items without featureId
+    const filteredMenuSections = useMemo(() => {
+        return menuSections.filter(section => {
+            if (!section.featureId) return true;
             if (shouldShowAllFreeFeatures) {
-                // When loading or no plan, show items that are part of free tier
-                const featureAccess = checkFeatureAccess(null, item.featureId, 'free');
+                const featureAccess = checkFeatureAccess(null, section.featureId, 'free');
                 return featureAccess.canAccess;
             }
-            // Use dynamic feature access from auth context if available
             if (accessibleFeatures && accessibleFeatures.length > 0) {
-                return accessibleFeatures.includes(item.featureId);
+                return accessibleFeatures.includes(section.featureId);
             }
-            // Fall back to hardcoded feature access
-            const featureAccess = checkFeatureAccess(planName, item.featureId, featureTier);
+            const featureAccess = checkFeatureAccess(planName, section.featureId, featureTier);
             return featureAccess.canAccess;
-        })
-    })).filter(section => section.items.length > 0); // Only show sections that have accessible items
+        }).map(section => ({
+            ...section,
+            items: section.items.filter(item => {
+                if (!item.featureId) return true;
+                if (shouldShowAllFreeFeatures) {
+                    const featureAccess = checkFeatureAccess(null, item.featureId, 'free');
+                    return featureAccess.canAccess;
+                }
+                if (accessibleFeatures && accessibleFeatures.length > 0) {
+                    return accessibleFeatures.includes(item.featureId);
+                }
+                const featureAccess = checkFeatureAccess(planName, item.featureId, featureTier);
+                return featureAccess.canAccess;
+            })
+        })).filter(section => section.items.length > 0);
+    }, [accessibleFeatures, featureTier, planName, shouldShowAllFreeFeatures]);
 
     return (
         <div className="flex flex-col gap-2 px-4 py-2">

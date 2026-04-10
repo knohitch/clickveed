@@ -1,19 +1,25 @@
+import { redirect } from 'next/navigation';
 
-'use client';
+import { auth } from '@/auth';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+export default async function LandingPage() {
+  const session = await auth();
 
-export default function LandingPage() {
-  const { status } = useSession();
-  const router = useRouter();
+  if (!session?.user) {
+    redirect('/login');
+  }
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
-    }
-  }, [status, router]);
+  if (session.user.role === 'SUPER_ADMIN') {
+    redirect('/chin/dashboard');
+  }
 
-  return null;
+  if (session.user.role === 'ADMIN') {
+    redirect('/kanri/dashboard');
+  }
+
+  if (!session.user.onboardingComplete) {
+    redirect('/dashboard/onboarding');
+  }
+
+  redirect('/dashboard');
 }

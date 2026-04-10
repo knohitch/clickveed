@@ -1,36 +1,23 @@
+import { redirect } from 'next/navigation';
 
-'use client';
-
-import React from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { auth } from '@/auth';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [redirecting, setRedirecting] = React.useState(false);
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
 
-  React.useEffect(() => {
-    if (status === 'authenticated' && session?.user && !redirecting) {
-      setRedirecting(true);
-
-      try {
-        if (session.user.role === 'SUPER_ADMIN') {
-          router.replace('/chin/dashboard');
-        } else if (session.user.role === 'ADMIN') {
-          router.replace('/kanri/dashboard');
-        } else if (session.user.onboardingComplete) {
-          router.replace('/dashboard');
-        } else {
-          router.replace('/dashboard/onboarding');
-        }
-      } catch (error) {
-        console.error('Navigation error:', error);
-        setRedirecting(false);
-      }
+  if (session?.user) {
+    if (session.user.role === 'SUPER_ADMIN') {
+      redirect('/chin/dashboard');
     }
-  }, [session, status, router, redirecting]);
+    if (session.user.role === 'ADMIN') {
+      redirect('/kanri/dashboard');
+    }
+    if (session.user.onboardingComplete) {
+      redirect('/dashboard');
+    }
+    redirect('/dashboard/onboarding');
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
