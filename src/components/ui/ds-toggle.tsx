@@ -20,7 +20,8 @@ export function Toggle({
   id,
   className,
 }: ToggleProps) {
-  const toggleId = id ?? React.useId();
+  const generatedId = React.useId();
+  const toggleId = id ?? generatedId;
 
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
