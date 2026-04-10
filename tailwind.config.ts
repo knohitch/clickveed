@@ -17,11 +17,54 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['var(--font-nunito)', 'sans-serif'],
+        body: ['var(--font-inter)', 'var(--font-nunito)', 'sans-serif'],
+        sans: ['var(--font-inter)', 'var(--font-nunito)', 'sans-serif'],
         headline: ['var(--font-poppins)', 'sans-serif'],
         code: ['monospace'],
       },
+      fontSize: {
+        '2xs': ['11px', { lineHeight: '1.4', letterSpacing: '0.08em' }],
+        xs: ['12px', { lineHeight: '1.5' }],
+        sm: ['13px', { lineHeight: '1.5' }],
+        base: ['14px', { lineHeight: '1.6' }],
+        lg: ['15px', { lineHeight: '1.5' }],
+        xl: ['18px', { lineHeight: '1.4' }],
+        '2xl': ['22px', { lineHeight: '1.3' }],
+        stat: ['28px', { lineHeight: '1.2', fontWeight: '600' }],
+      },
+      transitionDuration: {
+        fast: '150ms',
+      },
+      transitionTimingFunction: {
+        smooth: 'ease',
+      },
       colors: {
+        // ── Design system brand tokens ──────────────────────────────
+        brand: {
+          DEFAULT: '#2563EB',
+          dark: '#3B82F6',
+        },
+        // ── Surface tokens (use with bg-surface-*) ─────────────────
+        surface: {
+          'page-light': '#FFFFFF',
+          'sidebar-light': '#F3F4F6',
+          'card-light': '#FFFFFF',
+          'page-dark': '#0D0D14',
+          'sidebar-dark': '#13131F',
+          'card-dark': '#1A1A2E',
+        },
+        // ── Text tokens (use with text-ds-*) ───────────────────────
+        ds: {
+          'primary-light': '#0A0A0A',
+          'secondary-light': '#6B7280',
+          'muted-light': '#9CA3AF',
+          'primary-dark': '#F0F0FF',
+          'secondary-dark': '#8B8FA8',
+          'muted-dark': '#5C5F72',
+          'border-light': '#E5E7EB',
+          'border-dark': '#252538',
+          'border-dark-hover': '#3A3A55',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -77,6 +120,10 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        card: '8px',
+        btn: '8px',
+        badge: '4px',
+        toggle: '9999px',
       },
       keyframes: {
         'accordion-down': {

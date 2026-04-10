@@ -1,9 +1,17 @@
 import type { Metadata } from 'next';
-import { Nunito, Poppins } from 'next/font/google';
+import { Inter, Nunito, Poppins } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import ClientLayout from '@/components/client-layout';
 import { auth } from '@/auth';
+import { getBrandingMetadata } from '@/lib/branding-metadata';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  weight: ['400', '500', '600'],
+  display: 'swap',
+});
 
 const nunito = Nunito({
   subsets: ['latin'],
@@ -18,15 +26,24 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-const metadataAppName = process.env.NEXT_PUBLIC_APP_NAME || 'AI Video Creator';
-
 export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBrandingMetadata();
   return {
+    applicationName: branding.appName,
     title: {
-      default: metadataAppName,
-      template: `%s | ${metadataAppName}`,
+      default: branding.appName,
+      template: `%s | ${branding.appName}`,
     },
-    description: 'The All-in-One AI Video Creation Suite',
+    description: branding.description,
+    ...(branding.faviconUrl
+      ? {
+          icons: {
+            icon: branding.faviconUrl,
+            shortcut: branding.faviconUrl,
+            apple: branding.faviconUrl,
+          },
+        }
+      : {}),
   };
 }
 
@@ -39,7 +56,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("font-body antialiased", nunito.variable, poppins.variable)}>
+      <body className={cn("font-body antialiased", inter.variable, nunito.variable, poppins.variable)}>
         <ClientLayout session={session}>
           {children}
         </ClientLayout>
