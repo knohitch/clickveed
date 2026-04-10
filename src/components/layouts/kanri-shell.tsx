@@ -46,7 +46,7 @@ export default function KanriShell({
   return (
     <div className="flex min-h-screen bg-surface-page">
       {/* ── Fixed sidebar ─────────────────────────────────────────── */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-[192px] flex-col border-r border-border-default bg-surface-sidebar">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-[240px] flex-col border-r border-border-default bg-surface-sidebar">
 
         <div className="flex h-[52px] shrink-0 items-center border-b border-border-default px-4">
           <Logo inSidebar />
@@ -111,7 +111,7 @@ export default function KanriShell({
       </aside>
 
       {/* ── Main content ──────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col pl-[192px]">
+      <div className="flex flex-1 flex-col pl-[240px]">
         <header className={cn(
           'sticky top-0 z-30 flex h-[52px] items-center justify-between',
           'border-b border-border-default bg-surface-topbar/90 backdrop-blur-md',

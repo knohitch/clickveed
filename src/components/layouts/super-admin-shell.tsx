@@ -45,7 +45,7 @@ export default function SuperAdminShell({
     <div className="flex min-h-screen bg-surface-page">
 
       {/* ── Fixed sidebar ─────────────────────────────────────────── */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-[192px] flex-col border-r border-border-default bg-surface-sidebar">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-[240px] flex-col border-r border-border-default bg-surface-sidebar">
 
         {/* Logo area */}
         <div className="flex h-[52px] shrink-0 items-center gap-3 border-b border-border-default px-4">
@@ -118,7 +118,7 @@ export default function SuperAdminShell({
       </aside>
 
       {/* ── Main content area ─────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col pl-[192px]">
+      <div className="flex flex-1 flex-col pl-[240px]">
 
         {/* Top bar */}
         <header className={cn(
