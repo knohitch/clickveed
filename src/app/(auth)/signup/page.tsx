@@ -13,9 +13,10 @@ import { Logo } from '@/components/logo';
 import { Separator } from '@/components/ui/separator';
 import { GoogleIcon } from '@/components/icons/google-icon';
 import { SignupForm } from '@/components/auth/signup-form';
+import { getBrandingMetadata } from '@/lib/branding-metadata';
 
 export async function generateMetadata() {
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AI Video Creator';
+  const { appName } = await getBrandingMetadata();
   return {
     title: `Sign Up | ${appName}`,
   };

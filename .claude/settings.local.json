@@ -1,10 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls C:UsersAdministratorDesktopMyCodesclickveed-mainnext.config*)",
-      "Bash(git add .dockerignore Dockerfile.caprover next.config.mjs prisma/schema.prisma \"src/app/\\(app\\)/dashboard/media/library/page.tsx\" \"src/app/chin/dashboard/\\(main-dashboard\\)/api-integrations/page.tsx\" src/components/media-library-client.tsx src/lib/ai/api-service-manager.ts src/lib/ai/provider-clients.ts src/lib/ai/provider-registry.ts src/lib/media-actions.ts src/server/ai/flows/generate-persona-avatar.ts)",
+      "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push origin main)"
+      "Bash(git push:*)",
+      "Bash(wc -l \"/c/Users/Administrator/Desktop/MyCodes/clickveed-main/src/components/ui/\"*.tsx)",
+      "Bash(npx tsc:*)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=512\" npx tsc --noEmit --skipLibCheck)"
     ]
   }
 }

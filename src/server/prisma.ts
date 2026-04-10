@@ -92,6 +92,29 @@ const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+function isRetryableConnectionError(error: unknown): boolean {
+  const message =
+    error instanceof Error && error.message ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  const retryablePatterns = [
+    'connection reset by peer',
+    'transport endpoint is not connected',
+    'notconnected',
+    'connection reset',
+    'connection',
+    'econnreset',
+    'econnrefused',
+    'etimedout',
+    'p1001', // Prisma: Unable to reach database server
+    'p1002', // Prisma: Database server timeout
+    'p2024', // Prisma: Connection pool timeout
+    'server has closed the connection',
+    'socket hang up',
+  ];
+
+  return retryablePatterns.some((pattern) => message.includes(pattern));
+}
+
 // Wrapper for database operations with retry logic
 export async function withRetry<T>(
   operation: () => Promise<T>,
@@ -103,15 +126,7 @@ export async function withRetry<T>(
     try {
       return await operation();
     } catch (error) {
-      // Check if it's a connection error that should be retried
-      const isConnectionError =
-        error instanceof Error &&
-        (error.message.includes('Connection') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ETIMEDOUT') ||
-          error.message.includes('P1001') ||  // Prisma: Unable to reach database server
-          error.message.includes('P1002') ||  // Prisma: Database server timeout
-          error.message.includes('P2024'));   // Prisma: Connection pool timeout
+      const isConnectionError = isRetryableConnectionError(error);
 
       if (!isConnectionError || attempt === maxRetries) {
         console.error(`[Prisma] ${operationName} failed after ${attempt} attempts:`, error);

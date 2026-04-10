@@ -15,6 +15,7 @@ export interface FileUploadResult {
     storageUrl: string;
     cdnUrl: string;
     key: string;
+    mediaAssetId?: number;
   };
   error?: string;
 }

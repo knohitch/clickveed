@@ -25,21 +25,24 @@ secretEnvironmentVariables:
     secret: NEXT_PUBLIC_FIREBASE_APP_ID
   - key: DATABASE_URL
     secret: DATABASE_URL
+  - key: REDIS_URL
+    secret: REDIS_URL
   - key: CRON_SECRET
     secret: CRON_SECRET
   - key: WASABI_ENDPOINT
     secret: WASABI_ENDPOINT
   - key: WASABI_REGION
     secret: WASABI_REGION
-  - key: WASABI_ACCESS_KEY
+  # Map canonical runtime env names to existing secret names for compatibility.
+  - key: WASABI_ACCESS_KEY_ID
     secret: WASABI_ACCESS_KEY
-  - key: WASABI_SECRET_KEY
+  - key: WASABI_SECRET_ACCESS_KEY
     secret: WASABI_SECRET_KEY
   - key: WASABI_BUCKET
     secret: WASABI_BUCKET
   - key: BUNNY_CDN_URL
     secret: BUNNY_CDN_URL
-  - key: GEMINI_API_KEY
+  - key: GOOGLE_AI_API_KEY
     secret: GEMINI_API_KEY
   - key: OPENAI_API_KEY
     secret: OPENAI_API_KEY

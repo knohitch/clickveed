@@ -22,7 +22,9 @@ const ENV_VARS: EnvVarConfig[] = [
 
   // Storage (Wasabi/other object storage)
   { name: 'WASABI_ENDPOINT', required: false, isPublic: false },
+  { name: 'WASABI_ACCESS_KEY', required: false, isPublic: false },
   { name: 'WASABI_ACCESS_KEY_ID', required: false, isPublic: false },
+  { name: 'WASABI_SECRET_KEY', required: false, isPublic: false },
   { name: 'WASABI_SECRET_ACCESS_KEY', required: false, isPublic: false },
   { name: 'WASABI_BUCKET', required: false, isPublic: false },
 
@@ -31,6 +33,7 @@ const ENV_VARS: EnvVarConfig[] = [
 
   // AI Services (optional)
   { name: 'OPENAI_API_KEY', required: false, isPublic: false },
+  { name: 'GOOGLE_AI_API_KEY', required: false, isPublic: false },
   { name: 'GEMINI_API_KEY', required: false, isPublic: false },
 ];
 

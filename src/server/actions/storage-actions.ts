@@ -176,7 +176,8 @@ export async function testStorageConnection(): Promise<{ success: boolean; messa
   const actor = await requireAdminSession();
 
   try {
-    if (!storageManager.isConfigured()) {
+    const isInitialized = await storageManager.ensureInitialized();
+    if (!isInitialized || !storageManager.isConfigured()) {
       logAuditEvent({
         action: 'storage_connection_test',
         outcome: 'failure',
@@ -193,45 +194,46 @@ export async function testStorageConnection(): Promise<{ success: boolean; messa
       };
     }
 
-    // Try to list objects in the bucket to test connection
-    const config = storageManager.getConfig();
-
-    // This is a simple test - in a real implementation, you might want to
-    // list objects or try a small upload
-    const isConfigured = !!(
-      config.wasabi.accessKeyId &&
-      config.wasabi.secretAccessKey &&
-      config.wasabi.bucket
-    );
-
-    if (isConfigured) {
+    const probe = await storageManager.probeConnection({ validateWriteDelete: true });
+    if (probe.success) {
       logAuditEvent({
         action: 'storage_connection_test',
         outcome: 'success',
         actorId: actor.id,
         actorRole: actor.role,
         targetType: 'storage_settings',
-      });
-      return {
-        success: true,
-        message: 'Storage connection test successful'
-      };
-    } else {
-      logAuditEvent({
-        action: 'storage_connection_test',
-        outcome: 'failure',
-        actorId: actor.id,
-        actorRole: actor.role,
-        targetType: 'storage_settings',
         metadata: {
-          reason: 'configuration_incomplete',
+          latencyMs: probe.latencyMs,
+          endpoint: probe.endpoint,
+          bucket: probe.bucket,
+          checks: probe.checks,
         },
       });
       return {
-        success: false,
-        message: 'Storage configuration incomplete'
+        success: true,
+        message: `Storage connection test successful (${probe.latencyMs}ms).`
       };
     }
+
+    logAuditEvent({
+      action: 'storage_connection_test',
+      outcome: 'failure',
+      actorId: actor.id,
+      actorRole: actor.role,
+      targetType: 'storage_settings',
+      metadata: {
+        reason: 'probe_failed',
+        latencyMs: probe.latencyMs,
+        endpoint: probe.endpoint,
+        bucket: probe.bucket,
+        checks: probe.checks,
+        error: probe.error,
+      },
+    });
+    return {
+      success: false,
+      message: `Storage probe failed: ${probe.error || 'Unknown storage probe failure'}`
+    };
   } catch (error) {
     console.error('Storage connection test failed:', error);
     logAuditEvent({

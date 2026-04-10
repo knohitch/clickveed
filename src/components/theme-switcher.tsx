@@ -35,7 +35,7 @@ export function ThemeSwitcher() {
             aria-label={label}
             className={cn(
               'flex h-6 w-6 items-center justify-center rounded-[4px]',
-              'text-muted-foreground transition-all duration-[150ms] ease-[ease]',
+              'text-muted-foreground transition-all duration-150 ease-in-out',
               'hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive && 'bg-background dark:bg-white/15 text-foreground shadow-sm',
             )}

@@ -2,8 +2,9 @@
 
 'use server';
 
-import prisma from './prisma';
+import prisma, { withRetry } from '@/server/prisma';
 import { auth } from '@/auth';
+import { storageManager } from '@/lib/storage';
 
 export interface MediaAsset {
     id: number;
@@ -34,6 +35,16 @@ function normalizePublicUrl(rawUrl: string): string {
     return value;
 }
 
+function getUrlHost(rawUrl: string): string | null {
+    const normalized = normalizePublicUrl(rawUrl);
+    if (!normalized) return null;
+    try {
+        return new URL(normalized).host.toLowerCase();
+    } catch {
+        return null;
+    }
+}
+
 function extractStorageKeyFromUrl(rawUrl: string): string | null {
     const normalized = normalizePublicUrl(rawUrl);
     if (!normalized) return null;
@@ -61,6 +72,74 @@ function extractStorageKeyFromUrl(rawUrl: string): string | null {
     }
 }
 
+interface SignedUrlContext {
+    canSign: boolean;
+    wasabiEndpointHost: string;
+    wasabiBucket: string;
+    bunnyHost: string | null;
+}
+
+function isLikelyPrivateStorageUrl(rawUrl: string, context: SignedUrlContext): boolean {
+    if (!context.canSign) return false;
+    const normalized = normalizePublicUrl(rawUrl);
+    if (!normalized) return false;
+
+    let parsed: URL;
+    try {
+        parsed = new URL(normalized);
+    } catch {
+        return false;
+    }
+
+    if (parsed.protocol === 'data:') return false;
+    if (parsed.searchParams.has('X-Amz-Signature')) return false;
+
+    const host = parsed.host.toLowerCase();
+    const wasabiEndpointHost = context.wasabiEndpointHost.toLowerCase();
+    const wasabiBucket = context.wasabiBucket.toLowerCase();
+
+    if (context.bunnyHost && host === context.bunnyHost.toLowerCase()) {
+        return false;
+    }
+
+    if (host.includes('wasabisys.com')) return true;
+    if (wasabiEndpointHost && (host === wasabiEndpointHost || host.endsWith(`.${wasabiEndpointHost}`))) {
+        return true;
+    }
+    if (wasabiBucket && host.startsWith(`${wasabiBucket}.`)) {
+        return true;
+    }
+
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    if (wasabiBucket && segments[0]?.toLowerCase() === wasabiBucket) {
+        return true;
+    }
+
+    return false;
+}
+
+async function resolveClientAssetUrl(rawUrl: string, context: SignedUrlContext): Promise<string> {
+    const normalized = normalizePublicUrl(rawUrl);
+    if (!isLikelyPrivateStorageUrl(normalized, context)) {
+        return normalized;
+    }
+
+    const storageKey = extractStorageKeyFromUrl(normalized);
+    if (!storageKey) {
+        return normalized;
+    }
+
+    try {
+        return await storageManager.getSignedReadUrl(storageKey, 60 * 60);
+    } catch (error) {
+        console.warn('[media-library] Failed to generate signed URL, falling back to stored URL', {
+            storageKey,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return normalized;
+    }
+}
+
 /**
  * Retrieves all media assets for the current user from the database.
  */
@@ -71,26 +150,63 @@ export async function getMediaAssets(): Promise<MediaAsset[]> {
     }
 
     try {
-        const assets = await prisma.mediaAsset.findMany({
-            where: {
-                userId: session.user.id,
-            },
-            orderBy: {
-                createdAt: 'desc'
+        const assets = await withRetry(
+            () =>
+                prisma.mediaAsset.findMany({
+                    where: {
+                        userId: session.user.id,
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                }),
+            { operationName: 'mediaAsset.findMany' }
+        );
+
+        const signedUrlContext: SignedUrlContext = {
+            canSign: false,
+            wasabiEndpointHost: '',
+            wasabiBucket: '',
+            bunnyHost: null,
+        };
+
+        try {
+            const initialized = await storageManager.ensureInitialized();
+            if (initialized && storageManager.isConfigured()) {
+                const storageConfig = storageManager.getConfig();
+                signedUrlContext.canSign = true;
+                signedUrlContext.wasabiEndpointHost = stripInvisibleChars(storageConfig.wasabi.endpoint).replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                signedUrlContext.wasabiBucket = stripInvisibleChars(storageConfig.wasabi.bucket);
+                signedUrlContext.bunnyHost = storageConfig.bunny.cdnUrl ? getUrlHost(storageConfig.bunny.cdnUrl) : null;
             }
+        } catch (error) {
+            console.warn('[media-library] Could not initialize storage for signed URL generation', {
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+
+        console.info('[media-library] Loaded media assets', {
+            userId: session.user.id,
+            count: assets.length,
         });
 
-        return assets.map(asset => ({
-            id: asset.id,
-            name: asset.name,
-            type: asset.type as 'IMAGE' | 'VIDEO' | 'AUDIO',
-            url: normalizePublicUrl(asset.url),
-            size: asset.size,
-            createdAt: asset.createdAt.toLocaleDateString(),
-        }));
+        return await Promise.all(
+            assets.map(async (asset) => ({
+                id: asset.id,
+                name: asset.name,
+                type: asset.type as 'IMAGE' | 'VIDEO' | 'AUDIO',
+                url: await resolveClientAssetUrl(asset.url, signedUrlContext),
+                size: asset.size,
+                createdAt: asset.createdAt.toLocaleDateString(),
+            }))
+        );
     } catch (error) {
         console.error("Failed to fetch media assets:", error);
-        return [];
+        console.error('[media-library] Media asset query failed', {
+            userId: session.user.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw new Error('Failed to load media assets from the database.');
     }
 }
 
@@ -109,15 +225,19 @@ export async function createMediaAsset(
     }
 
     try {
-        const asset = await prisma.mediaAsset.create({
-            data: {
-                name,
-                type,
-                url,
-                size,
-                userId: session.user.id,
-            }
-        });
+        const asset = await withRetry(
+            () =>
+                prisma.mediaAsset.create({
+                    data: {
+                        name,
+                        type,
+                        url,
+                        size,
+                        userId: session.user.id,
+                    }
+                }),
+            { operationName: 'mediaAsset.create' }
+        );
 
         return {
             id: asset.id,
@@ -144,21 +264,29 @@ export async function deleteMediaAsset(assetId: number): Promise<{ success: bool
 
     try {
         // Get the asset
-        const asset = await prisma.mediaAsset.findFirst({
-            where: {
-                id: assetId,
-                userId: session.user.id,
-            }
-        });
+        const asset = await withRetry(
+            () =>
+                prisma.mediaAsset.findFirst({
+                    where: {
+                        id: assetId,
+                        userId: session.user.id,
+                    }
+                }),
+            { operationName: 'mediaAsset.findFirst(delete)' }
+        );
 
         if (!asset) {
             return { success: false, error: 'Asset not found' };
         }
 
         // Delete from database first so the UI responds immediately
-        await prisma.mediaAsset.delete({
-            where: { id: assetId }
-        });
+        await withRetry(
+            () =>
+                prisma.mediaAsset.delete({
+                    where: { id: assetId }
+                }),
+            { operationName: 'mediaAsset.delete' }
+        );
 
         // Best-effort storage cleanup after DB delete (non-blocking for caller)
         try {

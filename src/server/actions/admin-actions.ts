@@ -213,6 +213,20 @@ export async function updateAdminSettings(data: { [key: string]: any }) {
         });
     }
     console.log('[AdminSettings] Settings saved:', Object.keys(data));
+
+    const changedKeys = new Set(Object.keys(data));
+    const brandingKeys = ['appName', 'logoUrl', 'faviconUrl'];
+    const brandingChanged = brandingKeys.some((key) => changedKeys.has(key));
+
+    if (brandingChanged) {
+        // Ensure browser metadata (title/favicon) refreshes after branding updates.
+        revalidatePath('/', 'layout');
+        revalidatePath('/login', 'page');
+        revalidatePath('/signup', 'page');
+        revalidatePath('/forgot-password', 'page');
+        revalidatePath('/reset-password', 'page');
+        revalidatePath('/dashboard', 'layout');
+    }
 }
 
 /**

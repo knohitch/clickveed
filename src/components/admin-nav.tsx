@@ -62,7 +62,7 @@ export function AdminNav({ type }: { type: 'admin' | 'superAdmin' }) {
             className={cn(
               // Base nav item
               'group flex h-9 items-center gap-2.5 rounded-btn px-3 text-sm font-medium',
-              'text-sidebar-foreground/70 transition-all duration-[150ms] ease-[ease]',
+              'text-sidebar-foreground/70 transition-all duration-150 ease-in-out',
               'hover:bg-black/5 hover:text-sidebar-foreground dark:hover:bg-white/5',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               // Active state
@@ -74,7 +74,7 @@ export function AdminNav({ type }: { type: 'admin' | 'superAdmin' }) {
           >
             <item.icon
               className={cn(
-                'h-4 w-4 shrink-0 transition-colors duration-[150ms]',
+                'h-4 w-4 shrink-0 transition-colors duration-150',
                 isActive
                   ? 'text-sidebar-primary'
                   : 'text-sidebar-foreground/50 group-hover:text-sidebar-foreground/70',

@@ -22,6 +22,19 @@ export interface StorageConfig {
   bunny: BunnyConfig;
 }
 
+export interface StorageConnectionProbe {
+  success: boolean;
+  latencyMs: number;
+  endpoint: string;
+  bucket: string;
+  checks: {
+    headBucket: boolean;
+    listObjects: boolean;
+    writeDelete: boolean;
+  };
+  error?: string;
+}
+
 // Default configuration
 const defaultConfig: StorageConfig = {
   wasabi: {
@@ -53,6 +66,21 @@ function normalizeCdnUrl(cdnUrl: string): string {
   const cleaned = stripInvisibleChars(cdnUrl).replace(/\/+$/, '');
   if (!cleaned) return '';
   return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+}
+
+function getEnvValue(...names: string[]): string {
+  for (const name of names) {
+    const value = process.env[name];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function formatStorageError(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
 }
 
 class StorageManager {
@@ -240,6 +268,22 @@ class StorageManager {
   }
 
   /**
+   * Generate a time-limited signed URL for private object reads.
+   */
+  async getSignedReadUrl(key: string, expiresSeconds = 3600): Promise<string> {
+    if (!this.s3Client || !this.initialized) {
+      throw new Error('Storage manager not initialized');
+    }
+
+    const safeKey = key.replace(/^\/+/, '');
+    return this.s3Client.getSignedUrlPromise('getObject', {
+      Bucket: this.config.wasabi.bucket,
+      Key: safeKey,
+      Expires: expiresSeconds,
+    });
+  }
+
+  /**
    * Upload file and return both storage and CDN URLs
    */
   async uploadAndGetUrls(file: File, key: string, options?: {
@@ -253,6 +297,80 @@ class StorageManager {
       cdnUrl: this.getCdnUrl(key),
       key: uploadResult.key,
     };
+  }
+
+  /**
+   * Run an active connectivity probe against Wasabi.
+   * This validates credentials and bucket reachability beyond static config checks.
+   */
+  async probeConnection(options?: { validateWriteDelete?: boolean }): Promise<StorageConnectionProbe> {
+    const start = Date.now();
+    const checks = {
+      headBucket: false,
+      listObjects: false,
+      writeDelete: false,
+    };
+
+    if (!this.s3Client || !this.initialized) {
+      return {
+        success: false,
+        latencyMs: Date.now() - start,
+        endpoint: this.config.wasabi.endpoint || 'NOT_SET',
+        bucket: this.config.wasabi.bucket || 'NOT_SET',
+        checks,
+        error: 'Storage manager not initialized',
+      };
+    }
+
+    try {
+      await this.s3Client.headBucket({
+        Bucket: this.config.wasabi.bucket,
+      }).promise();
+      checks.headBucket = true;
+
+      await this.s3Client.listObjectsV2({
+        Bucket: this.config.wasabi.bucket,
+        MaxKeys: 1,
+      }).promise();
+      checks.listObjects = true;
+
+      if (options?.validateWriteDelete) {
+        const probeKey = `healthchecks/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`;
+        const body = Buffer.from('storage-probe');
+
+        await this.s3Client.putObject({
+          Bucket: this.config.wasabi.bucket,
+          Key: probeKey,
+          Body: body,
+          ContentType: 'text/plain',
+          ACL: 'private',
+        }).promise();
+
+        await this.s3Client.deleteObject({
+          Bucket: this.config.wasabi.bucket,
+          Key: probeKey,
+        }).promise();
+
+        checks.writeDelete = true;
+      }
+
+      return {
+        success: true,
+        latencyMs: Date.now() - start,
+        endpoint: this.config.wasabi.endpoint,
+        bucket: this.config.wasabi.bucket,
+        checks,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        latencyMs: Date.now() - start,
+        endpoint: this.config.wasabi.endpoint || 'NOT_SET',
+        bucket: this.config.wasabi.bucket || 'NOT_SET',
+        checks,
+        error: formatStorageError(error),
+      };
+    }
   }
 
   /**
@@ -350,16 +468,16 @@ export const initializeStorageFromDB = async (): Promise<void> => {
     // Fallback to environment variables
     const wasabiConfig = {
       wasabi: {
-        endpoint: process.env.WASABI_ENDPOINT || defaultConfig.wasabi.endpoint,
-        region: process.env.WASABI_REGION || defaultConfig.wasabi.region,
-        accessKeyId: process.env.WASABI_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.WASABI_SECRET_ACCESS_KEY || '',
-        bucket: process.env.WASABI_BUCKET || defaultConfig.wasabi.bucket,
+        endpoint: getEnvValue('WASABI_ENDPOINT') || defaultConfig.wasabi.endpoint,
+        region: getEnvValue('WASABI_REGION') || defaultConfig.wasabi.region,
+        accessKeyId: getEnvValue('WASABI_ACCESS_KEY_ID', 'WASABI_ACCESS_KEY') || '',
+        secretAccessKey: getEnvValue('WASABI_SECRET_ACCESS_KEY', 'WASABI_SECRET_KEY') || '',
+        bucket: getEnvValue('WASABI_BUCKET') || defaultConfig.wasabi.bucket,
       },
       bunny: {
-        cdnUrl: process.env.BUNNY_CDN_URL || defaultConfig.bunny.cdnUrl,
-        apiKey: process.env.BUNNY_API_KEY || '',
-        storageZone: process.env.BUNNY_STORAGE_ZONE || defaultConfig.bunny.storageZone,
+        cdnUrl: getEnvValue('BUNNY_CDN_URL') || defaultConfig.bunny.cdnUrl,
+        apiKey: getEnvValue('BUNNY_API_KEY') || '',
+        storageZone: getEnvValue('BUNNY_STORAGE_ZONE') || defaultConfig.bunny.storageZone,
       },
     };
 
@@ -371,16 +489,16 @@ export const initializeStorageFromDB = async (): Promise<void> => {
 if (typeof window === 'undefined') { // Server-side only
   const wasabiConfig = {
     wasabi: {
-      endpoint: process.env.WASABI_ENDPOINT || defaultConfig.wasabi.endpoint,
-      region: process.env.WASABI_REGION || defaultConfig.wasabi.region,
-      accessKeyId: process.env.WASABI_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.WASABI_SECRET_ACCESS_KEY || '',
-      bucket: process.env.WASABI_BUCKET || defaultConfig.wasabi.bucket,
+      endpoint: getEnvValue('WASABI_ENDPOINT') || defaultConfig.wasabi.endpoint,
+      region: getEnvValue('WASABI_REGION') || defaultConfig.wasabi.region,
+      accessKeyId: getEnvValue('WASABI_ACCESS_KEY_ID', 'WASABI_ACCESS_KEY') || '',
+      secretAccessKey: getEnvValue('WASABI_SECRET_ACCESS_KEY', 'WASABI_SECRET_KEY') || '',
+      bucket: getEnvValue('WASABI_BUCKET') || defaultConfig.wasabi.bucket,
     },
     bunny: {
-      cdnUrl: process.env.BUNNY_CDN_URL || defaultConfig.bunny.cdnUrl,
-      apiKey: process.env.BUNNY_API_KEY || '',
-      storageZone: process.env.BUNNY_STORAGE_ZONE || defaultConfig.bunny.storageZone,
+      cdnUrl: getEnvValue('BUNNY_CDN_URL') || defaultConfig.bunny.cdnUrl,
+      apiKey: getEnvValue('BUNNY_API_KEY') || '',
+      storageZone: getEnvValue('BUNNY_STORAGE_ZONE') || defaultConfig.bunny.storageZone,
     },
   };
 

@@ -67,7 +67,7 @@ export default function SuperAdminShell({
               <button
                 className={cn(
                   'flex w-full items-center gap-3 rounded-btn px-2 py-1.5',
-                  'transition-all duration-[150ms] ease-[ease]',
+                  'transition-all duration-150 ease-in-out',
                   'hover:bg-black/5 dark:hover:bg-white/5',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 )}
@@ -143,7 +143,7 @@ export default function SuperAdminShell({
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full bg-primary',
                     'text-[11px] font-semibold text-primary-foreground',
-                    'transition-all duration-[150ms] ease-[ease]',
+                    'transition-all duration-150 ease-in-out',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     'hover:opacity-90',
                   )}

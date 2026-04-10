@@ -142,7 +142,7 @@
   button,
   a,
   [role="button"] {
-    @apply transition-all duration-[150ms] ease-[ease];
+    @apply transition-all duration-150 ease-in-out;
   }
 }
 

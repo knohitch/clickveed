@@ -1,9 +1,10 @@
 
 import { Suspense } from 'react';
 import { ResetPasswordForm } from '@/components/auth/reset-password-form';
+import { getBrandingMetadata } from '@/lib/branding-metadata';
 
 export async function generateMetadata() {
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AI Video Creator';
+  const { appName } = await getBrandingMetadata();
   return {
     title: `Reset Password | ${appName}`,
   };

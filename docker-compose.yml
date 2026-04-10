@@ -10,24 +10,42 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@db:5432/clickvid
+      - REDIS_URL=redis://redis:6379
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=test-secret-change-in-production
       - AUTH_SECRET=test-secret-change-in-production
-<<<<<<< HEAD
       - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - AI_PROVIDER_PRIORITY=gemini,openai,anthropic
     depends_on:
       - db
+      - redis
     restart: unless-stopped
     env_file:
       - .env.production
-=======
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.caprover
+    command: npm run worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@db:5432/clickvid
+      - REDIS_URL=redis://redis:6379
+      - NEXTAUTH_SECRET=test-secret-change-in-production
+      - AUTH_SECRET=test-secret-change-in-production
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_PROVIDER_PRIORITY=gemini,openai,anthropic
     depends_on:
       - db
+      - redis
     restart: unless-stopped
->>>>>>> d1dae2eb28f3001f8677ec6e56290f0e4af2c514
+    env_file:
+      - .env.production
 
   db:
     image: postgres:15-alpine
@@ -39,6 +57,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
 volumes:

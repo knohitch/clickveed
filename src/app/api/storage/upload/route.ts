@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadToStorage } from '@/server/actions/storage-actions';
+import { deleteFromStorage, uploadToStorage } from '@/server/actions/storage-actions';
 import { auth } from '@/auth';
+import prisma, { withRetry } from '@/server/prisma';
+import { sanitizeFilename } from '@/lib/file-upload-security';
 import {
   createUnauthorizedError,
   createValidationError,
@@ -10,6 +12,13 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+function resolveMediaAssetType(mimeType: string): 'IMAGE' | 'VIDEO' | 'AUDIO' | null {
+  if (mimeType.startsWith('image/')) return 'IMAGE';
+  if (mimeType.startsWith('video/')) return 'VIDEO';
+  if (mimeType.startsWith('audio/')) return 'AUDIO';
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,6 +94,11 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       const isConfigError = result.error?.includes('not configured');
       const status = isConfigError ? 503 : 500;
+      console.error('[storage-upload] Upload failed', {
+        userId: session.user.id,
+        status,
+        error: result.error || 'Upload failed',
+      });
       return NextResponse.json(
         {
           success: false,
@@ -98,8 +112,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Persist media uploads in DB so they appear in Media Library.
+    const mediaAssetType = resolveMediaAssetType(file.type);
+    let mediaAssetId: number | null = null;
+
+    if (mediaAssetType) {
+      try {
+        const preferredUrl = result.data?.cdnUrl || result.data?.storageUrl;
+        if (typeof preferredUrl !== 'string' || !preferredUrl.startsWith('http')) {
+          throw new Error('Upload succeeded but no valid file URL was returned.');
+        }
+
+        const mediaAsset = await withRetry(
+          () =>
+            prisma.mediaAsset.create({
+              data: {
+                name: sanitizeFilename(file.name),
+                type: mediaAssetType,
+                url: preferredUrl,
+                size: file.size / (1024 * 1024),
+                userId: session.user.id,
+              },
+            }),
+          { operationName: 'mediaAsset.create(upload)' }
+        );
+        mediaAssetId = mediaAsset.id;
+        console.info('[storage-upload] Media asset record created', {
+          userId: session.user.id,
+          mediaAssetId,
+          storageKey: result.data?.key,
+          mimeType: file.type,
+        });
+      } catch (mediaError) {
+        console.error('Failed to create media library record after upload:', mediaError);
+
+        // Best-effort rollback to avoid orphan files in storage.
+        const storageKey = typeof result.data?.key === 'string' ? result.data.key : null;
+        if (storageKey) {
+          try {
+            const rollbackResult = await deleteFromStorage(storageKey, session.user.id);
+            if (!rollbackResult.success) {
+              console.warn('Rollback storage delete failed:', rollbackResult.error);
+            }
+          } catch (rollbackError) {
+            console.warn('Rollback storage delete threw an error:', rollbackError);
+          }
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Failed to save uploaded media in the media library.',
+            code: 'MEDIA_RECORD_CREATE_FAILED',
+            message: 'Upload aborted because media metadata could not be stored.',
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    const responseData = {
+      ...result.data,
+      ...(mediaAssetId !== null ? { mediaAssetId } : {}),
+    };
+
+    if (mediaAssetType === null) {
+      console.info('[storage-upload] Upload succeeded without media indexing', {
+        userId: session.user.id,
+        storageKey: result.data?.key,
+        mimeType: file.type,
+      });
+    }
+
     // Fix Bug #10: Use standardized success response
-    return NextResponse.json(createSuccessResponse(result.data, 'File uploaded successfully'), { status: 200 });
+    return NextResponse.json(createSuccessResponse(responseData, 'File uploaded successfully'), { status: 200 });
 
   } catch (error) {
     console.error('Upload API error:', error);

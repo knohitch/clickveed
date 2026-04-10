@@ -30,7 +30,7 @@ export function StatCard({
     <div
       className={cn(
         'relative flex flex-col gap-3 rounded-card border border-border bg-card p-5',
-        'transition-all duration-[150ms] ease-[ease]',
+        'transition-all duration-150 ease-in-out',
         className,
       )}
     >

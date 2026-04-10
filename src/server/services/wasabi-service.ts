@@ -66,8 +66,16 @@ async function getWasabiCredentials(): Promise<WasabiCredentials> {
         // Priority: apiKeys -> storageSettings -> env vars
         const wasabiEndpoint = apiKeys['wasabiEndpoint'] || storageSettings?.wasabiEndpoint || process.env.WASABI_ENDPOINT;
         const wasabiRegion = apiKeys['wasabiRegion'] || storageSettings?.wasabiRegion || process.env.WASABI_REGION;
-        const wasabiAccessKey = apiKeys['wasabiAccessKey'] || storageSettings?.wasabiAccessKey || process.env.WASABI_ACCESS_KEY_ID;
-        const wasabiSecretKey = apiKeys['wasabiSecretKey'] || storageSettings?.wasabiSecretKey || process.env.WASABI_SECRET_ACCESS_KEY;
+        const wasabiAccessKey =
+            apiKeys['wasabiAccessKey'] ||
+            storageSettings?.wasabiAccessKey ||
+            process.env.WASABI_ACCESS_KEY_ID ||
+            process.env.WASABI_ACCESS_KEY;
+        const wasabiSecretKey =
+            apiKeys['wasabiSecretKey'] ||
+            storageSettings?.wasabiSecretKey ||
+            process.env.WASABI_SECRET_ACCESS_KEY ||
+            process.env.WASABI_SECRET_KEY;
         const wasabiBucket = apiKeys['wasabiBucket'] || storageSettings?.wasabiBucket || process.env.WASABI_BUCKET;
         const bunnyCdnUrl = apiKeys['bunnyCdnUrl'] || storageSettings?.bunnyCdnUrl || process.env.BUNNY_CDN_URL;
 

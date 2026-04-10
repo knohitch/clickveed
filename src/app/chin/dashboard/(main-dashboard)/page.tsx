@@ -125,7 +125,7 @@ function ActionButtonLink({ href, children }: { href: string; children: React.Re
       className={[
         'flex h-10 w-full items-center justify-center rounded-btn border border-border',
         'bg-transparent text-sm font-medium text-foreground',
-        'transition-all duration-[150ms] ease-[ease]',
+        'transition-all duration-150 ease-in-out',
         'hover:border-brand hover:bg-brand hover:text-white',
         'active:scale-[0.98]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

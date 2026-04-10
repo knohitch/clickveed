@@ -20,7 +20,7 @@ export function SupportStatusSwitch() {
           <p className="flex items-center gap-2 text-sm font-medium">
             <Power
               className={cn(
-                'h-4 w-4 transition-colors duration-[150ms]',
+                'h-4 w-4 transition-colors duration-150',
                 isSupportOnline ? 'text-green-500' : 'text-red-500',
               )}
             />

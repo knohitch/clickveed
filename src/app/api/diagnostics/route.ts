@@ -50,6 +50,9 @@ export async function GET(request: Request) {
   };
 
   // 1. Environment Variables Check
+  const hasWasabiAccessKey = !!(process.env.WASABI_ACCESS_KEY_ID || process.env.WASABI_ACCESS_KEY);
+  const hasWasabiSecretKey = !!(process.env.WASABI_SECRET_ACCESS_KEY || process.env.WASABI_SECRET_KEY);
+
   const envVars = {
     DATABASE_URL: !!process.env.DATABASE_URL,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL ? (isAuthorized ? process.env.NEXTAUTH_URL : 'SET') : 'NOT SET',
@@ -62,8 +65,12 @@ export async function GET(request: Request) {
     REDIS_HOST: process.env.REDIS_HOST ? (isAuthorized ? process.env.REDIS_HOST : 'SET') : 'NOT SET',
     REDIS_PORT: process.env.REDIS_PORT || 'NOT SET',
     NODE_ENV: process.env.NODE_ENV,
+    WASABI_ACCESS_KEY: !!process.env.WASABI_ACCESS_KEY,
     WASABI_ACCESS_KEY_ID: !!process.env.WASABI_ACCESS_KEY_ID,
+    WASABI_SECRET_KEY: !!process.env.WASABI_SECRET_KEY,
     WASABI_SECRET_ACCESS_KEY: !!process.env.WASABI_SECRET_ACCESS_KEY,
+    WASABI_ACCESS_KEY_EFFECTIVE: hasWasabiAccessKey,
+    WASABI_SECRET_KEY_EFFECTIVE: hasWasabiSecretKey,
     WASABI_BUCKET: process.env.WASABI_BUCKET || 'NOT SET',
     WASABI_ENDPOINT: process.env.WASABI_ENDPOINT || 'NOT SET',
   };
@@ -219,22 +226,34 @@ export async function GET(request: Request) {
 
   // 4. Storage Check
   try {
-    await storageManager.ensureInitialized();
+    const initialized = await storageManager.ensureInitialized();
     const storageConfig = storageManager.getConfig();
+    const configured = storageManager.isConfigured();
+    const probe = configured
+      ? await storageManager.probeConnection({ validateWriteDelete: false })
+      : null;
+    const storageHealthy = configured && !!probe?.success;
     
     diagnostics.checks.storage = {
-      status: storageManager.isConfigured() ? 'healthy' : 'warning',
-      configured: storageManager.isConfigured(),
+      status: storageHealthy ? 'healthy' : 'warning',
+      initialized,
+      configured,
       endpoint: storageConfig.wasabi.endpoint || 'NOT SET',
       bucket: storageConfig.wasabi.bucket || 'NOT SET',
       hasAccessKey: !!storageConfig.wasabi.accessKeyId,
       hasSecretKey: !!storageConfig.wasabi.secretAccessKey,
       cdnUrl: storageConfig.bunny.cdnUrl || 'NOT SET',
+      connectivity: probe ? (probe.success ? 'reachable' : 'unreachable') : 'not_tested',
+      probeLatencyMs: probe?.latencyMs ?? null,
+      probeChecks: probe?.checks ?? null,
       issues: [],
     };
     
-    if (!storageManager.isConfigured()) {
+    if (!configured) {
       diagnostics.checks.storage.issues.push('Wasabi storage not configured - file uploads will fail');
+    }
+    if (probe && !probe.success) {
+      diagnostics.checks.storage.issues.push(`Storage probe failed: ${probe.error || 'Unknown error'}`);
     }
   } catch (error: any) {
     diagnostics.checks.storage = {
@@ -244,7 +263,31 @@ export async function GET(request: Request) {
     };
   }
 
-  // 5. Request Info (for debugging URL issues)
+  // 5. Image Optimization Check (Sharp runtime availability)
+  try {
+    const sharpModule = await import('sharp');
+    const sharpAny = sharpModule as any;
+    const sharpVersion =
+      sharpAny?.default?.versions?.sharp ||
+      sharpAny?.versions?.sharp ||
+      'installed';
+
+    diagnostics.checks.imageOptimization = {
+      status: 'healthy',
+      sharpInstalled: true,
+      sharpVersion,
+      issues: [],
+    };
+  } catch (error: any) {
+    diagnostics.checks.imageOptimization = {
+      status: 'warning',
+      sharpInstalled: false,
+      error: error?.message || 'Failed to import sharp',
+      issues: ['Sharp is not available - Next.js image optimization may fail in standalone mode'],
+    };
+  }
+
+  // 6. Request Info (for debugging URL issues)
   diagnostics.checks.request = {
     host: request.headers.get('host'),
     forwardedProto: request.headers.get('x-forwarded-proto'),

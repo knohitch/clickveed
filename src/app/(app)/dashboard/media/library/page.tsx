@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreVertical, Video, Image as ImageIcon, Music, Download, Link as LinkIcon, Trash2, ArrowUpDown, FolderOpen, Loader2 } from 'lucide-react';
+import { Search, MoreVertical, Video, Image as ImageIcon, Music, Download, Link as LinkIcon, Trash2, ArrowUpDown, FolderOpen, Loader2, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type MediaAsset as MediaAssetType, getMediaAssets, deleteMediaAsset } from '@/lib/media-actions';
 import { useToast } from '@/hooks/use-toast';
@@ -104,19 +104,29 @@ export default function MediaLibraryPage() {
     const { toast } = useToast();
     const [assets, setAssets] = useState<MediaAssetType[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState<AssetTypeFilter>('all');
     const [sortBy, setSortBy] = useState('date-desc');
 
-    useEffect(() => {
-        async function loadAssets() {
-            setLoading(true);
+    const loadAssets = async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
             const fetchedAssets = await getMediaAssets();
             setAssets(fetchedAssets);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to load media assets right now.';
+            setLoadError(message);
+            setAssets([]);
+        } finally {
             setLoading(false);
         }
-        loadAssets();
+    };
+
+    useEffect(() => {
+        void loadAssets();
     }, []);
 
     const handleDeleteAsset = async (assetId: number) => {
@@ -201,6 +211,17 @@ export default function MediaLibraryPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="aspect-video" />)}
                 </div>
+            ) : loadError ? (
+                <Card className="col-span-full border-destructive/40">
+                    <CardContent className="p-8 text-center flex flex-col items-center justify-center">
+                        <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+                        <p className="mt-4 text-lg font-semibold">Unable to load your media library</p>
+                        <p className="text-muted-foreground">{loadError}</p>
+                        <Button className="mt-4" onClick={() => void loadAssets()}>
+                            Try Again
+                        </Button>
+                    </CardContent>
+                </Card>
             ) : filteredAssets.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredAssets.map(asset => (

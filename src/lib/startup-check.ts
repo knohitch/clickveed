@@ -121,8 +121,8 @@ export async function startupHealthCheck(): Promise<HealthCheckResult> {
   // 4. Check Storage (Wasabi)
   try {
     const hasWasabiConfig = !!(
-      process.env.WASABI_ACCESS_KEY_ID &&
-      process.env.WASABI_SECRET_ACCESS_KEY &&
+      (process.env.WASABI_ACCESS_KEY_ID || process.env.WASABI_ACCESS_KEY) &&
+      (process.env.WASABI_SECRET_ACCESS_KEY || process.env.WASABI_SECRET_KEY) &&
       process.env.WASABI_BUCKET
     );
     
