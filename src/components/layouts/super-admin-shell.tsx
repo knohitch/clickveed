@@ -42,13 +42,13 @@ export default function SuperAdminShell({
     .slice(0, 2);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-surface-page">
 
       {/* ── Fixed sidebar ─────────────────────────────────────────── */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-[220px] flex-col border-r border-border bg-sidebar">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-[192px] flex-col border-r border-border-default bg-surface-sidebar">
 
         {/* Logo area */}
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+        <div className="flex h-[52px] shrink-0 items-center gap-3 border-b border-border-default px-4">
           <Logo inSidebar />
         </div>
 
@@ -58,29 +58,29 @@ export default function SuperAdminShell({
         </div>
 
         {/* Bottom user row */}
-        <div className="shrink-0 border-t border-border p-2">
+        <div className="shrink-0 border-t border-border-default p-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-md px-2 py-2',
-                  'transition-all duration-150 ease-in-out',
-                  'hover:bg-sidebar-accent',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'transition-colors duration-150',
+                  'hover:bg-surface-hover',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus',
                 )}
               >
                 <div className={cn(
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                  'bg-primary text-[10px] font-bold text-primary-foreground',
-                  'ring-2 ring-primary/20',
+                  'bg-brand text-[10px] font-bold text-text-on-brand',
+                  'ring-2 ring-brand/20',
                 )}>
                   {initials}
                 </div>
                 <div className="flex min-w-0 flex-col text-left">
-                  <span className="truncate text-xs font-semibold leading-tight text-sidebar-foreground">
+                  <span className="truncate text-xs font-semibold leading-tight text-text-primary">
                     {user.name || 'Admin'}
                   </span>
-                  <span className="truncate text-[10px] leading-tight text-muted-foreground">
+                  <span className="truncate text-[10px] leading-tight text-text-muted">
                     {user.email}
                   </span>
                 </div>
@@ -118,22 +118,22 @@ export default function SuperAdminShell({
       </aside>
 
       {/* ── Main content area ─────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col pl-[220px]">
+      <div className="flex flex-1 flex-col pl-[192px]">
 
-        {/* Top bar — no red, clean breadcrumb */}
+        {/* Top bar */}
         <header className={cn(
-          'sticky top-0 z-30 flex h-14 items-center justify-between',
-          'border-b border-border bg-background/80 backdrop-blur-md',
+          'sticky top-0 z-30 flex h-[52px] items-center justify-between',
+          'border-b border-border-default bg-surface-topbar/90 backdrop-blur-md',
           'px-8',
         )}>
           {/* Breadcrumb label */}
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-muted-foreground/60">Platform</span>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
-            <span className="font-semibold text-foreground">Super Admin</span>
+            <span className="font-medium text-text-muted">Platform</span>
+            <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
+            <span className="font-semibold text-text-primary">Super Admin</span>
             <span className={cn(
-              'ml-1 rounded border border-primary/25 bg-primary/8 px-1.5 py-0.5',
-              'text-[10px] font-bold uppercase tracking-widest text-primary',
+              'ml-1 rounded border border-brand/25 bg-brand-subtle px-1.5 py-0.5',
+              'text-[10px] font-bold uppercase tracking-widest text-text-brand',
             )}>
               Console
             </span>
@@ -146,9 +146,9 @@ export default function SuperAdminShell({
               <DropdownMenuTrigger asChild>
                 <button className={cn(
                   'flex h-8 w-8 items-center justify-center rounded-full',
-                  'bg-primary text-[11px] font-bold text-primary-foreground',
-                  'ring-2 ring-primary/20 transition-all duration-150',
-                  'hover:ring-primary/40 focus-visible:outline-none',
+                  'bg-brand text-[11px] font-bold text-text-on-brand',
+                  'ring-2 ring-brand/20 transition-colors duration-150',
+                  'hover:ring-brand/40 focus-visible:outline-none',
                 )}>
                   {initials}
                 </button>

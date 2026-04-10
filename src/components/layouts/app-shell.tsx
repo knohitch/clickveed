@@ -68,13 +68,13 @@ export default function AppShell({
               </Avatar>
               <div className="flex flex-col overflow-hidden">
                 <span className="font-semibold text-sm truncate">{user.name || 'User'}</span>
-                <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                <span className="text-xs text-text-muted truncate">{user.email}</span>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleSignOut}
-                className="text-muted-foreground hover:text-foreground ml-auto"
+                className="text-text-muted hover:text-text-primary ml-auto"
               >
                 <LogOut className="h-5 w-5" />
               </Button>
@@ -84,7 +84,7 @@ export default function AppShell({
         </Sidebar>
 
         <SidebarInset>
-          <header className="flex h-14 items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
+          <header className="flex h-[52px] items-center gap-4 border-b border-border-default bg-surface-topbar/90 px-6 sticky top-0 z-30 backdrop-blur-md">
             <SidebarTrigger>
               <PanelLeft className="h-5 w-5" />
             </SidebarTrigger>

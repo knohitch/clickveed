@@ -178,7 +178,7 @@ export default function CronJobsPage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <Loader2 className="h-8 w-8 animate-spin text-text-secondary" />
             </div>
         );
     }
@@ -187,7 +187,7 @@ export default function CronJobsPage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold font-headline">Cron Job Management</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Monitor, run, and configure scheduled tasks for the platform.
                 </p>
             </div>
@@ -229,7 +229,7 @@ export default function CronJobsPage() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2 font-mono text-xs max-w-md">
-                                            <Terminal className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                            <Terminal className="h-4 w-4 flex-shrink-0 text-text-secondary" />
                                             <code className="flex-1 truncate p-2 bg-muted rounded-md">{commandText}</code>
                                             <Button variant="ghost" size="icon" onClick={() => copyCommand(commandText)} className="flex-shrink-0" disabled={!appUrl}>
                                                 <Copy className="h-4 w-4" />

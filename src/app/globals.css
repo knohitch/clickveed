@@ -2,151 +2,237 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    /* Light — #F5F7FA page, pure white cards, navy text */
-    --background: 218 33% 97%;
-    --foreground: 222 47% 11%;
+/* ─── Design token custom properties ───────────────────────────── */
+:root {
+  /* surfaces */
+  --surface-page:        #F8F8FA;
+  --surface-sidebar:     #FFFFFF;
+  --surface-card:        #FFFFFF;
+  --surface-topbar:      #FFFFFF;
+  --surface-input:       #FFFFFF;
+  --surface-hover:       #F2F2F7;
+  --surface-active:      #EBF0FF;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+  /* borders */
+  --border-default:      #E4E4E9;
+  --border-strong:       #D0D0DA;
+  --border-focus:        #2563EB;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+  /* text */
+  --text-primary:        #0F0F13;
+  --text-secondary:      #6B6B80;
+  --text-muted:          #A0A0B0;
+  --text-brand:          #2563EB;
+  --text-on-brand:       #FFFFFF;
 
-    --primary: 217 82% 54%;
-    --primary-foreground: 0 0% 100%;
+  /* brand */
+  --brand:               #2563EB;
+  --brand-hover:         #1D4ED8;
+  --brand-subtle:        rgba(37, 99, 235, 0.08);
+  --brand-subtle-hover:  rgba(37, 99, 235, 0.14);
 
-    --secondary: 216 24% 93%;
-    --secondary-foreground: 222 47% 11%;
+  /* semantic */
+  --status-success:      #1D9E75;
+  --status-success-bg:   #DCFCE7;
+  --status-success-text: #166534;
+  --status-error:        #E24B4A;
+  --status-error-bg:     #FEE2E2;
+  --status-error-text:   #991B1B;
+  --status-neutral-bg:   #F3F4F6;
+  --status-neutral-text: #6B7280;
 
-    --muted: 216 24% 93%;
-    --muted-foreground: 213 20% 43%;
+  /* nav */
+  --nav-active-bg:       var(--surface-active);
+  --nav-active-text:     var(--brand);
+  --nav-hover-bg:        var(--surface-hover);
 
-    --accent: 217 82% 54%;
-    --accent-foreground: 0 0% 100%;
+  /* motion */
+  --ease-ui:             cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast:       150ms;
+  --duration-theme:      200ms;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+  /* ── Shadcn token bridge (keeps Radix/Shadcn components working) */
+  --background: 240 4% 97%;          /* #F8F8FA */
+  --foreground: 240 13% 7%;          /* #0F0F13 */
+  --card: 0 0% 100%;
+  --card-foreground: 240 13% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 13% 7%;
+  --primary: 217 82% 54%;            /* #2563EB */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 6% 95%;
+  --secondary-foreground: 240 13% 7%;
+  --muted: 240 6% 95%;
+  --muted-foreground: 240 8% 46%;    /* #6B6B80 */
+  --accent: 217 82% 54%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 90%;              /* #E4E4E9 */
+  --input: 240 6% 90%;
+  --ring: 217 82% 54%;
+  --radius: 0.625rem;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 240 13% 7%;
+  --sidebar-primary: 217 82% 54%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 6% 95%;
+  --sidebar-accent-foreground: 240 13% 7%;
+  --sidebar-border: 240 6% 91%;
+  --sidebar-ring: 217 82% 54%;
 
-    --border: 216 28% 88%;
-    --input: 216 28% 88%;
-    --ring: 217 82% 54%;
+  /* charts */
+  --chart-1: 217 82% 54%;
+  --chart-2: 44 94% 46%;
+  --chart-3: 164 70% 40%;
+  --chart-4: 344 80% 50%;
+  --chart-5: 270 70% 58%;
 
-    --radius: 0.625rem;
-
-    --chart-1: 217 82% 54%;
-    --chart-2: 44 94% 46%;
-    --chart-3: 164 70% 40%;
-    --chart-4: 344 80% 50%;
-    --chart-5: 270 70% 58%;
-
-    /* Sidebar: pure white with blue-tinted border */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 217 82% 54%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 216 24% 95%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 216 28% 91%;
-    --sidebar-ring: 217 82% 54%;
-
-    --color-youtube: 348 83% 47%;
-    --color-instagram: 326 63% 52%;
-    --color-tiktok: 180 100% 50%;
-    --color-likes: 262 84% 60%;
-    --color-comments: 210 90% 56%;
-    --color-shares: 34 94% 56%;
-  }
-
-  .dark {
-    /* Dark — deep navy #0A0F1E, not purple */
-    --background: 222 52% 8%;
-    --foreground: 214 100% 97%;
-
-    --card: 222 40% 12%;
-    --card-foreground: 214 100% 97%;
-
-    --popover: 222 48% 10%;
-    --popover-foreground: 214 100% 97%;
-
-    --primary: 217 91% 62%;
-    --primary-foreground: 222 52% 8%;
-
-    --secondary: 216 38% 19%;
-    --secondary-foreground: 214 100% 97%;
-
-    --muted: 216 32% 17%;
-    --muted-foreground: 213 17% 52%;
-
-    --accent: 217 91% 62%;
-    --accent-foreground: 222 52% 8%;
-
-    --destructive: 0 62% 42%;
-    --destructive-foreground: 214 100% 97%;
-
-    --border: 216 38% 19%;
-    --input: 216 38% 19%;
-    --ring: 217 91% 62%;
-
-    --radius: 0.625rem;
-
-    --chart-1: 217 91% 65%;
-    --chart-2: 44 94% 58%;
-    --chart-3: 164 70% 52%;
-    --chart-4: 344 80% 60%;
-    --chart-5: 270 70% 65%;
-
-    /* Sidebar: slightly lighter navy than page */
-    --sidebar-background: 222 48% 10%;
-    --sidebar-foreground: 214 80% 94%;
-    --sidebar-primary: 217 91% 62%;
-    --sidebar-primary-foreground: 222 52% 8%;
-    --sidebar-accent: 216 32% 16%;
-    --sidebar-accent-foreground: 214 80% 94%;
-    --sidebar-border: 216 35% 17%;
-    --sidebar-ring: 217 91% 62%;
-
-    --color-youtube: 348 91% 57%;
-    --color-instagram: 326 79% 56%;
-    --color-tiktok: 180 50% 70%;
-    --color-likes: 262 74% 66%;
-    --color-comments: 210 100% 66%;
-    --color-shares: 34 100% 66%;
-  }
+  /* social */
+  --color-youtube: 348 83% 47%;
+  --color-instagram: 326 63% 52%;
+  --color-tiktok: 180 100% 50%;
+  --color-likes: 262 84% 60%;
+  --color-comments: 210 90% 56%;
+  --color-shares: 34 94% 56%;
 }
 
+.dark {
+  /* surfaces */
+  --surface-page:        #0C0C14;
+  --surface-sidebar:     #10101C;
+  --surface-card:        #16162A;
+  --surface-topbar:      #10101C;
+  --surface-input:       #1E1E30;
+  --surface-hover:       rgba(255, 255, 255, 0.05);
+  --surface-active:      rgba(37, 99, 235, 0.12);
+
+  /* borders */
+  --border-default:      #1E1E30;
+  --border-strong:       #2A2A42;
+  --border-focus:        #3B82F6;
+
+  /* text */
+  --text-primary:        #EEEEF8;
+  --text-secondary:      #8888A8;
+  --text-muted:          #55556A;
+  --text-brand:          #6B9FFF;
+  --text-on-brand:       #FFFFFF;
+
+  /* brand */
+  --brand:               #3B82F6;
+  --brand-hover:         #2563EB;
+  --brand-subtle:        rgba(59, 130, 246, 0.12);
+  --brand-subtle-hover:  rgba(59, 130, 246, 0.18);
+
+  /* semantic */
+  --status-success:      #34D399;
+  --status-success-bg:   rgba(52, 211, 153, 0.12);
+  --status-success-text: #34D399;
+  --status-error:        #F87171;
+  --status-error-bg:     rgba(248, 113, 113, 0.12);
+  --status-error-text:   #F87171;
+  --status-neutral-bg:   rgba(255, 255, 255, 0.06);
+  --status-neutral-text: #8888A8;
+
+  /* ── Shadcn token bridge */
+  --background: 240 25% 6%;          /* #0C0C14 */
+  --foreground: 240 60% 96%;         /* #EEEEF8 */
+  --card: 240 30% 13%;               /* #16162A */
+  --card-foreground: 240 60% 96%;
+  --popover: 240 27% 9%;             /* #10101C */
+  --popover-foreground: 240 60% 96%;
+  --primary: 217 91% 60%;            /* #3B82F6 */
+  --primary-foreground: 240 25% 6%;
+  --secondary: 240 23% 15%;          /* #1E1E30 */
+  --secondary-foreground: 240 60% 96%;
+  --muted: 240 23% 15%;
+  --muted-foreground: 240 14% 59%;   /* #8888A8 */
+  --accent: 217 91% 60%;
+  --accent-foreground: 240 25% 6%;
+  --destructive: 0 62% 42%;
+  --destructive-foreground: 240 60% 96%;
+  --border: 240 23% 15%;             /* #1E1E30 */
+  --input: 240 23% 15%;
+  --ring: 217 91% 60%;
+  --sidebar-background: 240 27% 9%;  /* #10101C */
+  --sidebar-foreground: 240 60% 94%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 240 25% 6%;
+  --sidebar-accent: 240 23% 14%;
+  --sidebar-accent-foreground: 240 60% 94%;
+  --sidebar-border: 240 23% 13%;
+  --sidebar-ring: 217 91% 60%;
+
+  /* charts */
+  --chart-1: 217 91% 65%;
+  --chart-2: 44 94% 58%;
+  --chart-3: 164 70% 52%;
+  --chart-4: 344 80% 60%;
+  --chart-5: 270 70% 65%;
+
+  /* social */
+  --color-youtube: 348 91% 57%;
+  --color-instagram: 326 79% 56%;
+  --color-tiktok: 180 50% 70%;
+  --color-likes: 262 74% 66%;
+  --color-comments: 210 100% 66%;
+  --color-shares: 34 100% 66%;
+}
+
+/* ─── Base layer ────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
 
   html {
     color-scheme: light dark;
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition:
+      background-color var(--duration-theme) var(--ease-ui),
+      color var(--duration-theme) var(--ease-ui);
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+    min-height: 100vh;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    margin: 0;
-    font-weight: 600;
+  h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 600; }
+
+  /* Scoped transitions — NOT transition:all */
+  a, button, [role="button"] {
+    transition:
+      color var(--duration-fast) var(--ease-ui),
+      background-color var(--duration-fast) var(--ease-ui),
+      border-color var(--duration-fast) var(--ease-ui),
+      opacity var(--duration-fast) var(--ease-ui),
+      transform var(--duration-fast) var(--ease-ui),
+      box-shadow var(--duration-fast) var(--ease-ui);
   }
 
-  button, a, [role="button"] {
-    @apply transition-all duration-150 ease-in-out;
-  }
-
+  /* WCAG 2.1 AA focus */
   :focus { outline: none; }
   :focus-visible {
-    @apply ring-2 ring-ring ring-offset-2 ring-offset-background rounded-sm;
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-card/70 backdrop-blur-xl border border-border/30;
+    background-color: color-mix(in srgb, var(--surface-card) 70%, transparent);
+    backdrop-filter: blur(20px);
+    border: 1px solid color-mix(in srgb, var(--border-default) 30%, transparent);
   }
 }

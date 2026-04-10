@@ -102,28 +102,28 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: {
       <CardContent className="flex-1 space-y-4">
         <div className="flex items-baseline gap-2">
           <span className="text-4xl font-extrabold">${Number(displayPrice).toFixed(2)}</span>
-          <span className="text-muted-foreground">/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'qtr' : 'yr'}</span>
+          <span className="text-text-secondary">/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'qtr' : 'yr'}</span>
         </div>
         
         <RadioGroup defaultValue="monthly" onValueChange={setBillingCycle} className="grid grid-cols-1 gap-2">
           <Label className="flex items-center justify-between p-3 border rounded-md has-[:checked]:border-primary cursor-pointer text-sm">
             <div>
               <p className="font-semibold">Monthly</p>
-              <p className="text-xs text-muted-foreground">${Number(plan.priceMonthly).toFixed(2)} / month</p>
+              <p className="text-xs text-text-secondary">${Number(plan.priceMonthly).toFixed(2)} / month</p>
             </div>
             <RadioGroupItem value="monthly" />
           </Label>
           <Label className="flex items-center justify-between p-3 border rounded-md has-[:checked]:border-primary cursor-pointer text-sm">
             <div>
               <p className="font-semibold">Quarterly</p>
-              <p className="text-xs text-muted-foreground">${Number(plan.priceQuarterly).toFixed(2)} / quarter</p>
+              <p className="text-xs text-text-secondary">${Number(plan.priceQuarterly).toFixed(2)} / quarter</p>
             </div>
             <RadioGroupItem value="quarterly" />
           </Label>
           <Label className="flex items-center justify-between p-3 border rounded-md has-[:checked]:border-primary cursor-pointer text-sm">
             <div>
               <p className="font-semibold">Yearly</p>
-              <p className="text-xs text-muted-foreground">${Number(plan.priceYearly).toFixed(2)} / year</p>
+              <p className="text-xs text-text-secondary">${Number(plan.priceYearly).toFixed(2)} / year</p>
             </div>
             <RadioGroupItem value="yearly" />
           </Label>
@@ -134,7 +134,7 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: {
         <ul className="space-y-3 pt-2">
           {plan.features.map((feature, index) => (
             <li key={`${plan.id}-feature-${index}`} className="flex items-start gap-3">
-              <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <Check className="h-5 w-5 text-text-brand flex-shrink-0 mt-0.5" />
               <span className="text-sm">{feature.text}</span>
             </li>
           ))}
@@ -339,7 +339,7 @@ export default function ChinPlansPage() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold font-headline">Subscription Plans</h1>
-          <p className="text-muted-foreground">
+          <p className="text-text-secondary">
             Manage your subscription tiers.
           </p>
         </div>

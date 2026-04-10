@@ -81,7 +81,7 @@ const NewUserForm = ({ onUserAdded, closeDialog }: { onUserAdded: (newUser: User
                         <SelectItem value="Admin">Admin (Support Agent)</SelectItem>
                     </SelectContent>
                 </Select>
-                 <p className="text-xs text-muted-foreground">The new user will receive an email to set their own password.</p>
+                 <p className="text-xs text-text-secondary">The new user will receive an email to set their own password.</p>
             </div>
             <DialogFooter>
                 <Button type="submit">Invite User</Button>
@@ -208,7 +208,7 @@ export default function AdminUsersPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold font-headline">User Management</h1>
-                    <p className="text-muted-foreground">
+                    <p className="text-text-secondary">
                         View, manage, and edit user accounts. Approve new support agents here.
                     </p>
                 </div>
@@ -235,7 +235,7 @@ export default function AdminUsersPage() {
                 <CardContent>
                    <div className="flex flex-col md:flex-row gap-4 mb-4 justify-between">
                         <div className="relative w-full md:max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
                             <Input 
                                 placeholder="Search by name or email" 
                                 className="pl-10" 
@@ -359,9 +359,9 @@ export default function AdminUsersPage() {
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={5} className="h-24 text-center">
-                                            <UserSearch className="mx-auto h-12 w-12 text-muted-foreground" />
+                                            <UserSearch className="mx-auto h-12 w-12 text-text-secondary" />
                                             <h3 className="mt-4 font-semibold">No users found</h3>
-                                            <p className="text-sm text-muted-foreground">Try adjusting your search or filter.</p>
+                                            <p className="text-sm text-text-secondary">Try adjusting your search or filter.</p>
                                         </TableCell>
                                     </TableRow>
                                 )}

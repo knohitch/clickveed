@@ -363,7 +363,7 @@ export default function ChinSettingsPage() {
     <form onSubmit={handleFormSubmit} className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">Platform Settings</h1>
-        <p className="text-muted-foreground">
+        <p className="text-text-secondary">
           Manage global configuration for the application.
         </p>
       </div>
@@ -386,17 +386,17 @@ export default function ChinSettingsPage() {
                   <Label>Application Logo</Label>
                   <div className="flex items-center gap-4">
                     <div 
-                      className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 cursor-pointer hover:bg-muted"
+                      className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 cursor-pointer hover:bg-surface-hover"
                       onClick={() => logoInputRef.current?.click()}
                     >
                       {settings.logoUrl ? (
                         <Image src={settings.logoUrl} alt="App Logo" width={96} height={96} className="object-contain p-2"/>
                       ) : (
-                        <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                        <UploadCloud className="h-8 w-8 text-text-secondary" />
                       )}
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Upload a logo. Recommended size: 256x256px.</p>
+                      <p className="text-sm text-text-secondary">Upload a logo. Recommended size: 256x256px.</p>
                       <div className="flex gap-2">
                         <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()}>Upload Logo</Button>
                         <Button type="button" variant="destructive" size="icon" onClick={handleRemoveLogo} disabled={!settings.logoUrl}><Trash2 className="h-4 w-4"/></Button>
@@ -410,17 +410,17 @@ export default function ChinSettingsPage() {
                   <Label>Application Favicon</Label>
                   <div className="flex items-center gap-4">
                     <div 
-                      className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 cursor-pointer hover:bg-muted"
+                      className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 cursor-pointer hover:bg-surface-hover"
                       onClick={() => faviconInputRef.current?.click()}
                     >
                       {settings.faviconUrl ? (
                         <Image src={settings.faviconUrl} alt="App Favicon" width={96} height={96} className="object-contain p-2"/>
                       ) : (
-                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        <ImageIcon className="h-8 w-8 text-text-secondary" />
                       )}
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Upload a favicon. Recommended size: 32x32px or 48x48px.</p>
+                      <p className="text-sm text-text-secondary">Upload a favicon. Recommended size: 32x32px or 48x48px.</p>
                       <div className="flex gap-2">
                         <Button type="button" variant="outline" onClick={() => faviconInputRef.current?.click()}>Upload Favicon</Button>
                         <Button type="button" variant="destructive" size="icon" onClick={handleRemoveFavicon} disabled={!settings.faviconUrl}><Trash2 className="h-4 w-4"/></Button>
@@ -444,7 +444,7 @@ export default function ChinSettingsPage() {
                   <Label htmlFor="defaultLanguage">Default Language</Label>
                   <select 
                     id="defaultLanguage" 
-                    className="w-full p-2 border rounded-md bg-background"
+                    className="w-full p-2 border rounded-md bg-surface-page"
                     defaultValue="en"
                   >
                     <option value="en">English</option>
@@ -457,7 +457,7 @@ export default function ChinSettingsPage() {
                   <Label htmlFor="timezone">Timezone</Label>
                   <select 
                     id="timezone" 
-                    className="w-full p-2 border rounded-md bg-background"
+                    className="w-full p-2 border rounded-md bg-surface-page"
                     defaultValue="UTC"
                   >
                     <option value="UTC">UTC</option>
@@ -549,18 +549,18 @@ export default function ChinSettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="fromName">Sender Name</Label>
                 <Input id="fromName" name="fromName" placeholder="ClickVid Pro" value={settings.emailSettings.fromName} onChange={(e) => handleNestedChange('emailSettings', e)} />
-                <p className="text-xs text-muted-foreground">The name that will appear in the "From" field of emails.</p>
+                <p className="text-xs text-text-secondary">The name that will appear in the "From" field of emails.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="fromAdminEmail">Default "From" Email Address</Label>
                   <Input id="fromAdminEmail" name="fromAdminEmail" type="email" placeholder="noreply@example.com" value={settings.emailSettings.fromAdminEmail} onChange={(e) => handleNestedChange('emailSettings', e)} />
-                  <p className="text-xs text-muted-foreground">Used for general notifications like signups and password resets.</p>
+                  <p className="text-xs text-text-secondary">Used for general notifications like signups and password resets.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="fromSupportEmail">Support "From" Email Address</Label>
                   <Input id="fromSupportEmail" name="fromSupportEmail" type="email" placeholder="support@example.com" value={settings.emailSettings.fromSupportEmail} onChange={(e) => handleNestedChange('emailSettings', e)} />
-                  <p className="text-xs text-muted-foreground">Used for all support ticket correspondence.</p>
+                  <p className="text-xs text-text-secondary">Used for all support ticket correspondence.</p>
                 </div>
               </div>
 
@@ -583,7 +583,7 @@ export default function ChinSettingsPage() {
                       {testingEmail ? 'Sending...' : 'Send Test Email'}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-text-secondary">
                     Send a test email to verify your SMTP configuration and Sender Name settings.
                   </p>
                 </div>

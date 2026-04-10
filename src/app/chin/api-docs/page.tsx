@@ -57,7 +57,7 @@ export default function ChinApiDocsPage() {
         <div className="container py-8 space-y-8">
             <div>
                 <h1 className="text-3xl font-bold font-headline">API Documentation</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Find links to the official documentation for each integrated service to learn how to obtain and configure API keys.
                 </p>
             </div>

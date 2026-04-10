@@ -106,7 +106,7 @@ export default function AdminSubscriptionsPage() {
         <h1 className="text-3xl font-bold font-headline">
           Subscription Management
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-text-secondary">
           View user subscription plans to assist with support requests.
         </p>
       </div>
@@ -120,7 +120,7 @@ export default function AdminSubscriptionsPage() {
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 mb-4 justify-between">
             <div className="relative w-full md:max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
               <Input
                 placeholder="Search by name or email..."
                 className="pl-10"
@@ -175,7 +175,7 @@ export default function AdminSubscriptionsPage() {
                           </Avatar>
                           <div>
                             <div className="font-medium">{user.displayName}</div>
-                            <div className="hidden text-sm text-muted-foreground md:inline">
+                            <div className="hidden text-sm text-text-secondary md:inline">
                               {user.email}
                             </div>
                           </div>
@@ -214,9 +214,9 @@ export default function AdminSubscriptionsPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    <UserSearch className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <UserSearch className="mx-auto h-12 w-12 text-text-secondary" />
                     <h3 className="mt-4 font-semibold">No subscriptions found</h3>
-                    <p className="text-sm text-muted-foreground">Try adjusting your search or filter.</p>
+                    <p className="text-sm text-text-secondary">Try adjusting your search or filter.</p>
                   </TableCell>
                 </TableRow>
               )}

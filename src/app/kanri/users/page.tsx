@@ -100,7 +100,7 @@ export default function AdminUsersPage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold font-headline">View Users</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Look up user information and manage user plans.
                 </p>
             </div>
@@ -112,7 +112,7 @@ export default function AdminUsersPage() {
                 <CardContent>
                     <div className="flex flex-col md:flex-row gap-4 mb-4 justify-between">
                         <div className="relative w-full md:max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
                             <Input
                                 placeholder="Search by name or email"
                                 className="pl-10"
@@ -224,9 +224,9 @@ export default function AdminUsersPage() {
                              ) : (
                                  <TableRow>
                                      <TableCell colSpan={5} className="h-24 text-center">
-                                         <UserSearch className="h-12 w-12 mx-auto mb-2 text-muted-foreground"/>
+                                         <UserSearch className="h-12 w-12 mx-auto mb-2 text-text-secondary"/>
                                          <p className="font-semibold">No users found</p>
-                                         <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria.</p>
+                                         <p className="text-sm text-text-secondary">Try adjusting your search or filter criteria.</p>
                                      </TableCell>
                                  </TableRow>
                              )}
@@ -246,8 +246,8 @@ export default function AdminUsersPage() {
                     </DialogHeader>
                     {plans.length === 0 ? (
                         <div className="py-6 text-center space-y-2">
-                            <p className="text-sm text-muted-foreground">No plans have been created yet.</p>
-                            <p className="text-sm text-muted-foreground">Go to <strong>Super Admin → Plans</strong> to create plans first.</p>
+                            <p className="text-sm text-text-secondary">No plans have been created yet.</p>
+                            <p className="text-sm text-text-secondary">Go to <strong>Super Admin → Plans</strong> to create plans first.</p>
                         </div>
                     ) : (
                         <div className="space-y-4 py-4">
@@ -270,14 +270,14 @@ export default function AdminUsersPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <Label htmlFor="resetUsage" className="text-sm font-medium">Reset Usage Counters</Label>
-                                    <p className="text-xs text-muted-foreground">Reset AI credits used to zero</p>
+                                    <p className="text-xs text-text-secondary">Reset AI credits used to zero</p>
                                 </div>
                                 <Switch id="resetUsage" checked={resetUsage} onCheckedChange={setResetUsage} />
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
                                     <Label htmlFor="notifyUser" className="text-sm font-medium">Notify User</Label>
-                                    <p className="text-xs text-muted-foreground">Send in-app notification about plan change</p>
+                                    <p className="text-xs text-text-secondary">Send in-app notification about plan change</p>
                                 </div>
                                 <Switch id="notifyUser" checked={notifyUser} onCheckedChange={setNotifyUser} />
                             </div>

@@ -71,7 +71,7 @@ export default function DatabasePage() {
             case 'failure':
                 return <AlertTriangle className="h-5 w-5 text-destructive" />;
             default:
-                return <Server className="h-5 w-5 text-muted-foreground" />;
+                return <Server className="h-5 w-5 text-text-secondary" />;
         }
     }
 
@@ -92,7 +92,7 @@ export default function DatabasePage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold font-headline">Database Connection</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Check the status of the application&apos;s database connection via Prisma Accelerate.
                 </p>
             </div>
@@ -109,9 +109,9 @@ export default function DatabasePage() {
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center justify-between">
                                 Current Data Store
-                                <span className="text-primary font-bold">{dbType}</span>
+                                <span className="text-text-brand font-bold">{dbType}</span>
                             </CardTitle>
-                             <div className="text-sm text-muted-foreground">
+                             <div className="text-sm text-text-secondary">
                                 The application is connected to a persistent PostgreSQL database, configured via the DATABASE_URL environment variable and Prisma Accelerate.
                             </div>
                         </CardHeader>
@@ -130,7 +130,7 @@ export default function DatabasePage() {
                                     {getStatusMessage()}
                                 </h3>
                                 {lastTestTime && (
-                                    <div className="text-sm text-muted-foreground">
+                                    <div className="text-sm text-text-secondary">
                                         Last checked: {lastTestTime.toLocaleTimeString()} on {lastTestTime.toLocaleDateString()}
                                     </div>
                                 )}
@@ -154,7 +154,7 @@ export default function DatabasePage() {
                     {status === 'failure' && errorMessage && (
                         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
                             <h4 className="font-semibold text-destructive mb-2">Error Details</h4>
-                            <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono">
+                            <pre className="text-sm text-text-secondary whitespace-pre-wrap font-mono">
                                 {errorMessage}
                             </pre>
                         </div>

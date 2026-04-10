@@ -224,7 +224,7 @@ export default function ApiIntegrationsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">API Integrations</h1>
-        <p className="text-muted-foreground">
+        <p className="text-text-secondary">
           Manage API keys and connections for third-party services. Your keys are stored securely.
         </p>
       </div>

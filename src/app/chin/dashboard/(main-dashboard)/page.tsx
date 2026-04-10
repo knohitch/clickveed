@@ -25,19 +25,19 @@ function DashboardLoading() {
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <div className="h-6 w-56 animate-pulse rounded-md bg-muted" />
-        <div className="h-4 w-80 animate-pulse rounded-md bg-muted" />
+        <div className="h-6 w-56 animate-pulse rounded-md bg-surface-hover" />
+        <div className="h-4 w-80 animate-pulse rounded-md bg-surface-hover" />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="h-[128px] animate-pulse rounded-card border border-border bg-card shadow-sm"
+            className="h-[128px] animate-pulse rounded-card border border-border-default bg-surface-card"
           />
         ))}
       </div>
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/50" />
+        <Loader2 className="h-6 w-6 animate-spin text-text-secondary/50" />
       </div>
     </div>
   );
@@ -57,12 +57,11 @@ function ActionLink({ href, children }: { href: string; children: React.ReactNod
     <Link
       href={href}
       className={cn(
-        'group flex h-10 items-center justify-between rounded-md border border-border px-4',
-        'bg-transparent text-[13px] font-medium text-foreground/75',
-        'transition-all duration-150 ease-in-out',
-        'hover:border-primary/30 hover:bg-primary/5 hover:text-primary',
-        'dark:hover:border-primary/25 dark:hover:bg-primary/10 dark:hover:text-primary',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'group flex h-10 items-center justify-between rounded-md border border-border-default px-4',
+        'bg-transparent text-[13px] font-medium text-text-secondary',
+        'transition-colors duration-150',
+        'hover:border-brand/30 hover:bg-brand-subtle hover:text-text-brand',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus',
       )}
     >
       <span>{children}</span>
@@ -107,11 +106,11 @@ async function DashboardStats() {
 
       {/* ── Page heading ──────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Super Admin Dashboard
+        <h1 className="text-xl font-semibold tracking-tight text-text-primary">
+          Overview
         </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          Welcome to the main control panel for the entire platform.
+        <p className="mt-1 text-[13px] text-text-secondary">
+          Platform-wide metrics and quick access to key management areas.
         </p>
       </div>
 
@@ -134,11 +133,11 @@ async function DashboardStats() {
 
         {/* Quick Actions — 2 cols */}
         <div className={cn(
-          'flex flex-col rounded-card border border-border bg-card p-5 lg:col-span-2',
-          'shadow-[0_1px_3px_rgb(0_0_0/0.06)] dark:shadow-none',
+          'flex flex-col rounded-card border border-border-default bg-surface-card p-5 lg:col-span-2',
+          'shadow-[0_1px_4px_rgb(15_30_80/0.07),0_0_0_1px_rgb(15_30_80/0.03)] dark:shadow-none',
         )}>
-          <p className="text-sm font-semibold text-foreground">Quick Actions</p>
-          <p className="mb-4 mt-0.5 text-[12px] text-muted-foreground">
+          <p className="text-sm font-semibold text-text-primary">Quick Actions</p>
+          <p className="mb-4 mt-0.5 text-[12px] text-text-secondary">
             Jump directly to key management areas.
           </p>
           <div className="grid grid-cols-2 gap-2.5">

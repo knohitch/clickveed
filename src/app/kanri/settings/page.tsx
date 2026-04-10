@@ -26,7 +26,7 @@ export default function SupportSettingsPage() {
         <div className="space-y-8">
              <div>
                 <h1 className="text-3xl font-bold font-headline">Agent Settings</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Manage your profile and notification preferences.
                 </p>
             </div>
@@ -62,14 +62,14 @@ export default function SupportSettingsPage() {
                                 <div className="flex items-center justify-between rounded-lg border p-4">
                                     <div>
                                         <Label htmlFor="email-notifications" className="font-medium">Email Notifications</Label>
-                                        <p className="text-sm text-muted-foreground">Receive an email when a new ticket is assigned to you.</p>
+                                        <p className="text-sm text-text-secondary">Receive an email when a new ticket is assigned to you.</p>
                                     </div>
                                     <Switch id="email-notifications" defaultChecked />
                                 </div>
                                 <div className="flex items-center justify-between rounded-lg border p-4">
                                     <div>
                                         <Label htmlFor="desktop-notifications" className="font-medium">Desktop Notifications</Label>
-                                         <p className="text-sm text-muted-foreground">Show a browser notification for new replies.</p>
+                                         <p className="text-sm text-text-secondary">Show a browser notification for new replies.</p>
                                     </div>
                                     <Switch id="desktop-notifications" />
                                 </div>

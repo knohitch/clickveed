@@ -100,20 +100,19 @@ function NavItem({ item }: { item: NavLink }) {
       href={item.href}
       className={cn(
         'group flex h-8 items-center gap-2.5 rounded-md px-2.5',
-        'text-[13px] font-medium transition-all duration-150 ease-in-out',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'text-[13px] font-medium transition-colors duration-150',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus',
         isActive
-          ? // Light: near-black pill (Image 1 reference). Dark: blue tint.
-            'bg-foreground text-background dark:bg-primary/15 dark:text-primary'
-          : 'text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+          ? 'bg-surface-active text-text-brand border-l-2 border-brand pl-[9px]'
+          : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
       )}
     >
       <item.icon
         className={cn(
           'h-[14px] w-[14px] shrink-0 transition-colors duration-150',
           isActive
-            ? 'text-background dark:text-primary'
-            : 'text-sidebar-foreground/35 group-hover:text-sidebar-foreground/60',
+            ? 'text-text-brand'
+            : 'text-text-muted group-hover:text-text-secondary',
         )}
       />
       <span className="truncate">{item.label}</span>
@@ -129,7 +128,7 @@ export function AdminNav({ type }: { type: 'admin' | 'superAdmin' }) {
       {groups.map((group) => (
         <div key={group.label} className="flex flex-col gap-0.5">
           {/* Section label */}
-          <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 select-none">
+          <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-text-muted select-none">
             {group.label}
           </p>
 

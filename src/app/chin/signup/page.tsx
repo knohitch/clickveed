@@ -109,7 +109,7 @@ export default function ChinSignUpPage() {
         <div className="hidden bg-muted lg:flex items-center justify-center p-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-background -z-10" />
           <div className="absolute size-96 rounded-full bg-primary/20 blur-3xl -top-16 -left-16" />
-          <div className="absolute size-96 rounded-full bg-primary/10 blur-3xl -bottom-16 -right-16" />
+          <div className="absolute size-96 rounded-full bg-brand-subtle blur-3xl -bottom-16 -right-16" />
 
           <Card className="max-w-md w-full glass-card animate-fade-in-up">
             <CardHeader>
@@ -123,15 +123,15 @@ export default function ChinSignUpPage() {
             <CardContent className="space-y-4 text-lg">
               <ul className="space-y-3">
                 <li className="flex items-center gap-3 animate-fade-in-up [animation-delay:400ms]">
-                  <Check className="text-primary h-6 w-6" />
+                  <Check className="text-text-brand h-6 w-6" />
                   <span className="font-medium">User Management</span>
                 </li>
                 <li className="flex items-center gap-3 animate-fade-in-up [animation-delay:500ms]">
-                  <Check className="text-primary h-6 w-6" />
+                  <Check className="text-text-brand h-6 w-6" />
                   <span className="font-medium">System Monitoring</span>
                 </li>
                 <li className="flex items-center gap-3 animate-fade-in-up [animation-delay:600ms]">
-                  <Check className="text-primary h-6 w-6" />
+                  <Check className="text-text-brand h-6 w-6" />
                   <span className="font-medium">Platform Configuration</span>
                 </li>
               </ul>
@@ -151,7 +151,7 @@ export default function ChinSignUpPage() {
               <Logo size="large" />
             </div>
             <h1 className="text-3xl font-bold mt-4">Create Super Admin Account</h1>
-            <p className="text-balance text-base text-muted-foreground">
+            <p className="text-balance text-base text-text-secondary">
               This is for the first Super Admin user only.
             </p>
           </div>
@@ -218,7 +218,7 @@ export default function ChinSignUpPage() {
       <div className="hidden bg-muted lg:flex items-center justify-center p-8 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-background -z-10" />
         <div className="absolute size-96 rounded-full bg-primary/20 blur-3xl -top-16 -left-16" />
-        <div className="absolute size-96 rounded-full bg-primary/10 blur-3xl -bottom-16 -right-16" />
+        <div className="absolute size-96 rounded-full bg-brand-subtle blur-3xl -bottom-16 -right-16" />
 
         <Card className="max-w-md w-full glass-card animate-fade-in-up">
           <CardHeader>
@@ -232,15 +232,15 @@ export default function ChinSignUpPage() {
           <CardContent className="space-y-4 text-lg">
             <ul className="space-y-3">
               <li className="flex items-center gap-3 animate-fade-in-up [animation-delay:400ms]">
-                <Check className="text-primary h-6 w-6" />
+                <Check className="text-text-brand h-6 w-6" />
                 <span className="font-medium">User Management</span>
               </li>
               <li className="flex items-center gap-3 animate-fade-in-up [animation-delay:500ms]">
-                <Check className="text-primary h-6 w-6" />
+                <Check className="text-text-brand h-6 w-6" />
                 <span className="font-medium">System Monitoring</span>
               </li>
               <li className="flex items-center gap-3 animate-fade-in-up [animation-delay:600ms]">
-                <Check className="text-primary h-6 w-6" />
+                <Check className="text-text-brand h-6 w-6" />
                 <span className="font-medium">Platform Configuration</span>
               </li>
             </ul>

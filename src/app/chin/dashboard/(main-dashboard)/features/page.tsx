@@ -261,7 +261,7 @@ export default function FeaturesManagementPage() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold font-headline">Feature Management</h1>
-                    <p className="text-muted-foreground">
+                    <p className="text-text-secondary">
                         Manage which features are available for each subscription plan.
                     </p>
                 </div>
@@ -284,9 +284,9 @@ export default function FeaturesManagementPage() {
             {features.length === 0 ? (
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                        <Database className="h-12 w-12 text-muted-foreground mb-4" />
+                        <Database className="h-12 w-12 text-text-secondary mb-4" />
                         <h3 className="text-lg font-semibold mb-2">No Features Found</h3>
-                        <p className="text-muted-foreground text-center mb-4">
+                        <p className="text-text-secondary text-center mb-4">
                             Click &quot;Seed Defaults&quot; to populate the database with the default features, or add features manually.
                         </p>
                         <Button onClick={handleSeedFeatures} disabled={seeding}>
@@ -306,7 +306,7 @@ export default function FeaturesManagementPage() {
                     <CardContent>
                         <div className="flex flex-col md:flex-row gap-4 mb-4">
                             <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
                                 <Input
                                     placeholder="Search features..."
                                     className="pl-10"
@@ -348,7 +348,7 @@ export default function FeaturesManagementPage() {
                                             <TableCell>
                                                 <div>
                                                     <div className="font-medium">{feature.displayName}</div>
-                                                    <div className="text-xs text-muted-foreground font-mono">{feature.featureId}</div>
+                                                    <div className="text-xs text-text-secondary font-mono">{feature.featureId}</div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -414,7 +414,7 @@ export default function FeaturesManagementPage() {
                                 placeholder="e.g., video-suite"
                                 disabled={!!editingFeature}
                             />
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-text-secondary">
                                 Unique identifier used in code. Use lowercase with hyphens.
                             </p>
                         </div>

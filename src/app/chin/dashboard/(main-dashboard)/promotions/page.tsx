@@ -70,7 +70,7 @@ const PromotionForm = ({ promotion, plans, onSave, closeDialog }: { promotion: P
                             </div>
                         ))
                     ) : (
-                        <p className="text-sm text-muted-foreground">No paid plans available to apply promotions to.</p>
+                        <p className="text-sm text-text-secondary">No paid plans available to apply promotions to.</p>
                     )}
                 </div>
             </div>
@@ -154,7 +154,7 @@ export default function AdminPromotionsPage() {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold font-headline">Promotions</h1>
-                        <p className="text-muted-foreground">
+                        <p className="text-text-secondary">
                             Create and manage discounts for promotional events.
                         </p>
                     </div>
@@ -170,15 +170,15 @@ export default function AdminPromotionsPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {promotions.length > 0 ? promotions.map(promo => (
-                                <Card key={promo.id} className={cn(promo.isActive ? 'border-primary/50 bg-primary/5' : 'bg-muted/50')}>
+                                <Card key={promo.id} className={cn(promo.isActive ? 'border-primary/50 bg-brand-subtle' : 'bg-muted/50')}>
                                     <CardContent className="p-4 flex items-center justify-between">
                                         <div className="flex items-center gap-4">
-                                        <div className={cn("p-3 rounded-full", promo.isActive ? "bg-primary/10" : "bg-muted")}>
-                                            <TicketPercent className={cn("h-6 w-6", promo.isActive ? "text-primary" : "text-muted-foreground")} />
+                                        <div className={cn("p-3 rounded-full", promo.isActive ? "bg-brand-subtle" : "bg-muted")}>
+                                            <TicketPercent className={cn("h-6 w-6", promo.isActive ? "text-text-brand" : "text-text-secondary")} />
                                         </div>
                                             <div>
                                                 <h3 className="font-semibold">{promo.name} - {Number(promo.discountPercentage)}% OFF</h3>
-                                                <p className="text-sm text-muted-foreground">
+                                                <p className="text-sm text-text-secondary">
                                                     Applies to: {promo.applicablePlanIds?.map(id => plans.find(p => p.id === id)?.name).filter(Boolean).join(', ') || 'No plans'}
                                                 </p>
                                             </div>
@@ -204,8 +204,8 @@ export default function AdminPromotionsPage() {
                                     </CardContent>
                                 </Card>
                         )) : (
-                            <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-md">
-                                <TicketPercent className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <div className="text-center text-text-secondary p-8 border-2 border-dashed rounded-md">
+                                <TicketPercent className="mx-auto h-12 w-12 text-text-secondary" />
                                 <h3 className="mt-4 text-lg font-semibold">No Promotions Created</h3>
                                 <p className="mt-1 text-sm">Click "Add New Promotion" to get started.</p>
                             </div>

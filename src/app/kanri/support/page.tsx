@@ -106,7 +106,7 @@ export default function SupportPage() {
         <div className="h-full flex flex-col">
             <div className='flex-shrink-0'>
                 <h1 className="text-3xl font-bold font-headline">Support Center</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     View and respond to user support requests.
                 </p>
             </div>
@@ -114,7 +114,7 @@ export default function SupportPage() {
                 <div className="lg:col-span-4 border-r flex flex-col">
                     <div className="p-4 border-b">
                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
                             <Input 
                                 placeholder="Search tickets..." 
                                 className="pl-10" 
@@ -133,7 +133,7 @@ export default function SupportPage() {
                                 key={ticket.id}
                                 onClick={() => setSelectedTicketId(ticket.id)}
                                 className={cn(
-                                    "p-3 rounded-lg cursor-pointer hover:bg-muted",
+                                    "p-3 rounded-lg cursor-pointer hover:bg-surface-hover",
                                     selectedTicket?.id === ticket.id && "bg-muted"
                                 )}
                             >
@@ -148,12 +148,12 @@ export default function SupportPage() {
                                     <Badge variant={getStatusVariant(ticket.status)}>{ticket.status}</Badge>
                                 </div>
                                 <h4 className="font-semibold text-sm mt-2">{ticket.subject}</h4>
-                                <p className="text-xs text-muted-foreground truncate">{ticket.preview}</p>
-                                <p className="text-xs text-muted-foreground mt-2 text-right">{ticket.lastUpdate}</p>
+                                <p className="text-xs text-text-secondary truncate">{ticket.preview}</p>
+                                <p className="text-xs text-text-secondary mt-2 text-right">{ticket.lastUpdate}</p>
                             </div>
                          ))
                          ) : (
-                            <div className="text-center p-8 text-muted-foreground">
+                            <div className="text-center p-8 text-text-secondary">
                                 <Search className="h-8 w-8 mx-auto mb-2" />
                                 <p className="font-semibold">No tickets found</p>
                                 <p className="text-sm">Try a different search term.</p>
@@ -199,7 +199,7 @@ export default function SupportPage() {
                                     ))}
                                 </div>
                             </ScrollArea>
-                            <div className="p-4 border-t bg-background">
+                            <div className="p-4 border-t bg-surface-page">
                                 <div className="relative">
                                      <Textarea 
                                         placeholder="Type your reply..." 
@@ -222,7 +222,7 @@ export default function SupportPage() {
                             </div>
                         </>
                     ) : (
-                         <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                         <div className="flex flex-col items-center justify-center h-full text-text-secondary p-8">
                              <MessageSquare className="h-12 w-12 mb-4"/>
                             <p className="text-lg font-semibold">Select a ticket</p>
                             <p className="text-sm">Choose a conversation from the left to view details and respond.</p>

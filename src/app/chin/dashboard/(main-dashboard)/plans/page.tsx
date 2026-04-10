@@ -73,28 +73,28 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { plan: Pl
              <CardContent className="flex-1 space-y-4">
                 <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-extrabold">${Number(displayPrice).toFixed(2)}</span>
-                    <span className="text-muted-foreground">/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'qtr' : 'yr'}</span>
+                    <span className="text-text-secondary">/{billingCycle === 'monthly' ? 'mo' : billingCycle === 'quarterly' ? 'qtr' : 'yr'}</span>
                 </div>
                 
                 <RadioGroup defaultValue="monthly" onValueChange={setBillingCycle} className="grid grid-cols-1 gap-2">
                     <Label className="flex items-center justify-between p-3 border rounded-md has-[:checked]:border-primary cursor-pointer text-sm">
                         <div>
                             <p className="font-semibold">Monthly</p>
-                            <p className="text-xs text-muted-foreground">${Number(plan.priceMonthly).toFixed(2)} / month</p>
+                            <p className="text-xs text-text-secondary">${Number(plan.priceMonthly).toFixed(2)} / month</p>
                         </div>
                         <RadioGroupItem value="monthly" />
                     </Label>
                     <Label className="flex items-center justify-between p-3 border rounded-md has-[:checked]:border-primary cursor-pointer text-sm">
                             <div>
                             <p className="font-semibold">Quarterly</p>
-                            <p className="text-xs text-muted-foreground">${Number(plan.priceQuarterly).toFixed(2)} / quarter</p>
+                            <p className="text-xs text-text-secondary">${Number(plan.priceQuarterly).toFixed(2)} / quarter</p>
                         </div>
                         <RadioGroupItem value="quarterly" />
                     </Label>
                     <Label className="flex items-center justify-between p-3 border rounded-md has-[:checked]:border-primary cursor-pointer text-sm">
                         <div>
                             <p className="font-semibold">Yearly</p>
-                            <p className="text-xs text-muted-foreground">${Number(plan.priceYearly).toFixed(2)} / year</p>
+                            <p className="text-xs text-text-secondary">${Number(plan.priceYearly).toFixed(2)} / year</p>
                         </div>
                         <RadioGroupItem value="yearly" />
                     </Label>
@@ -102,10 +102,10 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { plan: Pl
 
                 <Separator/>
 
-                <div className="text-xs text-muted-foreground space-y-1 pt-1">
-                    <p>Video Exports: <span className="font-medium text-foreground">{plan.videoExports ?? 'Unlimited'}</span></p>
-                    <p>AI Credits: <span className="font-medium text-foreground">{plan.aiCredits ?? 'Unlimited'}</span></p>
-                    <p>Storage: <span className="font-medium text-foreground">{plan.storageGB ? `${plan.storageGB} GB` : 'Unlimited'}</span></p>
+                <div className="text-xs text-text-secondary space-y-1 pt-1">
+                    <p>Video Exports: <span className="font-medium text-text-primary">{plan.videoExports ?? 'Unlimited'}</span></p>
+                    <p>AI Credits: <span className="font-medium text-text-primary">{plan.aiCredits ?? 'Unlimited'}</span></p>
+                    <p>Storage: <span className="font-medium text-text-primary">{plan.storageGB ? `${plan.storageGB} GB` : 'Unlimited'}</span></p>
                 </div>
 
                 <Separator/>
@@ -113,7 +113,7 @@ const PlanCard = ({ plan, onEdit, onDelete, isPopular, isDeletable }: { plan: Pl
                 <ul className="space-y-3 pt-2">
                     {plan.features.map((feature, index) => (
                         <li key={`${plan.id}-feature-${index}`} className="flex items-start gap-3">
-                            <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                            <Check className="h-5 w-5 text-text-brand flex-shrink-0 mt-0.5" />
                             <span className="text-sm">{feature.text}</span>
                         </li>
                     ))}
@@ -255,7 +255,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                         ))}
                     </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Determines which features users on this plan can access.</p>
+                <p className="text-xs text-text-secondary">Determines which features users on this plan can access.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -274,7 +274,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             <Separator />
             <div className="space-y-2">
                 <Label className="text-sm font-semibold">Usage Limits</Label>
-                <p className="text-xs text-muted-foreground mb-2">Leave empty for unlimited. These limits control how much users on this plan can use.</p>
+                <p className="text-xs text-text-secondary mb-2">Leave empty for unlimited. These limits control how much users on this plan can use.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="videoExports">Video Exports</Label>
@@ -293,7 +293,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
             <Separator />
             <div className="space-y-2">
                 <Label className="text-sm font-semibold">Stripe Price IDs</Label>
-                <p className="text-xs text-muted-foreground mb-2">Required for payments. Get these from your Stripe Dashboard → Products → Price IDs.</p>
+                <p className="text-xs text-text-secondary mb-2">Required for payments. Get these from your Stripe Dashboard → Products → Price IDs.</p>
                 <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1">
                         <Label htmlFor="stripePriceIdMonthly" className="text-xs">Monthly Price ID</Label>
@@ -320,7 +320,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {featureItems.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic">No features added yet. Click "Add Feature" to start.</p>
+                        <p className="text-sm text-text-secondary italic">No features added yet. Click "Add Feature" to start.</p>
                     ) : (
                         featureItems.map((feature, index) => (
                             <div key={index} className="flex items-center gap-2">
@@ -343,7 +343,7 @@ const PlanForm = ({ plan, onSave, onCancel }: { plan: Partial<Plan> | null, onSa
                         ))
                     )}
                 </div>
-                <p className="text-xs text-muted-foreground">Each feature will be displayed as a bullet point in the plan card.</p>
+                <p className="text-xs text-text-secondary">Each feature will be displayed as a bullet point in the plan card.</p>
             </div>
             <DialogFooter>
                  <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -445,7 +445,7 @@ export default function AdminPlansPage() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold font-headline">Subscription Plans</h1>
-                    <p className="text-muted-foreground">
+                    <p className="text-text-secondary">
                         Create, edit, and manage your subscription tiers.
                     </p>
                 </div>

@@ -181,7 +181,7 @@ export default function AdminEmailTemplatesPage() {
         <div className="space-y-8">
              <div>
                 <h1 className="text-3xl font-bold font-headline">Email Templates</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Customize the transactional emails sent to your users and administrators. Use placeholders for dynamic content.
                 </p>
             </div>

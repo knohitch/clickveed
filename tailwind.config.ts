@@ -39,33 +39,37 @@ export default {
         smooth: 'ease',
       },
       colors: {
-        // ── Design system brand tokens ──────────────────────────────
-        brand: {
-          DEFAULT: '#2563EB',
-          dark: '#3B82F6',
-        },
-        // ── Surface tokens (use with bg-surface-*) ─────────────────
+        // ── Surface tokens ──────────────────────────────────────────
         surface: {
-          'page-light': '#FFFFFF',
-          'sidebar-light': '#F3F4F6',
-          'card-light': '#FFFFFF',
-          'page-dark': '#0D0D14',
-          'sidebar-dark': '#13131F',
-          'card-dark': '#1A1A2E',
+          page:    'var(--surface-page)',
+          sidebar: 'var(--surface-sidebar)',
+          card:    'var(--surface-card)',
+          topbar:  'var(--surface-topbar)',
+          input:   'var(--surface-input)',
+          hover:   'var(--surface-hover)',
+          active:  'var(--surface-active)',
         },
-        // ── Text tokens (use with text-ds-*) ───────────────────────
-        ds: {
-          'primary-light': '#0A0A0A',
-          'secondary-light': '#6B7280',
-          'muted-light': '#9CA3AF',
-          'primary-dark': '#F0F0FF',
-          'secondary-dark': '#8B8FA8',
-          'muted-dark': '#5C5F72',
-          'border-light': '#E5E7EB',
-          'border-dark': '#252538',
-          'border-dark-hover': '#3A3A55',
+        // ── Border tokens ───────────────────────────────────────────
+        border: {
+          DEFAULT: 'hsl(var(--border))',
+          default: 'var(--border-default)',
+          strong:  'var(--border-strong)',
+          focus:   'var(--border-focus)',
         },
-        border: 'hsl(var(--border))',
+        // ── Text tokens ─────────────────────────────────────────────
+        text: {
+          primary:    'var(--text-primary)',
+          secondary:  'var(--text-secondary)',
+          muted:      'var(--text-muted)',
+          brand:      'var(--text-brand)',
+          'on-brand': 'var(--text-on-brand)',
+        },
+        // ── Brand tokens ────────────────────────────────────────────
+        brand: {
+          DEFAULT: 'var(--brand)',
+          hover:   'var(--brand-hover)',
+          subtle:  'var(--brand-subtle)',
+        },
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',

@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-3xl font-bold font-headline">Support Dashboard</h1>
-                <p className="text-muted-foreground">
+                <p className="text-text-secondary">
                     Welcome to the support control panel.
                 </p>
             </div>
@@ -75,11 +75,11 @@ export default function AdminDashboardPage() {
                     <Card key={card.title}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-base font-medium">{card.title}</CardTitle>
-                            <card.icon className="h-5 w-5 text-muted-foreground" />
+                            <card.icon className="h-5 w-5 text-text-secondary" />
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : card.value}</div>
-                            <p className="text-sm text-muted-foreground">{card.change}</p>
+                            <p className="text-sm text-text-secondary">{card.change}</p>
                         </CardContent>
                     </Card>
                 ))}

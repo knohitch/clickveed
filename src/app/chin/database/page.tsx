@@ -48,7 +48,7 @@ export default function ChinDatabasePage() {
       case 'failure':
         return <AlertTriangle className="h-5 w-5 text-destructive" />;
       default:
-        return <Server className="h-5 w-5 text-muted-foreground" />;
+        return <Server className="h-5 w-5 text-text-secondary" />;
     }
   }
 
@@ -56,7 +56,7 @@ export default function ChinDatabasePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">Database Connection</h1>
-        <p className="text-muted-foreground">
+        <p className="text-text-secondary">
           Check the status of the application's database connection.
         </p>
       </div>
@@ -73,9 +73,9 @@ export default function ChinDatabasePage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 Current Data Store
-                <span className="text-primary font-bold">{dbType}</span>
+                <span className="text-text-brand font-bold">{dbType}</span>
               </CardTitle>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-text-secondary">
                 The application is connected to a persistent database, configured via environment variables.
               </div>
             </CardHeader>
@@ -95,7 +95,7 @@ export default function ChinDatabasePage() {
                   {status === 'success' && 'Connection successful.'}
                   {status === 'failure' && 'Connection failed.'}
                 </h3>
-                {status !== 'idle' && <div className="text-sm text-muted-foreground">Last test: {new Date().toLocaleTimeString()}</div>}
+                {status !== 'idle' && <div className="text-sm text-text-secondary">Last test: {new Date().toLocaleTimeString()}</div>}
               </div>
             </div>
             <Button onClick={handleTestConnection} disabled={status === 'testing'}>
@@ -117,7 +117,7 @@ export default function ChinDatabasePage() {
               <label htmlFor="dbType" className="text-sm font-medium">Database Type</label>
               <select 
                 id="dbType" 
-                className="w-full p-2 border rounded-md bg-background"
+                className="w-full p-2 border rounded-md bg-surface-page"
                 value={dbType}
                 onChange={(e) => setDbType(e.target.value as DatabaseType)}
               >
@@ -130,7 +130,7 @@ export default function ChinDatabasePage() {
               <label htmlFor="dbHost" className="text-sm font-medium">Host</label>
               <input 
                 id="dbHost" 
-                className="w-full p-2 border rounded-md bg-background"
+                className="w-full p-2 border rounded-md bg-surface-page"
                 placeholder="localhost"
                 defaultValue="db.example.com"
               />
@@ -142,7 +142,7 @@ export default function ChinDatabasePage() {
               <label htmlFor="dbPort" className="text-sm font-medium">Port</label>
               <input 
                 id="dbPort" 
-                className="w-full p-2 border rounded-md bg-background"
+                className="w-full p-2 border rounded-md bg-surface-page"
                 placeholder="5432"
                 defaultValue="5432"
               />
@@ -151,7 +151,7 @@ export default function ChinDatabasePage() {
               <label htmlFor="dbUser" className="text-sm font-medium">Username</label>
               <input 
                 id="dbUser" 
-                className="w-full p-2 border rounded-md bg-background"
+                className="w-full p-2 border rounded-md bg-surface-page"
                 placeholder="username"
                 defaultValue="admin"
               />
@@ -161,7 +161,7 @@ export default function ChinDatabasePage() {
               <input 
                 id="dbPassword" 
                 type="password"
-                className="w-full p-2 border rounded-md bg-background"
+                className="w-full p-2 border rounded-md bg-surface-page"
                 placeholder="••••••••"
                 defaultValue="••••••••"
               />
@@ -172,7 +172,7 @@ export default function ChinDatabasePage() {
             <label htmlFor="dbName" className="text-sm font-medium">Database Name</label>
             <input 
               id="dbName" 
-              className="w-full p-2 border rounded-md bg-background"
+              className="w-full p-2 border rounded-md bg-surface-page"
               placeholder="database_name"
               defaultValue="clickvid_production"
             />
