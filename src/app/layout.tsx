@@ -1,21 +1,15 @@
 import type { Metadata } from 'next';
-import { Inter, Nunito, Poppins } from 'next/font/google';
+import { Plus_Jakarta_Sans, Poppins } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import ClientLayout from '@/components/client-layout';
 import { auth } from '@/auth';
 import { getBrandingMetadata } from '@/lib/branding-metadata';
 
-const inter = Inter({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  variable: '--font-inter',
-  weight: ['400', '500', '600'],
-  display: 'swap',
-});
-
-const nunito = Nunito({
-  subsets: ['latin'],
-  variable: '--font-nunito',
+  variable: '--font-jakarta',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
@@ -56,7 +50,11 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("font-body antialiased", inter.variable, nunito.variable, poppins.variable)}>
+      <head>
+        {/* Inline script: apply theme class before first paint — eliminates flash */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||((!t||t==='system')&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})()` }} />
+      </head>
+      <body className={cn('font-body antialiased', jakarta.variable, poppins.variable)}>
         <ClientLayout session={session}>
           {children}
         </ClientLayout>

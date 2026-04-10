@@ -4,24 +4,24 @@
 
 @layer base {
   :root {
-    /* ── Light mode ─────────────────────────────────────────────── */
-    --background: 0 0% 98%;
-    --foreground: 222 20% 10%;
+    /* Light — #F5F7FA page, pure white cards, navy text */
+    --background: 218 33% 97%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 20% 10%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 20% 10%;
+    --popover-foreground: 222 47% 11%;
 
     --primary: 217 82% 54%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 95%;
-    --secondary-foreground: 222 20% 10%;
+    --secondary: 216 24% 93%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 14% 95%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 216 24% 93%;
+    --muted-foreground: 213 20% 43%;
 
     --accent: 217 82% 54%;
     --accent-foreground: 0 0% 100%;
@@ -29,29 +29,28 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 88%;
-    --input: 220 13% 88%;
+    --border: 216 28% 88%;
+    --input: 216 28% 88%;
     --ring: 217 82% 54%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
     --chart-1: 217 82% 54%;
     --chart-2: 44 94% 46%;
-    --chart-3: 164 90% 42%;
-    --chart-4: 344 90% 42%;
-    --chart-5: 284 90% 42%;
+    --chart-3: 164 70% 40%;
+    --chart-4: 344 80% 50%;
+    --chart-5: 270 70% 58%;
 
-    /* Sidebar – light: very subtle warm gray */
-    --sidebar-background: 220 20% 97%;
-    --sidebar-foreground: 222 20% 14%;
+    /* Sidebar: pure white with blue-tinted border */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 217 82% 54%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 93%;
-    --sidebar-accent-foreground: 222 20% 10%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-accent: 216 24% 95%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 216 28% 91%;
     --sidebar-ring: 217 82% 54%;
 
-    /* Social */
     --color-youtube: 348 83% 47%;
     --color-instagram: 326 63% 52%;
     --color-tiktok: 180 100% 50%;
@@ -61,61 +60,53 @@
   }
 
   .dark {
-    /* ── Dark mode — premium deep purple-black ───────────────────
-       Page:    #0B0B12  (240 25%  5%)
-       Sidebar: #11111C  (240 24%  8%)
-       Card:    #18182A  (240 26% 13%)
-       Border:  #2C2C44  (240 17% 22%)   ← clearly visible
-       Text:    #EEEEFF  (240 100% 96%)
-    ─────────────────────────────────────────────────────────── */
-    --background: 240 25% 5%;
-    --foreground: 240 100% 96%;
+    /* Dark — deep navy #0A0F1E, not purple */
+    --background: 222 52% 8%;
+    --foreground: 214 100% 97%;
 
-    --card: 240 26% 13%;
-    --card-foreground: 240 100% 96%;
+    --card: 222 40% 12%;
+    --card-foreground: 214 100% 97%;
 
-    --popover: 240 24% 8%;
-    --popover-foreground: 240 100% 96%;
+    --popover: 222 48% 10%;
+    --popover-foreground: 214 100% 97%;
 
     --primary: 217 91% 62%;
-    --primary-foreground: 240 25% 5%;
+    --primary-foreground: 222 52% 8%;
 
-    --secondary: 240 17% 22%;
-    --secondary-foreground: 240 100% 96%;
+    --secondary: 216 38% 19%;
+    --secondary-foreground: 214 100% 97%;
 
-    --muted: 240 17% 20%;
-    --muted-foreground: 240 12% 55%;
+    --muted: 216 32% 17%;
+    --muted-foreground: 213 17% 52%;
 
     --accent: 217 91% 62%;
-    --accent-foreground: 240 25% 5%;
+    --accent-foreground: 222 52% 8%;
 
-    --destructive: 0 62% 38%;
-    --destructive-foreground: 240 100% 96%;
+    --destructive: 0 62% 42%;
+    --destructive-foreground: 214 100% 97%;
 
-    /* Border clearly visible against card (13% lightness) */
-    --border: 240 17% 22%;
-    --input: 240 17% 22%;
+    --border: 216 38% 19%;
+    --input: 216 38% 19%;
     --ring: 217 91% 62%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
     --chart-1: 217 91% 65%;
     --chart-2: 44 94% 58%;
-    --chart-3: 164 80% 52%;
-    --chart-4: 344 80% 58%;
-    --chart-5: 270 80% 65%;
+    --chart-3: 164 70% 52%;
+    --chart-4: 344 80% 60%;
+    --chart-5: 270 70% 65%;
 
-    /* Sidebar – dark: deep purple-black, slightly lighter than page */
-    --sidebar-background: 240 24% 8%;
-    --sidebar-foreground: 240 80% 92%;
+    /* Sidebar: slightly lighter navy than page */
+    --sidebar-background: 222 48% 10%;
+    --sidebar-foreground: 214 80% 94%;
     --sidebar-primary: 217 91% 62%;
-    --sidebar-primary-foreground: 240 25% 5%;
-    --sidebar-accent: 240 17% 16%;
-    --sidebar-accent-foreground: 240 80% 92%;
-    --sidebar-border: 240 17% 18%;
+    --sidebar-primary-foreground: 222 52% 8%;
+    --sidebar-accent: 216 32% 16%;
+    --sidebar-accent-foreground: 214 80% 94%;
+    --sidebar-border: 216 35% 17%;
     --sidebar-ring: 217 91% 62%;
 
-    /* Social */
     --color-youtube: 348 91% 57%;
     --color-instagram: 326 79% 56%;
     --color-tiktok: 180 50% 70%;
@@ -131,7 +122,6 @@
   }
 
   html {
-    /* Prevent white flash during theme initialization */
     color-scheme: light dark;
   }
 
@@ -140,40 +130,23 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Normalize heading margins — spacing is layout's job */
   h1, h2, h3, h4, h5, h6 {
     margin: 0;
     font-weight: 600;
   }
 
-  /* Universal transitions on interactive elements */
-  button,
-  a,
-  [role="button"] {
+  button, a, [role="button"] {
     @apply transition-all duration-150 ease-in-out;
   }
 
-  /* Focus ring: only on keyboard nav */
-  :focus {
-    outline: none;
-  }
+  :focus { outline: none; }
   :focus-visible {
     @apply ring-2 ring-ring ring-offset-2 ring-offset-background rounded-sm;
   }
 }
 
 @layer components {
-  /* Glass card utility */
   .glass-card {
     @apply bg-card/70 backdrop-blur-xl border border-border/30;
-  }
-
-  /* Premium card: light shadow + dark border */
-  .premium-card {
-    @apply bg-card border border-border rounded-card;
-    @apply shadow-[0_1px_4px_rgb(0_0_0/0.06),0_0_0_1px_rgb(0_0_0/0.04)];
-  }
-  .dark .premium-card {
-    box-shadow: 0 0 0 1px hsl(240 17% 26% / 0.8), 0 4px 16px rgb(0 0 0 / 0.4);
   }
 }

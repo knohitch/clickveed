@@ -17,8 +17,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['var(--font-inter)', 'var(--font-nunito)', 'sans-serif'],
-        sans: ['var(--font-inter)', 'var(--font-nunito)', 'sans-serif'],
+        body: ['var(--font-jakarta)', 'sans-serif'],
+        sans: ['var(--font-jakarta)', 'sans-serif'],
         headline: ['var(--font-poppins)', 'sans-serif'],
         code: ['monospace'],
       },
@@ -120,9 +120,9 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
-        card: '8px',
-        btn: '8px',
-        badge: '4px',
+        card: '14px',
+        btn: '10px',
+        badge: '6px',
         toggle: '9999px',
       },
       keyframes: {

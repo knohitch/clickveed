@@ -32,11 +32,11 @@ export function StatCard({
         // Base structure
         'group relative flex flex-col justify-between overflow-hidden',
         'rounded-card border border-border bg-card p-5',
-        // Light mode: real shadow for depth
-        'shadow-[0_1px_3px_rgb(0_0_0/0.06),0_1px_2px_-1px_rgb(0_0_0/0.04)]',
-        'hover:shadow-[0_4px_12px_rgb(0_0_0/0.08),0_1px_3px_rgb(0_0_0/0.06)]',
-        // Dark mode: brighter border on hover instead of shadow
-        'dark:shadow-none dark:hover:border-white/[0.14]',
+        // Light: layered shadow so white card lifts off #F5F7FA bg
+        'shadow-[0_1px_4px_rgb(15_30_80/0.08),0_0_0_1px_rgb(15_30_80/0.04)]',
+        'hover:shadow-[0_6px_16px_rgb(15_30_80/0.10),0_1px_4px_rgb(15_30_80/0.06)] hover:-translate-y-px',
+        // Dark: border brightens on hover, no shadow
+        'dark:shadow-none dark:hover:border-white/[0.16]',
         'transition-all duration-200 ease-in-out',
         className,
       )}

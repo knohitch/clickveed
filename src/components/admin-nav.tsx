@@ -103,29 +103,20 @@ function NavItem({ item }: { item: NavLink }) {
         'text-[13px] font-medium transition-all duration-150 ease-in-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isActive
-          ? // Active: brand-tinted background, brand text
-            'bg-primary/10 text-primary dark:bg-primary/[0.15] dark:text-primary'
-          : // Inactive: muted text, subtle hover
-            [
-              'text-sidebar-foreground/55',
-              'hover:bg-sidebar-accent hover:text-sidebar-foreground',
-            ],
+          ? // Light: near-black pill (Image 1 reference). Dark: blue tint.
+            'bg-foreground text-background dark:bg-primary/15 dark:text-primary'
+          : 'text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground',
       )}
     >
       <item.icon
         className={cn(
           'h-[14px] w-[14px] shrink-0 transition-colors duration-150',
           isActive
-            ? 'text-primary'
+            ? 'text-background dark:text-primary'
             : 'text-sidebar-foreground/35 group-hover:text-sidebar-foreground/60',
         )}
       />
       <span className="truncate">{item.label}</span>
-
-      {/* Active dot — right side */}
-      {isActive && (
-        <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-      )}
     </Link>
   );
 }
