@@ -45,6 +45,41 @@ function sanitizeStorageField(name: keyof StorageSettings, value: string): strin
   return cleaned.trim();
 }
 
+function isHttpUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
+}
+
+type UrlProbeResult = 'reachable' | 'unreachable' | 'unknown';
+
+async function probeUrlReachability(url: string): Promise<UrlProbeResult> {
+  try {
+    const headResponse = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    if (headResponse.ok) {
+      return 'reachable';
+    }
+
+    if (headResponse.status === 405 || headResponse.status === 501) {
+      const getResponse = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Range: 'bytes=0-0',
+        },
+      });
+
+      if (getResponse.ok || getResponse.status === 206) {
+        return 'reachable';
+      }
+
+      return 'unreachable';
+    }
+
+    return 'unreachable';
+  } catch {
+    return 'unknown';
+  }
+}
+
 /**
  * Get current storage configuration
  */
@@ -306,7 +341,7 @@ export async function uploadToStorage(
     });
 
     // Verify upload was successful by checking if we got valid URLs
-    if (!result || !result.storageUrl || !result.storageUrl.startsWith('http')) {
+    if (!result || !isHttpUrl(result.storageUrl)) {
       console.error('[Storage] Upload verification failed - invalid URLs:', result);
       return {
         success: false,
@@ -314,22 +349,43 @@ export async function uploadToStorage(
       };
     }
 
-    // Verify the URL is accessible by doing a quick HEAD request
-    try {
-      const response = await fetch(result.storageUrl, { method: 'HEAD' });
-      if (!response.ok) {
-        console.error('[Storage] Upload verification failed - URL not accessible:', result.storageUrl);
-        return {
-          success: false,
-          error: 'Upload verification failed. The uploaded file is not accessible.'
-        };
-      }
-    } catch (verifyError) {
-      console.warn('[Storage] Could not verify uploaded file accessibility:', verifyError);
-      // Don't fail the upload just because verification failed
+    // Storage URL must at least be accessible (or unverifiable due to transient network issues).
+    const storageProbe = await probeUrlReachability(result.storageUrl);
+    if (storageProbe === 'unreachable') {
+      console.error('[Storage] Upload verification failed - storage URL not reachable:', result.storageUrl);
+      return {
+        success: false,
+        error: 'Upload verification failed. The uploaded file is not accessible.'
+      };
     }
 
-    console.log('[Storage] Upload successful:', result.storageUrl);
+    if (storageProbe === 'unknown') {
+      console.warn('[Storage] Could not verify uploaded storage URL accessibility, continuing with fallback safety.');
+    }
+
+    let resolvedPublicUrl = result.storageUrl;
+    let cdnReachability: UrlProbeResult = 'unknown';
+
+    if (isHttpUrl(result.cdnUrl)) {
+      cdnReachability = await probeUrlReachability(result.cdnUrl);
+      if (cdnReachability === 'reachable') {
+        resolvedPublicUrl = result.cdnUrl;
+      } else {
+        console.warn('[Storage] CDN URL was not reachable, falling back to storage URL', {
+          cdnUrl: result.cdnUrl,
+          storageUrl: result.storageUrl,
+          reachability: cdnReachability,
+        });
+      }
+    }
+
+    console.log('[Storage] Upload successful:', {
+      storageUrl: result.storageUrl,
+      cdnUrl: result.cdnUrl,
+      resolvedPublicUrl,
+      storageProbe,
+      cdnReachability,
+    });
     logAuditEvent({
       action: 'storage_file_upload',
       outcome: 'success',
@@ -343,7 +399,14 @@ export async function uploadToStorage(
     });
     return {
       success: true,
-      data: result
+      data: {
+        ...result,
+        publicUrl: resolvedPublicUrl,
+        urlReachability: {
+          storage: storageProbe,
+          cdn: cdnReachability,
+        },
+      }
     };
   } catch (error) {
     console.error('Upload to storage failed:', error);

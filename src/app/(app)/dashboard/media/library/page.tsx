@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Search, MoreVertical, Video, Image as ImageIcon, Music, Download, Link as LinkIcon, Trash2, ArrowUpDown, FolderOpen, Loader2, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { type MediaAsset as MediaAssetType, getMediaAssets, deleteMediaAsset } from '@/lib/media-actions';
+import { type MediaAsset as MediaAssetType, getMediaAssets, deleteMediaAsset, getMediaAssetFallbackUrl } from '@/lib/media-actions';
 import { useToast } from '@/hooks/use-toast';
 
 type AssetTypeFilter = 'all' | 'IMAGE' | 'VIDEO' | 'AUDIO';
@@ -35,10 +35,53 @@ const AssetCard = ({
     const TypeIcon = asset.type === 'VIDEO' ? Video : asset.type === 'IMAGE' ? ImageIcon : Music;
     const [imageLoadFailed, setImageLoadFailed] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageSrc, setImageSrc] = useState(asset.url);
+    const [isResolvingFallback, setIsResolvingFallback] = useState(false);
+    const [hasTriedFallback, setHasTriedFallback] = useState(false);
+
+    useEffect(() => {
+        setImageSrc(asset.url);
+        setImageLoadFailed(false);
+        setImageLoaded(false);
+        setIsResolvingFallback(false);
+        setHasTriedFallback(false);
+    }, [asset.id, asset.url]);
 
     const copyShareLink = () => {
         navigator.clipboard.writeText(asset.url);
         toast({ title: 'Link Copied!', description: 'The public URL has been copied to your clipboard.' });
+    };
+
+    const handleImageError = async () => {
+        if (hasTriedFallback || isResolvingFallback) {
+            setImageLoadFailed(true);
+            return;
+        }
+
+        setHasTriedFallback(true);
+        setIsResolvingFallback(true);
+
+        try {
+            const fallbackUrl = await getMediaAssetFallbackUrl(asset.id);
+            if (fallbackUrl && fallbackUrl !== imageSrc) {
+                setImageLoaded(false);
+                setImageSrc(fallbackUrl);
+                return;
+            }
+        } catch (error) {
+            console.warn('[media-library] Failed to resolve thumbnail fallback', {
+                assetId: asset.id,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        } finally {
+            setIsResolvingFallback(false);
+        }
+
+        console.warn('[media-library] Thumbnail preview failed', {
+            assetId: asset.id,
+            url: asset.url,
+        });
+        setImageLoadFailed(true);
     };
 
     return (
@@ -48,16 +91,23 @@ const AssetCard = ({
                     <>
                         {!imageLoaded && <TypeIcon className="w-16 h-16 text-muted-foreground absolute" />}
                         <img
-                            src={asset.url}
+                            src={imageSrc}
                             alt={asset.name}
                             loading="lazy"
                             className={`object-cover aspect-video w-full h-full transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
                             onLoad={() => setImageLoaded(true)}
-                            onError={() => setImageLoadFailed(true)}
+                            onError={() => {
+                                void handleImageError();
+                            }}
                         />
                     </>
                 ) : (
-                    <TypeIcon className="w-16 h-16 text-muted-foreground" />
+                    <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                        <TypeIcon className="w-16 h-16" />
+                        {asset.type === 'IMAGE' && imageLoadFailed && (
+                            <span className="text-xs">Preview unavailable</span>
+                        )}
+                    </div>
                 )}
             </CardHeader>
             <CardContent className="p-4">

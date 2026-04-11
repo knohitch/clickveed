@@ -137,7 +137,8 @@ export async function runVoiceOverWorkflow(
     userId: string;
     synthesizeSegmentAudio: (text: string, voiceId?: string) => Promise<string>;
     fetchAudioBuffer: typeof fetchAudioBuffer;
-    uploadCombinedAudio: (dataUri: string) => Promise<{ publicUrl: string }>;
+    uploadCombinedAudio: (dataUri: string) => Promise<{ publicUrl: string; sizeMB: number }>;
+    persistAudio: (mediaSource: string) => Promise<{ publicUrl: string; sizeMB: number }>;
     assertPlayableAudioUrl: (audioUrl: string) => Promise<void>;
     createMediaAsset: (asset: { name: string; type: 'AUDIO'; url: string; size: number; userId: string }) => Promise<unknown>;
   }
@@ -146,6 +147,7 @@ export async function runVoiceOverWorkflow(
   const hasMultipleVoices = availableSpeakers.length > 1;
 
   let audioUrl: string;
+  let sizeMB = 0;
 
   if (hasMultipleVoices) {
     const segments = parseMultiSpeakerScript(input.script, availableSpeakers);
@@ -170,17 +172,22 @@ export async function runVoiceOverWorkflow(
     );
 
     audioUrl = uploaded.publicUrl;
+    sizeMB = uploaded.sizeMB;
     await deps.assertPlayableAudioUrl(audioUrl);
   } else {
     const selectedVoice = availableSpeakers[0]?.voice?.trim();
-    audioUrl = await deps.synthesizeSegmentAudio(input.script, selectedVoice);
+    const providerAudioUrl = await deps.synthesizeSegmentAudio(input.script, selectedVoice);
+    const persistedAudio = await deps.persistAudio(providerAudioUrl);
+    audioUrl = persistedAudio.publicUrl;
+    sizeMB = persistedAudio.sizeMB;
+    await deps.assertPlayableAudioUrl(audioUrl);
   }
 
   await deps.createMediaAsset({
     name: `Voice Over: ${input.script.substring(0, 30)}...`,
     type: 'AUDIO',
     url: audioUrl,
-    size: 0,
+    size: sizeMB,
     userId: deps.userId,
   });
 
@@ -209,6 +216,7 @@ const generateVoiceOverFlow = ai.defineFlow(
         synthesizeSegmentAudio,
         fetchAudioBuffer,
         uploadCombinedAudio: async (dataUri) => uploadToWasabi(dataUri, 'audio'),
+        persistAudio: async (mediaSource) => uploadToWasabi(mediaSource, 'audio'),
         assertPlayableAudioUrl,
         createMediaAsset: async (asset) => prisma.mediaAsset.create({ data: asset }),
       }

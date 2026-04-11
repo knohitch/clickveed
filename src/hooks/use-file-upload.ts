@@ -88,10 +88,11 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
       const result = await uploadFile(file, uploadOptions);
 
       if (result.success && result.data) {
+        const resolvedUrl = result.data.publicUrl || result.data.cdnUrl || result.data.storageUrl;
         // Update file with uploaded data
         setFiles(prev => prev.map(f =>
           f.file === file
-            ? { ...f, key: result.data!.key, url: result.data!.cdnUrl }
+            ? { ...f, key: result.data!.key, url: resolvedUrl }
             : f
         ));
 
@@ -131,9 +132,10 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
       results.push(result);
 
       if (result.success && result.data) {
+        const resolvedUrl = result.data.publicUrl || result.data.cdnUrl || result.data.storageUrl;
         setFiles(prev => prev.map(f =>
           f.file === fileWithPreview.file
-            ? { ...f, key: result.data!.key, url: result.data!.cdnUrl }
+            ? { ...f, key: result.data!.key, url: resolvedUrl }
             : f
         ));
       }

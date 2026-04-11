@@ -5,6 +5,13 @@ import { useFormState } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { creativeAssistantChatAction } from '@/lib/actions';
 import type { Message } from '@/lib/types';
+import {
+  createAiAssistantConversation,
+  getAiAssistantConversations,
+  importAiAssistantConversations,
+  saveAiAssistantConversation,
+  type AiAssistantConversation,
+} from '@/lib/ai-assistant-conversations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,6 +23,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const STORAGE_KEY = 'ai_assistant_conversations_v1';
+const STORAGE_MIGRATION_KEY = 'ai_assistant_conversations_migrated_v1';
 
 const initialState = {
   stream: null,
@@ -29,6 +37,13 @@ type Conversation = {
   title: string;
   updatedAt: number;
   messages: Message[];
+};
+
+type LegacyConversation = {
+  id?: string;
+  title?: string;
+  updatedAt?: number;
+  messages?: Message[];
 };
 
 const starterPrompts: Record<string, string> = {
@@ -65,13 +80,60 @@ const starterCards = [
   },
 ];
 
-function createConversation(seedTitle?: string): Conversation {
+function toConversation(record: AiAssistantConversation): Conversation {
   return {
-    id: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    title: seedTitle || 'New chat',
-    updatedAt: Date.now(),
-    messages: [],
+    id: record.id,
+    title: record.title,
+    updatedAt: record.updatedAt,
+    messages: record.messages,
   };
+}
+
+function normalizeRole(role: unknown): 'user' | 'model' {
+  if (role === 'user') return 'user';
+  if (role === 'assistant') return 'model';
+  return 'model';
+}
+
+function parseLocalConversations(raw: string): LegacyConversation[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((item) => {
+      const candidate = item as Partial<LegacyConversation>;
+      const messages = Array.isArray(candidate.messages)
+        ? candidate.messages
+            .map((message, index) => {
+              const msgCandidate = message as Partial<Message>;
+              if (typeof msgCandidate?.content !== 'string') return null;
+              if (!msgCandidate.content.trim()) return null;
+              return {
+                id:
+                  typeof msgCandidate.id === 'string' && msgCandidate.id.trim()
+                    ? msgCandidate.id
+                    : `legacy-${Date.now()}-${index}`,
+                role: normalizeRole(msgCandidate.role),
+                content: msgCandidate.content,
+              } satisfies Message;
+            })
+            .filter((message): message is Message => !!message)
+        : [];
+
+      return {
+        id: typeof candidate.id === 'string' ? candidate.id : undefined,
+        title: typeof candidate.title === 'string' ? candidate.title : 'New chat',
+        updatedAt: typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now(),
+        messages,
+      } satisfies LegacyConversation;
+    });
+  } catch {
+    return [];
+  }
+}
+
+function sortConversations(conversations: Conversation[]): Conversation[] {
+  return [...conversations].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 function ChatSubmitButton({ disabled }: { disabled: boolean }) {
@@ -94,7 +156,10 @@ export default function AiAssistantChatPage() {
   const router = useRouter();
   const [hasInitialized, setHasInitialized] = useState(false);
   const pendingMessageIdRef = useRef<string | null>(null);
+  const pendingConversationIdRef = useRef<string | null>(null);
   const pendingInitialMessageRef = useRef<string | null>(null);
+  const conversationsRef = useRef<Conversation[]>([]);
+  const activeConversationIdRef = useRef<string | null>(null);
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConversationId) || null,
@@ -103,64 +168,157 @@ export default function AiAssistantChatPage() {
   const messages = activeConversation?.messages || [];
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Conversation[];
-      if (!Array.isArray(parsed) || parsed.length === 0) return;
-      const sorted = parsed.sort((a, b) => b.updatedAt - a.updatedAt);
-      setConversations(sorted);
-      setActiveConversationId(sorted[0].id);
-    } catch (error) {
-      console.warn('Failed to load AI assistant history', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (conversations.length === 0) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    conversationsRef.current = conversations;
   }, [conversations]);
 
-  const updateActiveConversationMessages = (updater: (current: Message[]) => Message[], titleHint?: string) => {
-    setConversations((prev) => {
-      let targetId = activeConversationId;
-      let next = [...prev];
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
-      if (!targetId) {
-        const created = createConversation(titleHint);
-        next = [created, ...next];
-        targetId = created.id;
-        setActiveConversationId(created.id);
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadHistory = async () => {
+      try {
+        const dbConversations = await getAiAssistantConversations();
+        if (isCancelled) return;
+
+        if (dbConversations.length > 0) {
+          const normalized = sortConversations(dbConversations.map(toConversation));
+          setConversations(normalized);
+          setActiveConversationId(normalized[0]?.id || null);
+          localStorage.setItem(STORAGE_MIGRATION_KEY, '1');
+          return;
+        }
+
+        if (localStorage.getItem(STORAGE_MIGRATION_KEY) === '1') {
+          return;
+        }
+
+        const localRaw = localStorage.getItem(STORAGE_KEY);
+        if (!localRaw) return;
+
+        const localConversations = parseLocalConversations(localRaw);
+        if (localConversations.length === 0) return;
+
+        localStorage.setItem(STORAGE_MIGRATION_KEY, '1');
+        localStorage.removeItem(STORAGE_KEY);
+
+        let imported: AiAssistantConversation[] = [];
+        try {
+          imported = await importAiAssistantConversations({ conversations: localConversations });
+        } catch (importError) {
+          localStorage.setItem(STORAGE_KEY, localRaw);
+          localStorage.removeItem(STORAGE_MIGRATION_KEY);
+          throw importError;
+        }
+        if (isCancelled) return;
+
+        const normalized = sortConversations(imported.map(toConversation));
+        setConversations(normalized);
+        setActiveConversationId(normalized[0]?.id || null);
+      } catch (error) {
+        console.warn('Failed to load AI assistant history from DB', error);
       }
+    };
 
-      return next
+    void loadHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const persistConversation = (conversation: Conversation) => {
+    void saveAiAssistantConversation({
+      id: conversation.id,
+      title: conversation.title,
+      messages: conversation.messages,
+    }).catch((error) => {
+      console.warn('Failed to persist AI assistant conversation', error);
+    });
+  };
+
+  const updateConversationMessages = (
+    conversationId: string,
+    updater: (current: Message[]) => Message[],
+    titleHint?: string,
+    shouldPersist = true
+  ) => {
+    let updatedConversation: Conversation | null = null;
+    setConversations((prev) => {
+      const next = prev
         .map((conv) => {
-          if (conv.id !== targetId) return conv;
+          if (conv.id !== conversationId) return conv;
           const updatedMessages = updater(conv.messages);
           const newTitle =
             conv.title === 'New chat' && titleHint
-              ? titleHint.slice(0, 60)
+              ? titleHint.slice(0, 120)
               : conv.title;
-          return {
+          updatedConversation = {
             ...conv,
             title: newTitle,
             updatedAt: Date.now(),
             messages: updatedMessages,
           };
+          return updatedConversation;
         })
-        .sort((a, b) => b.updatedAt - a.updatedAt);
+      return sortConversations(next);
     });
+
+    if (updatedConversation && shouldPersist) {
+      persistConversation(updatedConversation);
+    }
   };
 
-  const startNewChat = () => {
-    const created = createConversation();
-    setConversations((prev) => [created, ...prev]);
-    setActiveConversationId(created.id);
+  const startNewChat = async () => {
+    try {
+      const created = await createAiAssistantConversation({ title: 'New chat', messages: [] });
+      const nextConversation = toConversation(created);
+      setConversations((prev) => sortConversations([nextConversation, ...prev.filter((conv) => conv.id !== nextConversation.id)]));
+      setActiveConversationId(nextConversation.id);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not start a chat',
+        description: error instanceof Error ? error.message : 'Try again.',
+      });
+    }
   };
 
-  const sendMessage = (text: string) => {
+  const ensureActiveConversation = async (seedTitle?: string): Promise<Conversation | null> => {
+    const currentId = activeConversationIdRef.current;
+    if (currentId) {
+      const existing = conversationsRef.current.find((conv) => conv.id === currentId);
+      if (existing) return existing;
+    }
+
+    try {
+      const created = await createAiAssistantConversation({ title: seedTitle || 'New chat', messages: [] });
+      const nextConversation = toConversation(created);
+      setConversations((prev) => sortConversations([nextConversation, ...prev.filter((conv) => conv.id !== nextConversation.id)]));
+      setActiveConversationId(nextConversation.id);
+      return nextConversation;
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not start a chat',
+        description: error instanceof Error ? error.message : 'Try again.',
+      });
+      return null;
+    }
+  };
+
+  const sendMessage = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    const targetConversation = await ensureActiveConversation(trimmed);
+    if (!targetConversation) return;
+
+    const targetConversationId = targetConversation.id;
+    const latestConversation =
+      conversationsRef.current.find((conversation) => conversation.id === targetConversationId) || targetConversation;
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -170,15 +328,16 @@ export default function AiAssistantChatPage() {
     const pendingId = `pending-${Date.now()}`;
     const pendingMessage: Message = { id: pendingId, role: 'model', content: '' };
 
-    const requestHistory = messages
+    const requestHistory = latestConversation.messages
       .filter((m) => !m.id.startsWith('pending-'))
       .map((msg) => ({
         role: msg.role === 'model' ? 'assistant' : 'user',
         content: msg.content,
       }));
 
-    updateActiveConversationMessages((current) => [...current, userMessage, pendingMessage], trimmed);
+    updateConversationMessages(targetConversationId, (current) => [...current, userMessage, pendingMessage], trimmed);
     pendingMessageIdRef.current = pendingId;
+    pendingConversationIdRef.current = targetConversationId;
 
     const formData = new FormData();
     formData.append('message', trimmed);
@@ -195,52 +354,73 @@ export default function AiAssistantChatPage() {
     const starterKey = searchParams.get('starter');
     const directMessage = searchParams.get('prompt');
 
-    if (starterKey && starterPrompts[starterKey]) {
-      const created = createConversation(starterCards.find((s) => s.key === starterKey)?.title || 'New chat');
-      created.messages = [{ id: `starter-${Date.now()}`, role: 'model', content: starterPrompts[starterKey] }];
-      setConversations((prev) => [created, ...prev]);
-      setActiveConversationId(created.id);
-      setHasInitialized(true);
-      router.replace('/dashboard/ai-assistant/chat', { scroll: false });
-      return;
-    }
+    const bootstrapQueryConversation = async () => {
+      if (starterKey && starterPrompts[starterKey]) {
+        const created = await createAiAssistantConversation({
+          title: starterCards.find((s) => s.key === starterKey)?.title || 'New chat',
+          messages: [{ id: `starter-${Date.now()}`, role: 'model', content: starterPrompts[starterKey] }],
+        });
+        const conversation = toConversation(created);
+        setConversations((prev) => sortConversations([conversation, ...prev.filter((item) => item.id !== conversation.id)]));
+        setActiveConversationId(conversation.id);
+        router.replace('/dashboard/ai-assistant/chat', { scroll: false });
+        return;
+      }
 
-    if (directMessage) {
-      const created = createConversation(directMessage);
-      setConversations((prev) => [created, ...prev]);
-      setActiveConversationId(created.id);
-      pendingInitialMessageRef.current = directMessage;
-      setHasInitialized(true);
-      router.replace('/dashboard/ai-assistant/chat', { scroll: false });
-      return;
-    }
+      if (directMessage) {
+        const created = await createAiAssistantConversation({ title: directMessage, messages: [] });
+        const conversation = toConversation(created);
+        setConversations((prev) => sortConversations([conversation, ...prev.filter((item) => item.id !== conversation.id)]));
+        setActiveConversationId(conversation.id);
+        pendingInitialMessageRef.current = directMessage;
+        router.replace('/dashboard/ai-assistant/chat', { scroll: false });
+        return;
+      }
+    };
 
-    setHasInitialized(true);
+    void bootstrapQueryConversation()
+      .catch((error) => {
+        console.warn('Failed to initialize query-based conversation', error);
+      })
+      .finally(() => {
+        setHasInitialized(true);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, hasInitialized]);
 
-  const handleStarterClick = (starterKey: string, userMessage: string) => {
+  const handleStarterClick = async (starterKey: string, userMessage: string) => {
     const botReply = starterPrompts[starterKey];
-    const created = createConversation(userMessage);
-    created.messages = [
-      { id: `user-${Date.now()}`, role: 'user', content: userMessage },
-      { id: `model-${Date.now()}`, role: 'model', content: botReply || 'How can I help you?' },
-    ];
-    setConversations((prev) => [created, ...prev]);
-    setActiveConversationId(created.id);
+    try {
+      const created = await createAiAssistantConversation({
+        title: userMessage,
+        messages: [
+          { id: `user-${Date.now()}`, role: 'user', content: userMessage },
+          { id: `model-${Date.now()}`, role: 'model', content: botReply || 'How can I help you?' },
+        ],
+      });
+      const conversation = toConversation(created);
+      setConversations((prev) => sortConversations([conversation, ...prev.filter((item) => item.id !== conversation.id)]));
+      setActiveConversationId(conversation.id);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not create starter chat',
+        description: error instanceof Error ? error.message : 'Try again.',
+      });
+    }
   };
 
   const handleFormSubmit = (formData: FormData) => {
     const userInput = (formData.get('message') as string) || '';
     formRef.current?.reset();
-    sendMessage(userInput);
+    void sendMessage(userInput);
   };
 
   useEffect(() => {
     if (!activeConversationId || !pendingInitialMessageRef.current) return;
     const initialText = pendingInitialMessageRef.current;
     pendingInitialMessageRef.current = null;
-    sendMessage(initialText);
+    void sendMessage(initialText);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId]);
 
@@ -248,17 +428,22 @@ export default function AiAssistantChatPage() {
     if (state.message) {
       toast({ variant: 'destructive', title: 'Error', description: state.message });
       const pendingId = pendingMessageIdRef.current;
-      if (pendingId) {
-        updateActiveConversationMessages((current) => current.filter((m) => m.id !== pendingId));
+      const pendingConversationId = pendingConversationIdRef.current;
+      if (pendingId && pendingConversationId) {
+        updateConversationMessages(pendingConversationId, (current) => current.filter((m) => m.id !== pendingId));
       }
       pendingMessageIdRef.current = null;
+      pendingConversationIdRef.current = null;
       return;
     }
 
     if (!state.responseText) return;
 
     const pendingId = pendingMessageIdRef.current;
-    updateActiveConversationMessages((current) => {
+    const pendingConversationId = pendingConversationIdRef.current;
+    if (!pendingConversationId) return;
+
+    updateConversationMessages(pendingConversationId, (current) => {
       const next = [...current];
       const targetIndex = pendingId ? next.findIndex((m) => m.id === pendingId) : -1;
       const modelMessage: Message = {
@@ -274,6 +459,7 @@ export default function AiAssistantChatPage() {
       return next;
     });
     pendingMessageIdRef.current = null;
+    pendingConversationIdRef.current = null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.responseText, state.message, toast]);
 

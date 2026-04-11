@@ -30,6 +30,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "worker": "tsx lib/worker.ts",
     "storage:backfill-media": "tsx scripts/backfill-media-assets-from-storage.ts",
+    "storage:repair-media-urls": "tsx scripts/repair-media-asset-urls.ts",
     "deploy:preflight": "node scripts/deploy-preflight.mjs"
   },
   "prisma": {

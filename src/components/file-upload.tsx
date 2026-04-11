@@ -50,9 +50,10 @@ export function FileUpload({
   } = useFileUpload({
     onUploadSuccess: (result) => {
       if (result.data && onUploadComplete) {
+        const resolvedUrl = result.data.publicUrl || result.data.cdnUrl || result.data.storageUrl;
         onUploadComplete([{
           key: result.data.key,
-          url: result.data.cdnUrl,
+          url: resolvedUrl,
           fileName: result.data.key.split('/').pop() || 'Unknown'
         }]);
       }

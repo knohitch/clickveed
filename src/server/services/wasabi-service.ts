@@ -37,6 +37,7 @@ const MAX_FILE_SIZE_MB = 500; // 500MB max file size
 const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000; // 1 second initial delay
+const PUBLIC_URL_PROBE_TIMEOUT_MS = 5000;
 
 function stripInvisibleChars(value: string): string {
     return value
@@ -225,6 +226,43 @@ function isRemoteMediaUrl(value: string): boolean {
     return /^https?:\/\//i.test(value);
 }
 
+async function probePublicUrlReachability(url: string, timeoutMs: number = PUBLIC_URL_PROBE_TIMEOUT_MS): Promise<'reachable' | 'unreachable' | 'unknown'> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const headResponse = await fetch(url, {
+            method: 'HEAD',
+            cache: 'no-store',
+            signal: controller.signal,
+        });
+
+        if (headResponse.ok) {
+            return 'reachable';
+        }
+
+        if (headResponse.status === 405 || headResponse.status === 501) {
+            const getResponse = await fetch(url, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: controller.signal,
+                headers: {
+                    Range: 'bytes=0-0',
+                },
+            });
+            if (getResponse.ok || getResponse.status === 206) {
+                return 'reachable';
+            }
+        }
+
+        return 'unreachable';
+    } catch {
+        return 'unknown';
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 /**
  * Upload with retry logic using exponential backoff
  */
@@ -339,15 +377,22 @@ export async function uploadToWasabi(
 
         console.log(`[WasabiService][${requestId}] Upload successful: ${key}`);
 
-        // Generate public URL
-        let publicUrl: string;
+        // Generate public URL with safe CDN fallback to storage URL.
+        const storagePublicUrl = `${creds.endpoint}/${creds.bucket}/${key}`;
+        let publicUrl = storagePublicUrl;
+
         if (creds.cdnUrl) {
-            const cdnUrl = creds.cdnUrl.endsWith('/') ? creds.cdnUrl : `${creds.cdnUrl}/`;
-            publicUrl = `${cdnUrl}${key}`;
-            console.log(`[WasabiService][${requestId}] Using CDN URL: ${publicUrl}`);
+            const cdnBase = creds.cdnUrl.endsWith('/') ? creds.cdnUrl : `${creds.cdnUrl}/`;
+            const cdnPublicUrl = `${cdnBase}${key}`;
+            const cdnProbe = await probePublicUrlReachability(cdnPublicUrl);
+            if (cdnProbe === 'reachable') {
+                publicUrl = cdnPublicUrl;
+                console.log(`[WasabiService][${requestId}] Using CDN URL: ${publicUrl}`);
+            } else {
+                console.warn(`[WasabiService][${requestId}] CDN URL not reachable (${cdnProbe}). Falling back to storage URL.`);
+                publicUrl = storagePublicUrl;
+            }
         } else {
-            // Fallback to direct Wasabi URL
-            publicUrl = `${creds.endpoint}/${creds.bucket}/${key}`;
             console.log(`[WasabiService][${requestId}] Using direct Wasabi URL: ${publicUrl}`);
         }
 

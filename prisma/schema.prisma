@@ -42,6 +42,7 @@ model User {
   sessions              Session[]
   projects              Project[]
   mediaAssets           MediaAsset[]
+  aiAssistantConversations AiAssistantConversation[]
   agents                Agent[]
   socialConnections     SocialConnection[]
   supportTickets        SupportTicket[]
@@ -219,6 +220,18 @@ model MediaAsset {
   updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
+}
+
+model AiAssistantConversation {
+  id        String   @id @default(cuid())
+  title     String
+  messages  Json     @default("[]")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
 }
 
 model Agent {

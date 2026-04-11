@@ -107,7 +107,7 @@ export async function generatePipelineVoiceOver(input: GeneratePipelineVoiceOver
         messages: [{ role: 'user' as const, content: [{ text: voiceOverText }] }],
         voiceId,
       }),
-    uploadAudio: async (dataUri) => uploadToWasabi(dataUri, 'audio'),
+    uploadAudio: async (mediaSource) => uploadToWasabi(mediaSource, 'audio'),
     createMediaAsset: async (asset) => prisma.mediaAsset.create({ data: asset }),
   });
 }
@@ -117,7 +117,7 @@ export async function runPipelineVoiceOverWorkflow(
   deps: {
     userId: string;
     generateTts: (voiceOverText: string, voiceId: string) => Promise<any>;
-    uploadAudio: (dataUri: string) => Promise<{ publicUrl: string; sizeMB: number }>;
+    uploadAudio: (mediaSource: string) => Promise<{ publicUrl: string; sizeMB: number }>;
     createMediaAsset: (asset: { name: string; type: 'AUDIO'; url: string; size: number; userId: string }) => Promise<unknown>;
   }
 ): Promise<GeneratePipelineVoiceOverOutput> {
@@ -128,6 +128,7 @@ export async function runPipelineVoiceOverWorkflow(
   const responseText = ttsResponse?.result?.content?.[0]?.text || '';
   let publicUrl = responseText.replace('Speech generated: ', '').trim() || ttsResponse?.audioUrl || '';
   let sizeMB = 0;
+  let alreadyPersisted = false;
 
   if (!publicUrl && ttsResponse?.media?.url) {
     const audioPcmBuffer = Buffer.from(
@@ -138,10 +139,20 @@ export async function runPipelineVoiceOverWorkflow(
     const uploadResult = await deps.uploadAudio(audioDataUri);
     publicUrl = uploadResult.publicUrl;
     sizeMB = uploadResult.sizeMB;
+    alreadyPersisted = true;
   }
 
   if (!publicUrl) {
     throw new Error('Audio generation failed. No media was returned.');
+  }
+
+  // Persist provider-hosted audio URLs in our storage so media library links remain stable.
+  if (!alreadyPersisted) {
+    const persistedAudio = await deps.uploadAudio(publicUrl);
+    publicUrl = persistedAudio.publicUrl;
+    if (persistedAudio.sizeMB > 0) {
+      sizeMB = persistedAudio.sizeMB;
+    }
   }
 
   const originalPromptMatch = input.script.match(/Core Idea: (.*?)\n/);
@@ -181,6 +192,7 @@ export async function generatePipelineVideo(input: GeneratePipelineVideoInput): 
         generateVideoWithProvider({
           messages: [{ role: 'user' as const, content: [{ text: prompt }] }],
         }),
+      uploadVideo: async (mediaSource) => uploadToWasabi(mediaSource, 'videos'),
       createMediaAsset: async (asset) => prisma.mediaAsset.create({ data: asset }),
     });
   } catch (error) {
@@ -195,6 +207,7 @@ export async function runPipelineVideoWorkflow(
     userId: string;
     generateImage: (visualPrompt: string) => Promise<any>;
     generateVideo: (prompt: string) => Promise<any>;
+    uploadVideo: (mediaSource: string) => Promise<{ publicUrl: string; sizeMB: number }>;
     createMediaAsset: (asset: { name: string; type: 'VIDEO'; url: string; size: number; userId: string }) => Promise<unknown>;
   }
 ): Promise<GeneratePipelineVideoOutput> {
@@ -222,16 +235,18 @@ export async function runPipelineVideoWorkflow(
   const videoResponse: any = await deps.generateVideo(`${visualPrompt}\nImage: ${placeholderImageUrl}`);
 
   const videoText = videoResponse?.result?.content?.[0]?.text || '';
-  const videoUrl = videoText.replace('Video generated: ', '').trim();
-  if (!videoUrl) {
+  const providerVideoUrl = videoText.replace('Video generated: ', '').trim();
+  if (!providerVideoUrl) {
     throw new Error('Video generation failed. No video URL was returned.');
   }
+  const uploadedVideo = await deps.uploadVideo(providerVideoUrl);
+  const videoUrl = uploadedVideo.publicUrl;
 
   await deps.createMediaAsset({
     name: `Pipeline Video: ${visualPrompt.substring(0, 30)}...`,
     type: 'VIDEO',
     url: videoUrl,
-    size: 0,
+    size: uploadedVideo.sizeMB,
     userId: deps.userId,
   });
 

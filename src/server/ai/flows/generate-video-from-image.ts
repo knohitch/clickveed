@@ -8,6 +8,7 @@ import { z } from 'genkit';
 import { generateStructuredOutput, generateTtsWithProvider, generateVideoWithProvider } from '@/lib/ai/api-service-manager';
 import prisma from '@/server/prisma';
 import { auth } from '@/auth';
+import { uploadToWasabi } from '@/server/services/wasabi-service';
 import {
   GenerateVideoFromImageInputSchema,
   GenerateVideoFromImageOutputSchema,
@@ -74,23 +75,39 @@ Video Description: ${input.videoDescription}`,
     ]);
 
     const videoText = (videoResponse as any)?.result?.content?.[0]?.text || '';
-    const videoUrl = videoText.replace('Video generated: ', '').trim();
-    if (!videoUrl) {
+    const providerVideoUrl = videoText.replace('Video generated: ', '').trim();
+    if (!providerVideoUrl) {
       throw new Error('Video generation failed. No video URL was returned.');
     }
+    const uploadedVideo = await uploadToWasabi(providerVideoUrl, 'videos');
+    const videoUrl = uploadedVideo.publicUrl;
 
     await prisma.mediaAsset.create({
-      data: { name: `Video: ${input.videoDescription.substring(0, 30)}...`, type: 'VIDEO', url: videoUrl, size: 0, userId: session.user.id }
+      data: {
+        name: `Video: ${input.videoDescription.substring(0, 30)}...`,
+        type: 'VIDEO',
+        url: videoUrl,
+        size: uploadedVideo.sizeMB,
+        userId: session.user.id
+      }
     });
 
     const audioText = (ttsResponse as any)?.result?.content?.[0]?.text || '';
-    const audioUrl = audioText.replace('Speech generated: ', '').trim() || (ttsResponse as any)?.audioUrl || '';
-    if (!audioUrl) {
+    const providerAudioUrl = audioText.replace('Speech generated: ', '').trim() || (ttsResponse as any)?.audioUrl || '';
+    if (!providerAudioUrl) {
       throw new Error('Audio generation failed. No audio URL was returned.');
     }
+    const uploadedAudio = await uploadToWasabi(providerAudioUrl, 'audio');
+    const audioUrl = uploadedAudio.publicUrl;
 
     await prisma.mediaAsset.create({
-      data: { name: `Audio: ${input.musicPrompt.substring(0, 30)}...`, type: 'AUDIO', url: audioUrl, size: 0, userId: session.user.id }
+      data: {
+        name: `Audio: ${input.musicPrompt.substring(0, 30)}...`,
+        type: 'AUDIO',
+        url: audioUrl,
+        size: uploadedAudio.sizeMB,
+        userId: session.user.id
+      }
     });
 
 

@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     if (mediaAssetType) {
       try {
-        const preferredUrl = result.data?.cdnUrl || result.data?.storageUrl;
+        const preferredUrl = result.data?.publicUrl || result.data?.storageUrl || result.data?.cdnUrl;
         if (typeof preferredUrl !== 'string' || !preferredUrl.startsWith('http')) {
           throw new Error('Upload succeeded but no valid file URL was returned.');
         }

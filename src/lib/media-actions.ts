@@ -140,6 +140,26 @@ async function resolveClientAssetUrl(rawUrl: string, context: SignedUrlContext):
     }
 }
 
+async function getFallbackSignedUrl(rawUrl: string): Promise<string | null> {
+    const storageKey = extractStorageKeyFromUrl(rawUrl);
+    if (!storageKey) return null;
+
+    try {
+        const initialized = await storageManager.ensureInitialized();
+        if (!initialized || !storageManager.isConfigured()) {
+            return null;
+        }
+
+        return await storageManager.getSignedReadUrl(storageKey, 60 * 60);
+    } catch (error) {
+        console.warn('[media-library] Failed to create fallback signed URL', {
+            storageKey,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return null;
+    }
+}
+
 /**
  * Retrieves all media assets for the current user from the database.
  */
@@ -207,6 +227,55 @@ export async function getMediaAssets(): Promise<MediaAsset[]> {
             error: error instanceof Error ? error.message : 'Unknown error',
         });
         throw new Error('Failed to load media assets from the database.');
+    }
+}
+
+/**
+ * Returns a best-effort fallback URL (signed from storage) for a single media asset.
+ * Useful when a CDN/original URL fails to render on the client.
+ */
+export async function getMediaAssetFallbackUrl(assetId: number): Promise<string | null> {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return null;
+    }
+
+    try {
+        const asset = await withRetry(
+            () =>
+                prisma.mediaAsset.findFirst({
+                    where: {
+                        id: assetId,
+                        userId: session.user.id,
+                    },
+                    select: {
+                        id: true,
+                        url: true,
+                    },
+                }),
+            { operationName: 'mediaAsset.findFirst(fallbackUrl)' }
+        );
+
+        if (!asset) {
+            return null;
+        }
+
+        const fallback = await getFallbackSignedUrl(asset.url);
+        if (fallback) {
+            console.info('[media-library] Resolved fallback URL for asset', {
+                userId: session.user.id,
+                assetId: asset.id,
+            });
+        }
+
+        return fallback;
+    } catch (error) {
+        console.warn('[media-library] Failed to resolve fallback URL', {
+            userId: session.user.id,
+            assetId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return null;
     }
 }
 
