@@ -208,6 +208,9 @@ export async function getMediaAssets(): Promise<MediaAsset[]> {
         console.info('[media-library] Loaded media assets', {
             userId: session.user.id,
             count: assets.length,
+            canSign: signedUrlContext.canSign,
+            wasabiEndpointHost: signedUrlContext.wasabiEndpointHost || '(empty)',
+            bunnyHost: signedUrlContext.bunnyHost || '(none)',
         });
 
         return await Promise.all(

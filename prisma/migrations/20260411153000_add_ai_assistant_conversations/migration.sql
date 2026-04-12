@@ -13,3 +13,8 @@ CREATE TABLE "AiAssistantConversation" (
 -- CreateIndex
 CREATE INDEX "AiAssistantConversation_userId_updatedAt_idx"
 ON "AiAssistantConversation"("userId", "updatedAt");
+
+-- AddForeignKey
+ALTER TABLE "AiAssistantConversation"
+ADD CONSTRAINT "AiAssistantConversation_userId_fkey"
+FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

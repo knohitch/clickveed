@@ -80,7 +80,7 @@ export async function getAiAssistantConversations(): Promise<AiAssistantConversa
   const userId = await requireUserId();
   const rows = await withRetry<any[]>(
     () =>
-      (prisma as any).aiAssistantConversation.findMany({
+      prisma.aiAssistantConversation.findMany({
         where: { userId },
         orderBy: { updatedAt: 'desc' },
       }),
@@ -98,7 +98,7 @@ export async function createAiAssistantConversation(input: ConversationInput = {
 
   const created = await withRetry(
     () =>
-      (prisma as any).aiAssistantConversation.create({
+      prisma.aiAssistantConversation.create({
         data: {
           ...(typeof input.id === 'string' && input.id.trim() ? { id: input.id.trim() } : {}),
           title,
@@ -125,7 +125,7 @@ export async function saveAiAssistantConversation(input: ConversationInput): Pro
 
   const existing = await withRetry(
     () =>
-      (prisma as any).aiAssistantConversation.findFirst({
+      prisma.aiAssistantConversation.findFirst({
         where: {
           id: conversationId,
           userId,
@@ -137,7 +137,7 @@ export async function saveAiAssistantConversation(input: ConversationInput): Pro
   if (!existing) {
     const created = await withRetry(
       () =>
-        (prisma as any).aiAssistantConversation.create({
+        prisma.aiAssistantConversation.create({
           data: {
             id: conversationId,
             title,
@@ -152,7 +152,7 @@ export async function saveAiAssistantConversation(input: ConversationInput): Pro
 
   const updated = await withRetry(
     () =>
-      (prisma as any).aiAssistantConversation.update({
+      prisma.aiAssistantConversation.update({
         where: { id: conversationId },
         data: {
           title,
@@ -176,7 +176,7 @@ export async function importAiAssistantConversations(input: { conversations: Con
 
     await withRetry(
       () =>
-        (prisma as any).aiAssistantConversation.create({
+        prisma.aiAssistantConversation.create({
           data: {
             title,
             messages,
@@ -191,7 +191,7 @@ export async function importAiAssistantConversations(input: { conversations: Con
 
   const rows = await withRetry<any[]>(
     () =>
-      (prisma as any).aiAssistantConversation.findMany({
+      prisma.aiAssistantConversation.findMany({
         where: { userId },
         orderBy: { updatedAt: 'desc' },
       }),
