@@ -3,6 +3,7 @@
 import { auth } from '@/auth';
 import type { Message } from '@/lib/types';
 import prisma, { withRetry } from '@/server/prisma';
+import type { Prisma } from '@prisma/client';
 
 export type AiAssistantConversation = {
   id: string;
@@ -102,7 +103,7 @@ export async function createAiAssistantConversation(input: ConversationInput = {
         data: {
           ...(typeof input.id === 'string' && input.id.trim() ? { id: input.id.trim() } : {}),
           title,
-          messages,
+          messages: messages as Prisma.InputJsonValue,
           userId,
           ...(timestamp ? { createdAt: timestamp, updatedAt: timestamp } : {}),
         },
@@ -141,7 +142,7 @@ export async function saveAiAssistantConversation(input: ConversationInput): Pro
           data: {
             id: conversationId,
             title,
-            messages,
+            messages: messages as Prisma.InputJsonValue,
             userId,
           },
         }),
@@ -156,7 +157,7 @@ export async function saveAiAssistantConversation(input: ConversationInput): Pro
         where: { id: conversationId },
         data: {
           title,
-          messages,
+          messages: messages as Prisma.InputJsonValue,
         },
       }),
     { operationName: 'aiAssistantConversation.update' }
@@ -179,7 +180,7 @@ export async function importAiAssistantConversations(input: { conversations: Con
         prisma.aiAssistantConversation.create({
           data: {
             title,
-            messages,
+            messages: messages as Prisma.InputJsonValue,
             userId,
             createdAt: timestamp,
             updatedAt: timestamp,
